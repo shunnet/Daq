@@ -1,0 +1,607 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <!-- 
+		Microsoft ResX Schema
+
+		Version 1.3
+
+		The primary goals of this format is to allow a simple XML format 
+		that is mostly human readable. The generation and parsing of the 
+		various data types are done through the TypeConverter classes 
+		associated with the data types.
+
+		Example:
+
+		... ado.net/XML headers & schema ...
+		<resheader name="resmimetype">text/microsoft-resx</resheader>
+		<resheader name="version">1.3</resheader>
+		<resheader name="reader">System.Resources.ResXResourceReader, System.Windows.Forms, ...</resheader>
+		<resheader name="writer">System.Resources.ResXResourceWriter, System.Windows.Forms, ...</resheader>
+		<data name="Name1">this is my long string</data>
+		<data name="Color1" type="System.Drawing.Color, System.Drawing">Blue</data>
+		<data name="Bitmap1" mimetype="application/x-microsoft.net.object.binary.base64">
+			[base64 mime encoded serialized .NET Framework object]
+		</data>
+		<data name="Icon1" type="System.Drawing.Icon, System.Drawing" mimetype="application/x-microsoft.net.object.bytearray.base64">
+			[base64 mime encoded string representing a byte array form of the .NET Framework object]
+		</data>
+
+		There are any number of "resheader" rows that contain simple 
+		name/value pairs.
+
+		Each data row contains a name, and value. The row also contains a 
+		type or mimetype. Type corresponds to a .NET class that support 
+		text/value conversion through the TypeConverter architecture. 
+		Classes that don't support this are serialized and stored with the 
+		mimetype set.
+
+		The mimetype is used for serialized objects, and tells the 
+		ResXResourceReader how to depersist the object. This is currently not 
+		extensible. For a given mimetype the value must be set accordingly:
+
+		Note - application/x-microsoft.net.object.binary.base64 is the format 
+		that the ResXResourceWriter will generate, however the reader can 
+		read any of the formats listed below.
+
+		mimetype: application/x-microsoft.net.object.binary.base64
+		value   : The object must be serialized with 
+			: System.Serialization.Formatters.Binary.BinaryFormatter
+			: and then encoded with base64 encoding.
+
+		mimetype: application/x-microsoft.net.object.soap.base64
+		value   : The object must be serialized with 
+			: System.Runtime.Serialization.Formatters.Soap.SoapFormatter
+			: and then encoded with base64 encoding.
+
+		mimetype: application/x-microsoft.net.object.bytearray.base64
+		value   : The object must be serialized into a byte array 
+			: using a System.ComponentModel.TypeConverter
+			: and then encoded with base64 encoding.
+	-->
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>1.3</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=2.0.3500.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.3500.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="SystemTitle" xml:space="preserve">
+    <value>[ Shunnet.top ] Iot Lightweight DAQ</value>
+  </data>
+  <data name="关于" xml:space="preserve">
+    <value>About</value>
+  </data>
+  <data name="主页" xml:space="preserve">
+    <value>Home</value>
+  </data>
+  <data name="插件设置" xml:space="preserve">
+    <value>PluginSettings</value>
+  </data>
+  <data name="物联网数轻量化数据采集" xml:space="preserve">
+    <value>IoT lightweight data collection</value>
+  </data>
+  <data name="快速搭建数据采集服务终端" xml:space="preserve">
+    <value>Quickly set up a data collection service terminal</value>
+  </data>
+  <data name="使用 .net10 WPF 终端形式开发全流程配置采集与消息队列转发" xml:space="preserve">
+    <value>Developing a full process configuration collection and message queue forwarding using the. net10 WPF terminal format</value>
+  </data>
+  <data name="插件列表" xml:space="preserve">
+    <value>PluginList</value>
+  </data>
+  <data name="插件类型" xml:space="preserve">
+    <value>PluginType</value>
+  </data>
+  <data name="上传插件" xml:space="preserve">
+    <value>UploadPlugin</value>
+  </data>
+  <data name="移除插件" xml:space="preserve">
+    <value>RemovePlugin</value>
+  </data>
+  <data name="名称" xml:space="preserve">
+    <value>Name</value>
+  </data>
+  <data name="类型" xml:space="preserve">
+    <value>Type</value>
+  </data>
+  <data name="添加时间" xml:space="preserve">
+    <value>AddTime</value>
+  </data>
+  <data name="插件配置" xml:space="preserve">
+    <value>PluginConfig</value>
+  </data>
+  <data name="序号" xml:space="preserve">
+    <value>Index</value>
+  </data>
+  <data name="唯一标识符" xml:space="preserve">
+    <value>SN</value>
+  </data>
+  <data name="最后更新时间" xml:space="preserve">
+    <value>FinallyUpdateTime</value>
+  </data>
+  <data name="状态" xml:space="preserve">
+    <value>Status</value>
+  </data>
+  <data name="添加插件配置" xml:space="preserve">
+    <value>AddPluginConfig</value>
+  </data>
+  <data name="移除插件配置" xml:space="preserve">
+    <value>RemovePluginConfig</value>
+  </data>
+  <data name="修改插件配置" xml:space="preserve">
+    <value>UpdatePluginConfig</value>
+  </data>
+  <data name="状态验证" xml:space="preserve">
+    <value>StatusVerification</value>
+  </data>
+  <data name="版本" xml:space="preserve">
+    <value>Version</value>
+  </data>
+  <data name="参数设置" xml:space="preserve">
+    <value>ParamSettings</value>
+  </data>
+  <data name="正常" xml:space="preserve">
+    <value>Normal</value>
+  </data>
+  <data name="异常" xml:space="preserve">
+    <value>Exception</value>
+  </data>
+  <data name="复制唯一标识符" xml:space="preserve">
+    <value>CopySN</value>
+  </data>
+  <data name="项目设置" xml:space="preserve">
+    <value>ProjectSettings</value>
+  </data>
+  <data name="项目列表" xml:space="preserve">
+    <value>ProjectList</value>
+  </data>
+  <data name="添加顶级项" xml:space="preserve">
+    <value>AddTopItem</value>
+  </data>
+  <data name="移除" xml:space="preserve">
+    <value>Remove</value>
+  </data>
+  <data name="地址设置" xml:space="preserve">
+    <value>AddressSettings</value>
+  </data>
+  <data name="手动添加一个地址" xml:space="preserve">
+    <value>ManuallyAddAnAddress</value>
+  </data>
+  <data name="地址" xml:space="preserve">
+    <value>Address</value>
+  </data>
+  <data name="描述" xml:space="preserve">
+    <value>Describe</value>
+  </data>
+  <data name="修改" xml:space="preserve">
+    <value>Update</value>
+  </data>
+  <data name="删除" xml:space="preserve">
+    <value>Delete</value>
+  </data>
+  <data name="别名" xml:space="preserve">
+    <value>AnotherName</value>
+  </data>
+  <data name="操作" xml:space="preserve">
+    <value>Operate</value>
+  </data>
+  <data name="导入" xml:space="preserve">
+    <value>Import</value>
+  </data>
+  <data name="导出" xml:space="preserve">
+    <value>Export</value>
+  </data>
+  <data name="查询" xml:space="preserve">
+    <value>Query</value>
+  </data>
+  <data name="反选" xml:space="preserve">
+    <value>InverseSelect</value>
+  </data>
+  <data name="全选" xml:space="preserve">
+    <value>AllSelect</value>
+  </data>
+  <data name="请选择文件夹" xml:space="preserve">
+    <value>Please select the folder</value>
+  </data>
+  <data name="请选择文件" xml:space="preserve">
+    <value>Please select the file</value>
+  </data>
+  <data name="导入失败" xml:space="preserve">
+    <value>IncFail</value>
+  </data>
+  <data name="导入成功" xml:space="preserve">
+    <value>IncSuccess</value>
+  </data>
+  <data name="导出成功" xml:space="preserve">
+    <value>ExpSuccess</value>
+  </data>
+  <data name="导出失败" xml:space="preserve">
+    <value>ExpFail</value>
+  </data>
+  <data name="温馨提示" xml:space="preserve">
+    <value>Kind Reminder</value>
+  </data>
+  <data name="未查询到对应内容" xml:space="preserve">
+    <value>No corresponding content found</value>
+  </data>
+  <data name="添加失败，地址或别名重复！" xml:space="preserve">
+    <value>Add failed, duplicate address or alias!</value>
+  </data>
+  <data name="注意：重复点位与别名将不重复添加！" xml:space="preserve">
+    <value>Attention: Duplicate points and aliases will not be added repeatedly!</value>
+  </data>
+  <data name="存在" xml:space="preserve">
+    <value>There are</value>
+  </data>
+  <data name="个点位导入失败" xml:space="preserve">
+    <value>Points that failed to import</value>
+  </data>
+  <data name="确认删除选中的地址项吗？" xml:space="preserve">
+    <value>Are you sure to delete the selected address item?</value>
+  </data>
+  <data name="个点位删除失败" xml:space="preserve">
+    <value>Points that have failed to be deleted</value>
+  </data>
+  <data name="删除成功" xml:space="preserve">
+    <value>Deleted Success</value>
+  </data>
+  <data name="此插件已上传，请先移除" xml:space="preserve">
+    <value>This plugin has been uploaded, please remove it first</value>
+  </data>
+  <data name="插件上传成功" xml:space="preserve">
+    <value>Plugin uploaded successfully</value>
+  </data>
+  <data name="插件上传失败，未检索到对应接口" xml:space="preserve">
+    <value>Plugin upload failed, corresponding interface not retrieved</value>
+  </data>
+  <data name="请先移除该插件的所有配置文件" xml:space="preserve">
+    <value>Please remove all configuration files of this plugin first</value>
+  </data>
+  <data name="确定移除此插件吗？" xml:space="preserve">
+    <value>Are you sure to remove this plugin?</value>
+  </data>
+  <data name="插件移除任务创建成功，重启后生效！" xml:space="preserve">
+    <value>The plugin removal task has been successfully created and will take effect after restarting!</value>
+  </data>
+  <data name="确定移除此配置吗？" xml:space="preserve">
+    <value>Are you sure to remove this configuration?</value>
+  </data>
+  <data name="配置移除成功！" xml:space="preserve">
+    <value>Configuration removed successfully!</value>
+  </data>
+  <data name="添加项" xml:space="preserve">
+    <value>AddItem</value>
+  </data>
+  <data name="添加设备" xml:space="preserve">
+    <value>AddDevice</value>
+  </data>
+  <data name="展开所有" xml:space="preserve">
+    <value>ExpandAll</value>
+  </data>
+  <data name="折叠所有" xml:space="preserve">
+    <value>CollapseAll</value>
+  </data>
+  <data name="展开" xml:space="preserve">
+    <value>Expand</value>
+  </data>
+  <data name="折叠" xml:space="preserve">
+    <value>Collapse</value>
+  </data>
+  <data name="选择" xml:space="preserve">
+    <value>Select</value>
+  </data>
+  <data name="选中" xml:space="preserve">
+    <value>Selected</value>
+  </data>
+  <data name="关闭" xml:space="preserve">
+    <value>Close</value>
+  </data>
+  <data name="退出选择" xml:space="preserve">
+    <value>ExitSelect</value>
+  </data>
+  <data name="指示灯绿色，状态正常" xml:space="preserve">
+    <value>The indicator light is green and in normal condition</value>
+  </data>
+  <data name="添加失败，插件配置文件已经存在！" xml:space="preserve">
+    <value>Add failed, plugin configuration file already exists!</value>
+  </data>
+  <data name="修改失败，插件配置文件名称已经存在，请修改SN！" xml:space="preserve">
+    <value>Modification failed, plugin configuration file name already exists, please modify SN!</value>
+  </data>
+  <data name="确定覆盖当前项目列表吗？" xml:space="preserve">
+    <value>Are you sure to overwrite the current project list?</value>
+  </data>
+  <data name="存在空数据！" xml:space="preserve">
+    <value>There is empty data!</value>
+  </data>
+  <data name="未检索到对应项" xml:space="preserve">
+    <value>No corresponding item was retrieved</value>
+  </data>
+  <data name="确定移除选中的项吗？" xml:space="preserve">
+    <value>Are you sure to remove the selected items?</value>
+  </data>
+  <data name="移除成功" xml:space="preserve">
+    <value>Removal successful</value>
+  </data>
+  <data name="项目详情" xml:space="preserve">
+    <value>ProjectDetails</value>
+  </data>
+  <data name="搜索" xml:space="preserve">
+    <value>Search</value>
+  </data>
+  <data name="选择选中项" xml:space="preserve">
+    <value>SelectSelectedItem</value>
+  </data>
+  <data name="添加地址" xml:space="preserve">
+    <value>AddAddress</value>
+  </data>
+  <data name="为所有地址添加设备" xml:space="preserve">
+    <value>AddDeviceForAllAddress</value>
+  </data>
+  <data name="地址不能为空" xml:space="preserve">
+    <value>The address cannot be empty</value>
+  </data>
+  <data name="地址别名不能为空" xml:space="preserve">
+    <value>The address alias cannot be empty</value>
+  </data>
+  <data name="此设备已添加！" xml:space="preserve">
+    <value>This device has been added!</value>
+  </data>
+  <data name="移除所有" xml:space="preserve">
+    <value>RemoveAll</value>
+  </data>
+  <data name="确定移除所有项吗？" xml:space="preserve">
+    <value>Are you sure to remove all items?</value>
+  </data>
+  <data name="读取" xml:space="preserve">
+    <value>Read</value>
+  </data>
+  <data name="写入" xml:space="preserve">
+    <value>Write</value>
+  </data>
+  <data name="结果" xml:space="preserve">
+    <value>Result</value>
+  </data>
+  <data name="读取成功" xml:space="preserve">
+    <value>Read successfully</value>
+  </data>
+  <data name="读取失败" xml:space="preserve">
+    <value>Read failed</value>
+  </data>
+  <data name="传输失败" xml:space="preserve">
+    <value>Transmission failed</value>
+  </data>
+  <data name="传输成功" xml:space="preserve">
+    <value>Transmission successful</value>
+  </data>
+  <data name="写入成功" xml:space="preserve">
+    <value>Write successful</value>
+  </data>
+  <data name="写入失败" xml:space="preserve">
+    <value>Write failed</value>
+  </data>
+  <data name="成功" xml:space="preserve">
+    <value>Successful</value>
+  </data>
+  <data name="失败" xml:space="preserve">
+    <value>Failed</value>
+  </data>
+  <data name="该插件配置文件在项目设置中有使用" xml:space="preserve">
+    <value>The plugin configuration file is used in project settings</value>
+  </data>
+  <data name="地址配置在项目设置中有使用" xml:space="preserve">
+    <value>The address configuration is used in project settings</value>
+  </data>
+  <data name="文件内容发生改变" xml:space="preserve">
+    <value>The content of the file has changed</value>
+  </data>
+  <data name="修改项" xml:space="preserve">
+    <value>UpdateItem</value>
+  </data>
+  <data name="设置WebApi" xml:space="preserve">
+    <value>SettingsWebApi</value>
+  </data>
+  <data name="修改WebApi" xml:space="preserve">
+    <value>UpdateWebApi</value>
+  </data>
+  <data name="移除WebApi" xml:space="preserve">
+    <value>RemoveWebApi</value>
+  </data>
+  <data name="设置失败，已存在" xml:space="preserve">
+    <value>Addition failed, already exists</value>
+  </data>
+  <data name="设置成功" xml:space="preserve">
+    <value>Added successfully</value>
+  </data>
+  <data name="修改失败，尚未添加" xml:space="preserve">
+    <value>Modification failed, not added yet</value>
+  </data>
+  <data name="修改成功" xml:space="preserve">
+    <value>Modified successfully</value>
+  </data>
+  <data name="移除失败，尚未添加" xml:space="preserve">
+    <value>Removal failed, not yet added</value>
+  </data>
+  <data name="存在传输失败数据如下" xml:space="preserve">
+    <value>The data that failed to be transmitted is as follows</value>
+  </data>
+  <data name="生产" xml:space="preserve">
+    <value>Produce</value>
+  </data>
+  <data name="控制台" xml:space="preserve">
+    <value>Console</value>
+  </data>
+  <data name="详情" xml:space="preserve">
+    <value>Details</value>
+  </data>
+  <data name="列表" xml:space="preserve">
+    <value>List</value>
+  </data>
+  <data name="控制" xml:space="preserve">
+    <value>Control</value>
+  </data>
+  <data name="监控" xml:space="preserve">
+    <value>Monitor</value>
+  </data>
+  <data name="信息" xml:space="preserve">
+    <value>Info</value>
+  </data>
+  <data name="清空" xml:space="preserve">
+    <value>Clear</value>
+  </data>
+  <data name="设备类型" xml:space="preserve">
+    <value>DeviceType</value>
+  </data>
+  <data name="设备层级" xml:space="preserve">
+    <value>DeviceHierarchy</value>
+  </data>
+  <data name="采集时间" xml:space="preserve">
+    <value>CollectTime</value>
+  </data>
+  <data name="采集状态" xml:space="preserve">
+    <value>CollectStatus</value>
+  </data>
+  <data name="更新时间" xml:space="preserve">
+    <value>UpdateTime</value>
+  </data>
+  <data name="设备状态（常亮通信正常）（闪烁采集正常）" xml:space="preserve">
+    <value>Device status (normally on indicates normal communication) (flashing indicates normal data collection)</value>
+  </data>
+  <data name="添加软启采集" xml:space="preserve">
+    <value>Add soft start acquisition</value>
+  </data>
+  <data name="取消软启采集" xml:space="preserve">
+    <value>Cancel soft start acquisition</value>
+  </data>
+  <data name="当软件启动时，此设备自动开始采集" xml:space="preserve">
+    <value>When the software is launched, this device automatically starts to collect data</value>
+  </data>
+  <data name="采集" xml:space="preserve">
+    <value>Collect</value>
+  </data>
+  <data name="停止" xml:space="preserve">
+    <value>Stop</value>
+  </data>
+  <data name="重试" xml:space="preserve">
+    <value>Retry</value>
+  </data>
+  <data name="刷新" xml:space="preserve">
+    <value>Refresh</value>
+  </data>
+  <data name="台设备已成功加载" xml:space="preserve">
+    <value>devices have been successfully loaded</value>
+  </data>
+  <data name="启动采集" xml:space="preserve">
+    <value>StartCollect</value>
+  </data>
+  <data name="停止采集" xml:space="preserve">
+    <value>StopCollect</value>
+  </data>
+  <data name="启动" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="未设置WebApi参数" xml:space="preserve">
+    <value>WebApi parameters have not been set</value>
+  </data>
+  <data name="请求示例" xml:space="preserve">
+    <value>RequestExample</value>
+  </data>
+  <data name="WebApi启动成功" xml:space="preserve">
+    <value>WebApi has been successfully started</value>
+  </data>
+  <data name="WebApi启动失败" xml:space="preserve">
+    <value>WebApi startup failed</value>
+  </data>
+  <data name="WebApi停止成功" xml:space="preserve">
+    <value>WebApi stopped successfully</value>
+  </data>
+  <data name="WebApi停止失败" xml:space="preserve">
+    <value>WebApi stop failed</value>
+  </data>
+  <data name="添加软启采集成功" xml:space="preserve">
+    <value>Add soft start acquisition successfully</value>
+  </data>
+  <data name="取消软启采集成功" xml:space="preserve">
+    <value>Cancel soft start acquisition successfully</value>
+  </data>
+  <data name="扩展参数文件不存在" xml:space="preserve">
+    <value>The extension parameter file does not exist</value>
+  </data>
+  <data name="不支持类型转换" xml:space="preserve">
+    <value>Type conversion is not supported</value>
+  </data>
+  <data name="转换失败" xml:space="preserve">
+    <value>Conversion failed</value>
+  </data>
+  <data name="转换失败：" xml:space="preserve">
+    <value>Conversion failed:</value>
+  </data>
+  <data name="字节处理" xml:space="preserve">
+    <value>ByteProcessing</value>
+  </data>
+  <data name="地址文件转换" xml:space="preserve">
+    <value>AddressFileConversion</value>
+  </data>
+  <data name="地址处理" xml:space="preserve">
+    <value>AddressHandle</value>
+  </data>
+  <data name="起始位" xml:space="preserve">
+    <value>StartBit</value>
+  </data>
+  <data name="长度" xml:space="preserve">
+    <value>Length</value>
+  </data>
+  <data name="数据类型" xml:space="preserve">
+    <value>DataType</value>
+  </data>
+  <data name="编码类型" xml:space="preserve">
+    <value>EncodingType</value>
+  </data>
+  <data name="数据格式" xml:space="preserve">
+    <value>DataFormat</value>
+  </data>
+  <data name="请输入地址名称" xml:space="preserve">
+    <value>Please enter the address name</value>
+  </data>
+  <data name="请输入描述" xml:space="preserve">
+    <value>Please enter a description</value>
+  </data>
+  <data name="确定删除吗？" xml:space="preserve">
+    <value>Are you sure to delete?</value>
+  </data>
+  <data name="添加" xml:space="preserve">
+    <value>Add</value>
+  </data>
+</root>

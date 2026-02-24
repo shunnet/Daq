@@ -1,0 +1,61 @@
+﻿<snet:WindowBase
+    x:Class="Snet.Iot.Daq.MainWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="clr-namespace:Snet.Iot.Daq"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:snet="https://shunnet.top"
+    xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
+    Title="{snet:Loc SystemTitle}"
+    Width="1600"
+    Height="900"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultDictionary="Language"
+    Icon="/icon.ico"
+    LoadAnimationEnabled="True"
+    VerEnabled="True"
+    WindowStartupLocation="CenterScreen">
+    <Grid x:Name="mainGrid">
+        <!--  菜单项  -->
+        <uis:NavigationView
+            x:Name="NavigationViewControls"
+            ui:ScrollViewerAssist.CornerRectangleVisibility="Collapsed"
+            FooterMenuItemsSource="{Binding FooterMenuItemsSource}"
+            IsBackButtonVisible="Auto"
+            IsPaneToggleVisible="True"
+            MenuItemsSource="{Binding MenuItemsSource}"
+            OpenPaneLength="260"
+            TextOptions.TextFormattingMode="Display">
+            <!--<wpfui:NavigationView.AutoSuggestBox>
+                <wpfui:AutoSuggestBox
+                    x:Name="AutoSuggestBox"
+                    OriginalItemsSource="{Binding SelectItems}"
+                    PlaceholderText="{snet:Loc 搜索}">
+                    <wpfui:AutoSuggestBox.Icon>
+                        <wpfui:IconSourceElement>
+                            <wpfui:SymbolIconSource Symbol="Search24" />
+                        </wpfui:IconSourceElement>
+                    </wpfui:AutoSuggestBox.Icon>
+                </wpfui:AutoSuggestBox>
+            </wpfui:NavigationView.AutoSuggestBox>-->
+        </uis:NavigationView>
+
+        <!--  托盘  -->
+        <snet:NotifyIcon
+            FocusOnLeftClick="True"
+            Icon="/icon.ico"
+            MenuOnRightClick="True"
+            TooltipText="{snet:Loc SystemTitle}">
+            <snet:NotifyIcon.Menu>
+                <ContextMenu Style="{StaticResource UiContextMenu}">
+                    <uis:MenuItem
+                        Command="{Binding Close}"
+                        Header="{snet:Loc 关闭}"
+                        Icon="{uis:SymbolIcon Symbol=Dismiss24}" />
+                </ContextMenu>
+            </snet:NotifyIcon.Menu>
+        </snet:NotifyIcon>
+    </Grid>
+</snet:WindowBase>

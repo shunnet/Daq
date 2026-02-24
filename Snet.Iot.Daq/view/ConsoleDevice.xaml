@@ -1,0 +1,199 @@
+﻿<UserControl
+    x:Class="Snet.Iot.Daq.view.ConsoleDevice"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:data="clr-namespace:Snet.Iot.Daq.data"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:local="clr-namespace:Snet.Iot.Daq.view"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:model="clr-namespace:Snet.Iot.Daq.viewModel"
+    xmlns:snet="https://shunnet.top"
+    xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:view="clr-namespace:Snet.Iot.Daq.view"
+    Width="323.4"
+    Height="285"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultDictionary="Language"
+    mc:Ignorable="d">
+    <UserControl.DataContext>
+        <model:ConsoleDeviceModel />
+    </UserControl.DataContext>
+    <GroupBox
+        Height="auto"
+        Margin="5"
+        Padding="0"
+        ui:ElevationAssist.Elevation="Dp2"
+        ui:GroupBoxAssist.HeaderPadding="7"
+        Header="{Binding}"
+        Style="{StaticResource MaterialDesignCardGroupBox}">
+        <GroupBox.HeaderTemplate>
+            <DataTemplate>
+                <StackPanel
+                    HorizontalAlignment="Left"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+                    <ui:PackIcon
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Kind="Devices" />
+                    <TextBlock
+                        Margin="5,0,0,0"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Text="{Binding DeviceName}"
+                        TextAlignment="Center" />
+                </StackPanel>
+            </DataTemplate>
+        </GroupBox.HeaderTemplate>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="auto" />
+                <RowDefinition Height="*" />
+                <RowDefinition Height="auto" />
+            </Grid.RowDefinitions>
+            <Border
+                Grid.Row="0"
+                BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}"
+                BorderThickness="0,0,0,1">
+                <Menu HorizontalAlignment="Right">
+                    <uis:MenuItem
+                        Command="{Binding Collect}"
+                        Foreground="{DynamicResource PaletteGreenBrush}"
+                        Header="{x:Null}"
+                        Icon="{uis:SymbolIcon Symbol=Play20,
+                                              Filled=True}"
+                        ToolTip="{snet:Loc 采集}" />
+                    <uis:MenuItem
+                        Command="{Binding Stop}"
+                        Foreground="{DynamicResource PaletteRedBrush}"
+                        Header="{x:Null}"
+                        Icon="{uis:SymbolIcon Symbol=Stop20,
+                                              Filled=True}"
+                        ToolTip="{snet:Loc 停止}" />
+                    <uis:MenuItem
+                        Command="{Binding Retry}"
+                        Foreground="{DynamicResource PaletteBlueBrush}"
+                        Header="{x:Null}"
+                        Icon="{uis:SymbolIcon Symbol=ArrowClockwise20,
+                                              Filled=True}"
+                        ToolTip="{snet:Loc 重试}" />
+
+                </Menu>
+            </Border>
+            <StackPanel
+                Grid.Row="1"
+                Margin="14,0,14,0"
+                VerticalAlignment="Center"
+                Orientation="Vertical">
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Source="{DynamicResource DeviceNet}" />
+                    <Label Content="{snet:Loc 设备类型}" />
+                    <Label Content=":" />
+                    <Label Grid.Column="1" Content="{Binding DeviceType}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal" ToolTip="{Binding DeviceHierarchyToolTip}">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Source="{DynamicResource 层级}" />
+                    <Label Content="{snet:Loc 设备层级}" />
+                    <Label Content=":" />
+                    <Label Grid.Column="1" Content="{Binding DeviceHierarchy}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Source="{DynamicResource TimePeriod}" />
+                    <Label Content="{snet:Loc 采集时间}" />
+                    <Label Content=":" />
+                    <Label
+                        Grid.Column="1"
+                        Content="{Binding CollectTime}"
+                        ContentStringFormat="{}{0} s" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Source="{DynamicResource Status}" />
+                    <Label Content="{snet:Loc 采集状态}" />
+                    <Label Content=":" />
+                    <Label Grid.Column="1" Content="{Binding CollectStatus}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Source="{DynamicResource 更新时间}" />
+                    <Label Content="{snet:Loc 更新时间}" />
+                    <Label Content=":" />
+                    <Label
+                        Grid.Column="1"
+                        Content="{Binding UpdateTime}"
+                        ContentStringFormat="yyyy-MM-dd HH:mm:ss" />
+                </StackPanel>
+
+            </StackPanel>
+            <Border
+                Grid.Row="2"
+                BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}"
+                BorderThickness="0,1,0,0">
+                <Grid VerticalAlignment="Bottom">
+                    <snet:LedGaugeControl
+                        Width="25"
+                        Margin="10,0,0,0"
+                        HorizontalAlignment="Left"
+                        IsFlashing="{Binding DeviceStatusFlashing}"
+                        IsOn="{Binding DeviceStatus}"
+                        OffLightness="0.1"
+                        ToolTip="{snet:Loc 设备状态（常亮通信正常）（闪烁采集正常）}" />
+                    <Menu HorizontalAlignment="Right">
+                        <uis:MenuItem Header="{x:Null}" Icon="{uis:SymbolIcon Symbol=ReOrderDotsVertical24, Filled=True}">
+                            <uis:MenuItem
+                                Command="{Binding WASatrt}"
+                                Header="{snet:Loc 启动}"
+                                HeaderStringFormat="{}WebApi{0}"
+                                Icon="{uis:SymbolIcon Symbol=PlayCircle20,
+                                                      Filled=False}" />
+                            <uis:MenuItem
+                                Command="{Binding WAStop}"
+                                Header="{snet:Loc 停止}"
+                                HeaderStringFormat="{}WebApi{0}"
+                                Icon="{uis:SymbolIcon Symbol=RecordStop20,
+                                                      Filled=False}" />
+                            <uis:MenuItem
+                                Command="{Binding WARequestExample}"
+                                Header="{snet:Loc 请求示例}"
+                                HeaderStringFormat="{}WebApi{0}"
+                                Icon="{uis:SymbolIcon Symbol=BranchRequest20,
+                                                      Filled=False}" />
+                            <uis:MenuItem
+                                Command="{Binding OnSoftCollect}"
+                                Header="{snet:Loc 添加软启采集}"
+                                Icon="{uis:SymbolIcon Symbol=StarThreeQuarter24,
+                                                      Filled=True}"
+                                ToolTip="{snet:Loc 当软件启动时，此设备自动开始采集}" />
+                            <uis:MenuItem
+                                Command="{Binding OffSoftCollect}"
+                                Header="{snet:Loc 取消软启采集}"
+                                Icon="{uis:SymbolIcon Symbol=ShareScreenStop24,
+                                                      Filled=False}" />
+                        </uis:MenuItem>
+                    </Menu>
+
+                </Grid>
+
+            </Border>
+        </Grid>
+    </GroupBox>
+</UserControl>

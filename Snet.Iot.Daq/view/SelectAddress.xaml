@@ -1,0 +1,356 @@
+﻿<UserControl
+    x:Class="Snet.Iot.Daq.view.SelectAddress"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:data="clr-namespace:Snet.Iot.Daq.data"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:local="clr-namespace:Snet.Iot.Daq.view"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:model="clr-namespace:Snet.Iot.Daq.viewModel"
+    xmlns:snet="https://shunnet.top"
+    xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
+    Width="900"
+    Height="600"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultDictionary="Language">
+    <GroupBox
+        Margin="5"
+        Padding="0"
+        ui:ElevationAssist.Elevation="Dp2"
+        ui:GroupBoxAssist.HeaderPadding="7"
+        Header="{Binding}"
+        Style="{StaticResource MaterialDesignCardGroupBox}">
+        <GroupBox.HeaderTemplate>
+            <DataTemplate>
+                <StackPanel
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Orientation="Horizontal">
+                    <ui:PackIcon
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Kind="AddressMarkerOutline" />
+                    <TextBlock
+                        Margin="5,0,0,0"
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Text="{snet:Loc 地址设置}"
+                        TextAlignment="Center" />
+                </StackPanel>
+            </DataTemplate>
+        </GroupBox.HeaderTemplate>
+        <Grid>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="auto" />
+                <RowDefinition Height="auto" />
+                <RowDefinition />
+                <RowDefinition Height="auto" />
+                <RowDefinition Height="auto" />
+            </Grid.RowDefinitions>
+
+            <Grid Grid.Row="0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="auto" />
+                </Grid.ColumnDefinitions>
+                <uis:TextBox
+                    Margin="5,5,0,5"
+                    ClearButtonEnabled="True"
+                    Icon="{uis:SymbolIcon Symbol=CalligraphyPen24}"
+                    PlaceholderText="{snet:Loc 查询}"
+                    Text="{Binding QueryCntent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                    <uis:TextBox.InputBindings>
+                        <KeyBinding Key="Enter" Command="{Binding QueryAddress}" />
+                    </uis:TextBox.InputBindings>
+                </uis:TextBox>
+                <Menu Grid.Column="1" HorizontalAlignment="Right">
+                    <uis:MenuItem
+                        Command="{Binding QueryAddress}"
+                        Header="{x:Null}"
+                        Icon="{uis:SymbolIcon Symbol=Search24,
+                                              Filled=False}"
+                        ToolTip="{snet:Loc 查询}" />
+                    <Separator Width="1" Style="{StaticResource MaterialDesignSeparator}" />
+                </Menu>
+            </Grid>
+
+            <Border
+                Grid.Row="1"
+                BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}"
+                BorderThickness="0,1,0,0" />
+            <DataGrid
+                Grid.Row="2"
+                Margin="5"
+                AutoGenerateColumns="False"
+                Background="Transparent"
+                BorderThickness="0"
+                ColumnHeaderHeight="45"
+                GridLinesVisibility="None"
+                IsReadOnly="True"
+                ItemsSource="{Binding AddressConfig}"
+                RowHeight="40"
+                SelectedItem="{Binding AddressConfigSelectedItem}"
+                SelectionMode="Single"
+                SnapsToDevicePixels="True"
+                UseLayoutRounding="True">
+                <i:Interaction.Triggers>
+                    <!--  内容菜单打开  -->
+                    <i:EventTrigger EventName="ContextMenuOpening">
+                        <snet:EventCommand Command="{Binding DataGrid_ContextMenuOpening}" />
+                    </i:EventTrigger>
+                    <!--  右键按下  -->
+                    <i:EventTrigger EventName="PreviewMouseRightButtonDown">
+                        <snet:EventCommand Command="{Binding DataGrid_PreviewMouseRightButtonDown}" />
+                    </i:EventTrigger>
+                </i:Interaction.Triggers>
+                <!--  右键菜单  -->
+                <DataGrid.ContextMenu>
+                    <ContextMenu VerticalContentAlignment="Center">
+                        <ContextMenu.Style>
+                            <Style BasedOn="{StaticResource UiContextMenu}" TargetType="{x:Type ContextMenu}">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding Path=PlacementTarget.DataContext.AddressConfigSelectedItem, RelativeSource={RelativeSource Self}}" Value="{x:Null}">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </ContextMenu.Style>
+
+                        <uis:MenuItem
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                            Command="{x:Static ui:DialogHost.CloseDialogCommand}"
+                            Header="{snet:Loc 选择选中项}"
+                            Icon="{uis:SymbolIcon Symbol=Checkmark32,
+                                                  Filled=True}">
+                            <uis:MenuItem.CommandParameter>
+                                <system:Boolean xmlns:system="clr-namespace:System;assembly=mscorlib">True</system:Boolean>
+                            </uis:MenuItem.CommandParameter>
+                        </uis:MenuItem>
+
+                        <uis:MenuItem
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                            Command="{x:Static ui:DialogHost.CloseDialogCommand}"
+                            Header="{snet:Loc 退出选择}"
+                            Icon="{uis:SymbolIcon Symbol=Dismiss12,
+                                                  Filled=False}">
+                            <uis:MenuItem.CommandParameter>
+                                <system:Boolean xmlns:system="clr-namespace:System;assembly=mscorlib">False</system:Boolean>
+                            </uis:MenuItem.CommandParameter>
+                        </uis:MenuItem>
+                        <Separator Margin="0,-4,0,-3" Padding="0" />
+                        <uis:MenuItem
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                            Command="{Binding InverseAddress}"
+                            Header="{snet:Loc 反选}"
+                            Icon="{uis:SymbolIcon Symbol=MultiselectLtr24,
+                                                  Filled=False}" />
+                        <uis:MenuItem
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                            Command="{Binding AllSelectAddress}"
+                            Header="{snet:Loc 全选}"
+                            Icon="{uis:SymbolIcon Symbol=SelectAllOn24,
+                                                  Filled=False}" />
+
+                    </ContextMenu>
+                </DataGrid.ContextMenu>
+                <DataGrid.Resources>
+
+                    <!--  滚动条样式  -->
+                    <Style BasedOn="{StaticResource UiScrollBar}" TargetType="ScrollBar" />
+
+                    <!--  Header样式  -->
+                    <Style
+                        x:Key="DataGridColumnHeaderStyle"
+                        BasedOn="{StaticResource DefaultDataGridColumnHeaderStyle}"
+                        TargetType="{x:Type DataGridColumnHeader}">
+                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                    </Style>
+
+                    <!--  单元格内容居中样式  -->
+                    <Style
+                        x:Key="DataGridCellStyle"
+                        BasedOn="{StaticResource DefaultDataGridCellStyle}"
+                        TargetType="{x:Type DataGridCell}">
+                        <Setter Property="HorizontalContentAlignment" Value="Center" />
+                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                    </Style>
+
+                </DataGrid.Resources>
+
+                <DataGrid.Columns>
+
+                    <DataGridCheckBoxColumn
+                        ui:ColorZoneAssist.Mode="PrimaryMid"
+                        Binding="{Binding IsSelected, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}"
+                        ElementStyle="{StaticResource MaterialDesignSecondaryCheckBox}" />
+
+                    <DataGridTextColumn
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Binding="{Binding Address}"
+                        CellStyle="{StaticResource DataGridCellStyle}"
+                        HeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+                        <DataGridTextColumn.Header>
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                                <Image
+                                    Width="13"
+                                    Height="13"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource Address}"
+                                    Stretch="Fill" />
+                                <TextBlock
+                                    Margin="5,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 地址}"
+                                    TextAlignment="Center" />
+                            </StackPanel>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Binding="{Binding Type}"
+                        CellStyle="{StaticResource DataGridCellStyle}"
+                        HeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+                        <DataGridTextColumn.Header>
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                                <Image
+                                    Width="13"
+                                    Height="13"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource Type}"
+                                    Stretch="Fill" />
+                                <TextBlock
+                                    Margin="5,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 类型}"
+                                    TextAlignment="Center" />
+                            </StackPanel>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+                    <DataGridTextColumn
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Binding="{Binding AnotherName}"
+                        CellStyle="{StaticResource DataGridCellStyle}"
+                        HeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+                        <DataGridTextColumn.Header>
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                                <Image
+                                    Width="13"
+                                    Height="13"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource AnotherName}"
+                                    Stretch="Fill" />
+                                <TextBlock
+                                    Margin="5,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 别名}"
+                                    TextAlignment="Center" />
+                            </StackPanel>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+
+
+
+                    <DataGridTextColumn
+                        Width="*"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Binding="{Binding Describe}"
+                        CellStyle="{StaticResource DataGridCellStyle}"
+                        HeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+                        <DataGridTextColumn.Header>
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                                <Image
+                                    Width="13"
+                                    Height="13"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource Describe}"
+                                    Stretch="Fill" />
+                                <TextBlock
+                                    Margin="5,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 描述}"
+                                    TextAlignment="Center" />
+                            </StackPanel>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
+
+                    <DataGridTextColumn
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Binding="{Binding Time, StringFormat=yyyy-MM-dd HH:mm:ss}"
+                        CellStyle="{StaticResource DataGridCellStyle}"
+                        HeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+                        <DataGridTextColumn.Header>
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                                <Image
+                                    Width="13"
+                                    Height="13"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource Time}"
+                                    Stretch="Fill" />
+                                <TextBlock
+                                    Margin="5,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 最后更新时间}"
+                                    TextAlignment="Center" />
+                            </StackPanel>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+                </DataGrid.Columns>
+            </DataGrid>
+
+            <Border
+                Grid.Row="3"
+                BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}"
+                BorderThickness="0,1,0,0" />
+
+
+            <snet:PageBarControl
+                Grid.Row="4"
+                PageIndexChangedCommand="{Binding PageIndexChanged}"
+                PageSize="{Binding PageSize}"
+                Total="{Binding Total}"
+                PageIndex="{Binding PageIndex}" />
+
+        </Grid>
+    </GroupBox>
+</UserControl>
+

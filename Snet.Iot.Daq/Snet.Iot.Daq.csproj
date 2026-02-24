@@ -1,0 +1,56 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<OutputType>WinExe</OutputType>
+		<TargetFramework>net10.0-windows</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UseWPF>true</UseWPF>
+		<SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
+		<ApplicationIcon>Icon.ico</ApplicationIcon>
+		<Version>1.0.0.0</Version>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<None Remove="resources\image\home-background.png" />
+		<None Remove="resources\image\home-head.png" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
+		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3800.47" />
+		<PackageReference Include="ScottPlot.WPF" Version="5.1.57" />
+		<PackageReference Include="Snet.Driver" Version="26.43.1" />
+		<PackageReference Include="Snet.Windows.Controls" Version="26.43.1" />
+		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Resource Include="icon.ico" />
+		<Resource Include="resources\image\home-background.png" />
+		<Resource Include="resources\image\home-head.png" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<Compile Update="Language.Designer.cs">
+			<DesignTime>True</DesignTime>
+			<AutoGen>True</AutoGen>
+			<DependentUpon>Language.resx</DependentUpon>
+		</Compile>
+	</ItemGroup>
+
+	<ItemGroup>
+		<EmbeddedResource Update="Language.resx">
+			<Generator>PublicResXFileCodeGenerator</Generator>
+			<LastGenOutput>Language.Designer.cs</LastGenOutput>
+		</EmbeddedResource>
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="icon.ico">
+			<Pack>True</Pack>
+			<PackagePath>\</PackagePath>
+		</None>
+	</ItemGroup>
+
+</Project>

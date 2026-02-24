@@ -1,0 +1,16 @@
+﻿<Application
+    x:Class="Snet.Iot.Daq.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="clr-namespace:Snet.Iot.Daq"
+    Exit="OnExit"
+    Startup="OnStartup">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--  加载默认样式  -->
+                <ResourceDictionary Source="pack://application:,,,/Snet.Windows.Core;component/themes/DarkTheme.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

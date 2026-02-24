@@ -1,0 +1,332 @@
+﻿<UserControl
+    x:Class="Snet.Iot.Daq.view.ProjectDetails"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:data="clr-namespace:Snet.Iot.Daq.data"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:local="clr-namespace:Snet.Iot.Daq.view"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:model="clr-namespace:Snet.Iot.Daq.viewModel"
+    xmlns:snet="https://shunnet.top"
+    xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultDictionary="Language">
+    <UserControl.DataContext>
+        <model:ProjectDetailsModel />
+    </UserControl.DataContext>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <Grid Grid.Row="0" Margin="0,2,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="auto" />
+            </Grid.ColumnDefinitions>
+            <uis:AutoSuggestBox
+                Margin="5,5,0,5"
+                ClearButtonEnabled="True"
+                Icon="{uis:SymbolIcon Symbol=Search24}"
+                OriginalItemsSource="{Binding SelectItems}"
+                PlaceholderText="{snet:Loc 查询}"
+                Text="{Binding QueryCntent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                <i:Interaction.Triggers>
+                    <!--  选中一个项触发  -->
+                    <i:EventTrigger EventName="SuggestionChosen">
+                        <snet:EventCommand Command="{Binding AutoSuggestBox_SuggestionChosen}" />
+                    </i:EventTrigger>
+                    <!--  查询触发  -->
+                    <i:EventTrigger EventName="QuerySubmitted">
+                        <snet:EventCommand Command="{Binding AutoSuggestBox_QuerySubmitted}" />
+                    </i:EventTrigger>
+                    <!--  文字变化  -->
+                    <i:EventTrigger EventName="TextChanged">
+                        <snet:EventCommand Command="{Binding AutoSuggestBox_TextChanged}" />
+                    </i:EventTrigger>
+                    <!--  右键按下  -->
+                    <i:EventTrigger EventName="PreviewMouseRightButtonDown">
+                        <snet:EventCommand Command="{Binding TreeView_PreviewMouseRightButtonDown}" />
+                    </i:EventTrigger>
+                </i:Interaction.Triggers>
+            </uis:AutoSuggestBox>
+            <Menu Grid.Column="1" HorizontalAlignment="Right">
+                <uis:MenuItem
+                    Header="{x:Null}"
+                    Icon="{uis:SymbolIcon Symbol=HandDraw16,
+                                          Filled=False}"
+                    ToolTip="{snet:Loc 操作}">
+                    <uis:MenuItem
+                        Command="{Binding AddAddress}"
+                        Header="{snet:Loc 添加地址}"
+                        Icon="{uis:SymbolIcon Symbol=LocationAdd20,
+                                              Filled=False}" />
+                    <uis:MenuItem
+                        Command="{Binding AllAddressAddDevice}"
+                        Header="{snet:Loc 为所有地址添加设备}"
+                        Icon="{uis:SymbolIcon Symbol=ClipboardTaskAdd20,
+                                              Filled=False}" />
+
+                </uis:MenuItem>
+            </Menu>
+        </Grid>
+        <Border
+            Grid.Row="1"
+            BorderBrush="{DynamicResource MaterialDesign.Brush.Primary}"
+            BorderThickness="0,1,0,0" />
+        <TreeView
+            Grid.Row="2"
+            Margin="5"
+            ItemsSource="{Binding DetailsNode}"
+            Style="{StaticResource DefaultTreeViewStyle}">
+            <i:Interaction.Triggers>
+                <!--  内容菜单打开  -->
+                <i:EventTrigger EventName="ContextMenuOpening">
+                    <snet:EventCommand Command="{Binding TreeView_ContextMenuOpening}" />
+                </i:EventTrigger>
+                <!--  选中  -->
+                <i:EventTrigger EventName="SelectedItemChanged">
+                    <snet:EventCommand Command="{Binding TreeView_SelectedItemChanged}" />
+                </i:EventTrigger>
+                <!--  右键按下  -->
+                <i:EventTrigger EventName="PreviewMouseRightButtonDown">
+                    <snet:EventCommand Command="{Binding TreeView_PreviewMouseRightButtonDown}" />
+                </i:EventTrigger>
+            </i:Interaction.Triggers>
+            <!--  右键菜单  -->
+            <TreeView.ContextMenu>
+                <ContextMenu VerticalContentAlignment="Center">
+                    <ContextMenu.Style>
+                        <Style BasedOn="{StaticResource UiContextMenu}" TargetType="ContextMenu">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem, RelativeSource={RelativeSource Self}}" Value="{x:Null}">
+                                    <Setter Property="Visibility" Value="Collapsed" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </ContextMenu.Style>
+
+
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding AddDevice}"
+                        Header="{snet:Loc 添加设备}"
+                        Icon="{uis:SymbolIcon Symbol=DeviceMeetingRoom16,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+                    <Separator>
+                        <Separator.Style>
+                            <Style BasedOn="{StaticResource MaterialDesignSeparator}" TargetType="Separator">
+                                <Setter Property="Height" Value="1" />
+                                <Setter Property="Margin" Value="0,3,0,3" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Separator.Style>
+                    </Separator>
+
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding Read}"
+                        Header="{snet:Loc 读取}"
+                        Icon="{uis:SymbolIcon Symbol=ArrowExit20,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding Write}"
+                        Header="{snet:Loc 写入}"
+                        Icon="{uis:SymbolIcon Symbol=ArrowEnter20,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+
+                    <Separator>
+                        <Separator.Style>
+                            <Style BasedOn="{StaticResource MaterialDesignSeparator}" TargetType="Separator">
+                                <Setter Property="Height" Value="1" />
+                                <Setter Property="Margin" Value="0,3,0,3" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Separator.Style>
+                    </Separator>
+
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding ExpandProject}"
+                        Header="{snet:Loc 展开}"
+                        Icon="{uis:SymbolIcon Symbol=PanelTopExpand20,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding CollapseProject}"
+                        Header="{snet:Loc 折叠}"
+                        Icon="{uis:SymbolIcon Symbol=PanelLeftExpand20,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding ExpandAllProject}"
+                        Header="{snet:Loc 展开所有}"
+                        Icon="{uis:SymbolIcon Symbol=TextIndentIncreaseLtr9024,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding CollapseAllProject}"
+                        Header="{snet:Loc 折叠所有}"
+                        Icon="{uis:SymbolIcon Symbol=TextIndentIncreaseLtr24,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+                    <Separator>
+                        <Separator.Style>
+                            <Style BasedOn="{StaticResource MaterialDesignSeparator}" TargetType="Separator">
+                                <Setter Property="Height" Value="1" />
+                                <Setter Property="Margin" Value="0,3,0,3" />
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Separator.Style>
+                    </Separator>
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding Remove}"
+                        Header="{snet:Loc 移除}"
+                        Icon="{uis:SymbolIcon Symbol=Delete16,
+                                              Filled=False}" />
+                    <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Command="{Binding RemoveAll}"
+                        Header="{snet:Loc 移除所有}"
+                        Icon="{uis:SymbolIcon Symbol=Delete16,
+                                              Filled=False}">
+                        <uis:MenuItem.Style>
+                            <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding PlacementTarget.DataContext.DetailsNodeSelectedItem.NodeType, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Mq">
+                                        <Setter Property="Visibility" Value="Collapsed" />
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </uis:MenuItem.Style>
+                    </uis:MenuItem>
+                </ContextMenu>
+            </TreeView.ContextMenu>
+            <TreeView.ItemContainerStyle>
+                <Style BasedOn="{StaticResource DefaultTreeViewItemStyle}" TargetType="TreeViewItem">
+                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                </Style>
+            </TreeView.ItemContainerStyle>
+            <TreeView.ItemTemplate>
+                <HierarchicalDataTemplate DataType="{x:Type data:ProjectDetailsTreeViewModel}" ItemsSource="{Binding Children}">
+                    <StackPanel Margin="0,5,0,5" Orientation="Horizontal">
+                        <ui:PackIcon
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Kind="{Binding Icon}" />
+                        <TextBlock
+                            Margin="5,0,5,0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Text="{Binding Name}" />
+                        <TextBlock
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            FontSize="12"
+                            Text="{Binding SpecialData}" />
+                    </StackPanel>
+                </HierarchicalDataTemplate>
+            </TreeView.ItemTemplate>
+            <TreeView.Resources>
+                <Style BasedOn="{StaticResource UiScrollBar}" TargetType="ScrollBar" />
+            </TreeView.Resources>
+        </TreeView>
+    </Grid>
+</UserControl>

@@ -1,0 +1,283 @@
+﻿<UserControl
+    x:Class="Snet.Iot.Daq.view.Console"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:data="clr-namespace:Snet.Iot.Daq.data"
+    xmlns:edit="http://icsharpcode.net/sharpdevelop/avalonedit"
+    xmlns:h="clr-namespace:Snet.Windows.Controls.handler;assembly=Snet.Windows.Controls"
+    xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
+    xmlns:local="clr-namespace:Snet.Iot.Daq.view"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:model="clr-namespace:Snet.Iot.Daq.viewModel"
+    xmlns:snet="https://shunnet.top"
+    xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
+    xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
+    xmlns:view="clr-namespace:Snet.Iot.Daq.view"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultDictionary="Language">
+    <UserControl.DataContext>
+        <model:ConsoleModel />
+    </UserControl.DataContext>
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition />
+            <RowDefinition Height="300" />
+        </Grid.RowDefinitions>
+        <GroupBox
+            Margin="5"
+            Padding="0"
+            ui:ElevationAssist.Elevation="Dp2"
+            ui:GroupBoxAssist.HeaderPadding="7"
+            Header="{Binding}"
+            Style="{StaticResource MaterialDesignCardGroupBox}">
+            <GroupBox.HeaderTemplate>
+                <DataTemplate>
+                    <StackPanel
+                        HorizontalAlignment="Center"
+                        VerticalAlignment="Center"
+                        Orientation="Horizontal">
+                        <ui:PackIcon
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Kind="Console" />
+                        <TextBlock
+                            Margin="5,0,0,0"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Text="{snet:Loc 控制台}"
+                            TextAlignment="Center" />
+                    </StackPanel>
+                </DataTemplate>
+            </GroupBox.HeaderTemplate>
+            <Grid>
+                <!--  刷新按钮  -->
+                <Button
+                    Width="80"
+                    Margin="0,-32,0,0"
+                    Padding="0"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Top"
+                    ui:ButtonAssist.CornerRadius="0,5,0,0"
+                    Command="{Binding Refresh}"
+                    Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid Grid.Column="0">
+                            <Image
+                                Width="15"
+                                Height="15"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Source="{DynamicResource 刷新}"
+                                Stretch="Fill" />
+                        </Grid>
+                        <Grid Grid.Column="2">
+                            <TextBlock
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Text="{snet:Loc 刷新}"
+                                TextAlignment="Center" />
+                        </Grid>
+                    </Grid>
+                </Button>
+                <ScrollViewer>
+                    <ScrollViewer.Resources>
+                        <Style BasedOn="{StaticResource UiScrollBar}" TargetType="ScrollBar" />
+                    </ScrollViewer.Resources>
+                    <ItemsControl Margin="5" ItemsSource="{Binding Devices}">
+
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <WrapPanel />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <view:ConsoleDevice />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </GroupBox>
+        <Grid Grid.Row="1">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition />
+                <ColumnDefinition />
+            </Grid.ColumnDefinitions>
+            <GroupBox
+                Grid.Column="0"
+                Margin="5,0,2.5,5"
+                Padding="0"
+                ui:ElevationAssist.Elevation="Dp4"
+                ui:GroupBoxAssist.HeaderPadding="7"
+                Header="{Binding}"
+                Style="{StaticResource MaterialDesignCardGroupBox}">
+                <GroupBox.HeaderTemplate>
+                    <DataTemplate>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition />
+                                <ColumnDefinition />
+                            </Grid.ColumnDefinitions>
+                            <Grid
+                                Grid.ColumnSpan="2"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="auto" />
+                                    <ColumnDefinition Width="auto" />
+                                </Grid.ColumnDefinitions>
+                                <ui:PackIcon
+                                    Grid.Column="0"
+                                    Padding="0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Kind="Monitor" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    Margin="5,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 监控}"
+                                    TextAlignment="Center" />
+
+                            </Grid>
+
+                            <StackPanel
+                                Grid.Column="1"
+                                HorizontalAlignment="Right"
+                                Orientation="Horizontal">
+                                <Label
+                                    Grid.Column="0"
+                                    Width="60"
+                                    Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    Content="{Binding Cpu}"
+                                    ContentStringFormat="{}{0}%"
+                                    Foreground="{Binding Cpu_Foreground}" />
+                                <Label
+                                    Grid.Column="1"
+                                    Width="60"
+                                    Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    Content="{Binding Gpu}"
+                                    ContentStringFormat="{}{0}%"
+                                    Foreground="{Binding Gpu_Foreground}" />
+                                <Label
+                                    Grid.Column="2"
+                                    Width="60"
+                                    Padding="0"
+                                    HorizontalContentAlignment="Center"
+                                    Content="{Binding RAM}"
+                                    ContentStringFormat="{}{0}%"
+                                    Foreground="{Binding RAM_Foreground}" />
+                            </StackPanel>
+
+                        </Grid>
+                    </DataTemplate>
+                </GroupBox.HeaderTemplate>
+                <ContentControl Grid.Row="1" Content="{Binding ChartControl}">
+                    <ContentControl.Resources>
+                        <!--  滚动条样式  -->
+                        <Style BasedOn="{StaticResource UiContextMenu}" TargetType="ContextMenu" />
+                        <Style BasedOn="{StaticResource UiMenuItem}" TargetType="MenuItem" />
+                    </ContentControl.Resources>
+                </ContentControl>
+            </GroupBox>
+
+            <GroupBox
+                Grid.Column="1"
+                Margin="2.5,0,5,5"
+                Padding="0"
+                ui:ElevationAssist.Elevation="Dp4"
+                ui:GroupBoxAssist.HeaderPadding="7"
+                Header="{Binding}"
+                Style="{StaticResource MaterialDesignCardGroupBox}">
+                <GroupBox.HeaderTemplate>
+                    <DataTemplate>
+                        <Grid HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="auto" />
+                            </Grid.ColumnDefinitions>
+                            <ui:PackIcon
+                                Grid.Column="0"
+                                Padding="0"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Kind="MessageAlertOutline" />
+                            <TextBlock
+                                Grid.Column="1"
+                                Margin="5,0,0,0"
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Text="{snet:Loc 信息}"
+                                TextAlignment="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </GroupBox.HeaderTemplate>
+                <Grid>
+                    <!--  清空按钮  -->
+                    <Button
+                        Width="80"
+                        Margin="0,-32,0,0"
+                        Padding="0"
+                        HorizontalAlignment="Right"
+                        VerticalAlignment="Top"
+                        ui:ButtonAssist.CornerRadius="0,5,0,0"
+                        Command="{Binding Clear}"
+                        Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Grid.Column="0">
+                                <Image
+                                    Width="15"
+                                    Height="15"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource Clear}"
+                                    Stretch="Fill" />
+                            </Grid>
+                            <Grid Grid.Column="2">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 清空}"
+                                    TextAlignment="Center" />
+                            </Grid>
+                        </Grid>
+                    </Button>
+
+                    <!--  数据框  -->
+                    <edit:TextEditor
+                        x:Name="edit"
+                        h:EditBindingHandler.EditText="{Binding Info}"
+                        IsReadOnly="True"
+                        PreviewKeyDown="TextEditor_PreviewKeyDown"
+                        PreviewTextInput="TextEditor_PreviewTextInput"
+                        TextChanged="TextEditor_TextChanged">
+                        <edit:TextEditor.Resources>
+                            <Style BasedOn="{StaticResource UiScrollViewer}" TargetType="ScrollViewer" />
+                            <Style BasedOn="{StaticResource UiScrollBar}" TargetType="ScrollBar" />
+                        </edit:TextEditor.Resources>
+                    </edit:TextEditor>
+
+                </Grid>
+            </GroupBox>
+
+        </Grid>
+    </Grid>
+
+
+</UserControl>
