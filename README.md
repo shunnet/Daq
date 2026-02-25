@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <b>开源 · 免费 · 插件化 · 工业物联网数据采集框架</b>
+  <b>开源 · 免费 · 插件化 · 工业物联网数据采集工具</b>
 </p>
 
 <p align="center">
@@ -16,39 +16,50 @@
 <p align="center">
   <a href="https://shunnet.top"><b>🌐 官方网站</b></a> ·
   <a href="https://github.com/shunnet/Daq"><b>📦 GitHub</b></a> ·
-  <a href="https://shunnet.top/rRbY7"><b>🎬 演示视频</b></a>
+  <a href="https://Shunnet.top/YJybu"><b>🎬 演示视频</b></a>
 </p>
 
 # ✨ 项目介绍
 
-Snet.Iot.Daq
+依托于 Shunnet.top 的采集与传输库开发的插件化工具，
 专为工业设备数据采集场景设计，支持多设备并发采集、字节级协议解析，并提供插件扩展机制，方便快速接入各种工业设备。
 
 适用于：
-
 -   工业自动化
 -   PLC 数据采集
 -   设备监控系统
 -   IoT 边缘采集网关
 -   自定义协议数据解析
+适合：
+-   工业现场
+-   边缘计算设备
+-   服务器环境
+
 
 
 # 🚀 核心特性
 
-✔ 完全开源免费（MIT License）\
-✔ 插件化架构，易扩展\
-✔ 内置 Sqlite 数据库存储\
-✔ 支持多设备并发采集\
-✔ 支持字节级协议解析\
-✔ 支持自定义点位映射\
-✔ 高性能、低资源占用\
-✔ 开箱即用，无需复杂配置\
+✔ 完全开源免费（MIT License）
+✔ 插件化架构，易扩展
+✔ 内置 Sqlite 数据库存储
+✔ 支持多设备并发采集
+✔ 支持字节级协议解析
+✔ 支持自定义点位映射
+✔ 高性能、低资源占用
+✔ 开箱即用，无需复杂配置
 ✔ 适用于工业级长期运行
+
+# ⚡ 性能特点
+
+✔ 极低 CPU 占用
+✔ 极低内存占用
+✔ 支持长期稳定运行
+✔ 支持高频数据采集
 
 
 # 📦 安装与使用
 
-## 1️⃣ 克隆仓库
+## 1️⃣克隆仓库
 
 ``` bash
 git clone https://github.com/shunnet/Daq.git
@@ -68,9 +79,18 @@ Snet.Iot.Daq.sln
 运行主程序即可开始数据采集。
 
 
-# 🎬 项目演示
+# 🙏 致谢
 
-https://shunnet.top/rRbY7
+[Shunnet](https://shunnet.top)
+[WpfMUI](https://github.com/shunnet/WpfMUI
+[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
+[scottplot.net](https://scottplot.net
+[sqlite-net](https://github.com/praeclarum/sqlite-net
+
+
+# 🎬 查阅
+
+https://Shunnet.top/YJybu
 
 
 # 📜 License
