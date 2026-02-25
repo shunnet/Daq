@@ -9,8 +9,16 @@
 </p>
 
 <p align="center">
-  Snet.Iot.Daq 是一款面向工业物联网（IIoT）的高性能数据采集与传输工具，  
-  基于插件架构设计，内置 Sqlite 轻量级数据库，实现开箱即用的数据采集解决方案。
+
+  <img src="https://img.shields.io/badge/.NET-10.0-blue"/>
+  <img src="https://img.shields.io/badge/platform-Windows-success"/>
+  <img src="https://img.shields.io/badge/license-MIT-green"/>
+  <img src="https://img.shields.io/github/stars/shunnet/Daq?style=social"/>
+
+</p>
+
+<p align="center">
+  基于插件架构的工业物联网（IIoT）数据采集与传输工具，内置 Sqlite 数据库，实现开箱即用的数据采集解决方案。
 </p>
 
 <p align="center">
@@ -19,81 +27,114 @@
   <a href="https://Shunnet.top/YJybu"><b>🎬 演示视频</b></a>
 </p>
 
-# ✨ 项目介绍
+## ✨ 项目介绍
 
-依托于 Shunnet.top 的采集与传输库开发的插件化工具，
-专为工业设备数据采集场景设计，支持多设备并发采集、字节级协议解析，并提供插件扩展机制，方便快速接入各种工业设备。
+Snet.Iot.Daq 是依托 **Shunnet.top 工业通信库** 开发的插件化采集工具，专为工业设备数据采集场景设计。
+
+支持：
+
+- 多设备并发采集
+- 字节级协议解析
+- 插件扩展架构
+- 点位映射与存储
+- 高性能稳定运行
 
 适用于：
--   工业自动化
--   PLC 数据采集
--   设备监控系统
--   IoT 边缘采集网关
--   自定义协议数据解析
-适合：
--   工业现场
--   边缘计算设备
--   服务器环境
+
+- 工业自动化
+- PLC 数据采集
+- 设备监控系统
+- IoT 边缘采集网关
+- 自定义协议设备
+
+运行环境：
+
+- 工业现场
+- 边缘计算设备
+- Windows 服务器
 
 
 
-# 🚀 核心特性
+## 🚀 核心特性
 
-✔ 完全开源免费（MIT License）
-✔ 插件化架构，易扩展
-✔ 内置 Sqlite 数据库存储
-✔ 支持多设备并发采集
-✔ 支持字节级协议解析
-✔ 支持自定义点位映射
-✔ 高性能、低资源占用
-✔ 开箱即用，无需复杂配置
-✔ 适用于工业级长期运行
+- ✔ 完全开源免费（MIT License）
+- ✔ 插件化架构，支持无限扩展
+- ✔ 内置 Sqlite 轻量级数据库
+- ✔ 支持多设备并发采集
+- ✔ 支持字节级协议解析
+- ✔ 支持自定义点位映射
+- ✔ 高性能低资源占用
+- ✔ 开箱即用
+- ✔ 支持长期稳定运行
 
-# ⚡ 性能特点
+## ⚡ 性能特点
 
-✔ 极低 CPU 占用
-✔ 极低内存占用
-✔ 支持长期稳定运行
-✔ 支持高频数据采集
+- ✔ 极低 CPU 占用
+- ✔ 极低内存占用
+- ✔ 支持高频采集
+- ✔ 支持 24/7 长期运行
+- ✔ 工业级稳定性
 
 
-# 📦 安装与使用
+## 🖥️ 界面
 
-## 1️⃣克隆仓库
+<p align="center">
+  <img src="images/home.png" width="900"/>
+</p>
+
+<p align="center">
+  <img src="images/ps.png" width="900"/>
+</p>
+
+<p align="center">
+  <img src="images/as.png" width="900"/>
+</p>
+
+<p align="center">
+  <img src="images/prs.png" width="900"/>
+</p>
+
+<p align="center">
+  <img src="images/cs.png" width="900"/>
+</p>
+
+## 📦 安装与使用
+
+### 1️⃣克隆仓库
 
 ``` bash
 git clone https://github.com/shunnet/Daq.git
 cd Daq
 ```
 
-## 2️⃣ 编译项目
+### 2️⃣ 编译项目
 
-使用 Visual Studio 2022 或更高版本打开：
+使用 **Visual Studio 2022** 或更高版本打开：
 
-Snet.Iot.Daq.sln
+`Snet.Iot.Daq.sln`
 
 选择 Debug 或 Release 构建。
 
-## 3️⃣ 运行程序
+### 3️⃣ 运行程序
 
-运行主程序即可开始数据采集。
-
-
-# 🙏 致谢
-
-[Shunnet](https://shunnet.top)
-[WpfMUI](https://github.com/shunnet/WpfMUI
-[LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor
-[scottplot.net](https://scottplot.net
-[sqlite-net](https://github.com/praeclarum/sqlite-net
+构建完成后，在输出目录中找到 `Snet.Iot.Daq.exe`，双击运行即可启动。
 
 
-# 🎬 查阅
+## 🙏 致谢
 
-https://Shunnet.top/YJybu
+- [Shunnet.top](https://shunnet.top)
+- [WpfMUI](https://github.com/shunnet/WpfMUI)
+- [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
+- [scottplot.net](https://scottplot.net)
+- [sqlite-net](https://github.com/praeclarum/sqlite-net)
 
 
-# 📜 License
+## 🎬 查阅
+
+👉 [点击跳转](https://Shunnet.top/YJybu)  
+
+
+## 📜 License
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)  
 
