@@ -228,7 +228,7 @@ namespace Snet.Iot.Daq.viewModel
                         _ = AddSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
                     }
                     //保存配置
-                    ProjectHandler.SaveConfigAsync(ProjectNode, GlobalConfigModel.UI_ProjectConfigPath);
+                    await ProjectHandler.SaveConfigAsync(ProjectNode, GlobalConfigModel.UI_ProjectConfigPath);
                     await Windows.Controls.message.MessageBox.Show("导入成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
@@ -329,7 +329,7 @@ namespace Snet.Iot.Daq.viewModel
                     // 清空选中项，防止绑定未更新
                     ProjectNodeSelectedItem = null;
                     //保存配置
-                    ProjectHandler.SaveConfigAsync(ProjectNode, GlobalConfigModel.UI_ProjectConfigPath);
+                    await ProjectHandler.SaveConfigAsync(ProjectNode, GlobalConfigModel.UI_ProjectConfigPath);
                     await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }

@@ -459,7 +459,11 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestProduceAsync(this PluginConfigModel plugin, string topic, string content)
         {
             IMq? mqNew = await plugin.CreateNewObjetcAsync<IMq>();
-            OperateResult operateResult = await mqNew.OnAsync();
+            OperateResult operateResult = await mqNew.GetStatusAsync();
+            if (!operateResult.Status)
+            {
+                operateResult = await mqNew.OnAsync();
+            }
             if (operateResult.Status)
             {
                 //读取数据
@@ -482,7 +486,11 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestReadAddressAsync(this AddressModel model, PluginConfigModel plugin)
         {
             IDaq? daqNew = await plugin.CreateNewObjetcAsync<IDaq>();
-            OperateResult operateResult = await daqNew.OnAsync();
+            OperateResult operateResult = await daqNew.GetStatusAsync();
+            if (!operateResult.Status)
+            {
+                operateResult = await daqNew.OnAsync();
+            }
             if (operateResult.Status)
             {
                 AddressDetails? address = model.Convert();
@@ -510,7 +518,11 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestWriteAddressAsync(this AddressModel model, PluginConfigModel plugin, WriteModel write)
         {
             IDaq? daqNew = await plugin.CreateNewObjetcAsync<IDaq>();
-            OperateResult operateResult = await daqNew.OnAsync();
+            OperateResult operateResult = await daqNew.GetStatusAsync();
+            if (!operateResult.Status)
+            {
+                operateResult = await daqNew.OnAsync();
+            }
             if (operateResult.Status)
             {
                 //组织写入数据
@@ -536,7 +548,11 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestTransmitDataAsync(this AddressModel address, PluginConfigModel plugin, AddressValue data)
         {
             IMq? mqNew = await plugin.CreateNewObjetcAsync<IMq>();
-            OperateResult operateResult = await mqNew.OnAsync();
+            OperateResult operateResult = await mqNew.GetStatusAsync();
+            if (!operateResult.Status)
+            {
+                operateResult = await mqNew.OnAsync();
+            }
             if (operateResult.Status)
             {
                 //转换数据
