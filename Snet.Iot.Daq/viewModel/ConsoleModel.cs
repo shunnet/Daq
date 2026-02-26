@@ -19,31 +19,6 @@ namespace Snet.Iot.Daq.viewModel
     public class ConsoleModel : BindNotify
     {
         /// <summary>
-        /// ui信息处理器
-        /// </summary>
-        private UiMessageHandler uiMessage = UiMessageHandler.Instance("Info");
-
-        /// <summary>
-        /// 图表操作
-        /// </summary>
-        private ChartOperate chartOperate;
-
-        /// <summary>
-        /// 系统信息监控
-        /// </summary>
-        private SystemMonitoring systemMonitoring;
-
-        /// <summary>
-        /// 间隔
-        /// </summary>
-        private int _interval = 1000;
-
-        /// <summary>
-        /// 全局的任务取消控制
-        /// </summary>
-        private CancellationTokenSource globalToken = new CancellationTokenSource();
-
-        /// <summary>
         /// 构造函数
         /// </summary>
         public ConsoleModel()
@@ -209,6 +184,32 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
+        #region 属性
+        /// <summary>
+        /// ui信息处理器
+        /// </summary>
+        private UiMessageHandler uiMessage = UiMessageHandler.Instance("Info");
+
+        /// <summary>
+        /// 图表操作
+        /// </summary>
+        private ChartOperate chartOperate;
+
+        /// <summary>
+        /// 系统信息监控
+        /// </summary>
+        private SystemMonitoring systemMonitoring;
+
+        /// <summary>
+        /// 间隔
+        /// </summary>
+        private int _interval = 1000;
+
+        /// <summary>
+        /// 全局的任务取消控制
+        /// </summary>
+        private CancellationTokenSource globalToken = new CancellationTokenSource();
+
         /// <summary>
         /// 控件
         /// </summary>
@@ -229,6 +230,18 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
+        /// 设备集合
+        /// </summary>
+        public ObservableCollection<ConsoleDevice> Devices
+        {
+            get => _Devices;
+            set => SetProperty(ref _Devices, value);
+        }
+        private ObservableCollection<ConsoleDevice> _Devices = new ObservableCollection<ConsoleDevice>();
+        #endregion
+
+        #region 命令与方法
+        /// <summary>
         /// 数据清空
         /// </summary>
         public IAsyncRelayCommand Clear => p_Clear ??= new AsyncRelayCommand(ClearAsync);
@@ -242,15 +255,7 @@ namespace Snet.Iot.Daq.viewModel
             await uiMessage.ClearAsync();
         }
 
-        /// <summary>
-        /// 设备集合
-        /// </summary>
-        public ObservableCollection<ConsoleDevice> Devices
-        {
-            get => _Devices;
-            set => SetProperty(ref _Devices, value);
-        }
-        private ObservableCollection<ConsoleDevice> _Devices = new ObservableCollection<ConsoleDevice>();
+
 
         /// <summary>
         /// 刷新
@@ -345,6 +350,6 @@ namespace Snet.Iot.Daq.viewModel
             string msg = $"[ Info ] {DateTime.Now} : {message}";
             await uiMessage.ShowAsync(msg, withTime: false);
         }
-
+        #endregion
     }
 }

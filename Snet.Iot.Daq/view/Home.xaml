@@ -50,7 +50,7 @@
                             FontSize="18"
                             FontWeight="Bold"
                             Foreground="{DynamicResource Font.Head.Foreground}"
-                            Text="{snet:Loc 物联网数轻量化数据采集}" />
+                            Text="{snet:Loc 物联网插件化数据采集}" />
                         <TextBlock
                             Margin="0,5,0,5"
                             FontFamily="宋体"

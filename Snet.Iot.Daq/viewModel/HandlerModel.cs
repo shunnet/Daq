@@ -62,6 +62,7 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
+        #region 属性
         /// <summary>
         /// 数据表格源
         /// </summary>
@@ -80,8 +81,9 @@ namespace Snet.Iot.Daq.viewModel
             get => GetProperty(() => HandlerConfigSelectedItem);
             set => SetProperty(() => HandlerConfigSelectedItem, value);
         }
+        #endregion
 
-
+        #region 命令
         /// <summary>
         /// 导入
         /// </summary>
@@ -136,6 +138,6 @@ namespace Snet.Iot.Daq.viewModel
                 HandlerItemsSource.Remove(HandlerConfigSelectedItem);
             }
         }
-
+        #endregion
     }
 }

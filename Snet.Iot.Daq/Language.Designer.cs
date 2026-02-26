@@ -979,6 +979,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 物联网插件化数据采集 的本地化字符串。
+        /// </summary>
+        public static string 物联网插件化数据采集 {
+            get {
+                return ResourceManager.GetString("物联网插件化数据采集", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 物联网数轻量化数据采集 的本地化字符串。
         /// </summary>
         public static string 物联网数轻量化数据采集 {

@@ -604,4 +604,7 @@
   <data name="添加" xml:space="preserve">
     <value>Add</value>
   </data>
+  <data name="物联网插件化数据采集" xml:space="preserve">
+    <value>Plug-in data collection for the Internet of Things</value>
+  </data>
 </root>

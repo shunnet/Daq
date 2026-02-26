@@ -604,4 +604,7 @@
   <data name="添加" xml:space="preserve">
     <value>添加</value>
   </data>
+  <data name="物联网插件化数据采集" xml:space="preserve">
+    <value>物联网插件化数据采集</value>
+  </data>
 </root>

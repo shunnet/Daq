@@ -3,7 +3,6 @@ using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
-using Snet.Model.@enum;
 using Snet.Utility;
 using Snet.Windows.Core.mvvm;
 using System.Collections.Concurrent;
@@ -57,7 +56,7 @@ namespace Snet.Iot.Daq.viewModel
         public ConsoleDeviceModel()
         {
             StartPolling(runtime);
-            Snet.Core.handler.LanguageHandler.OnLanguageEventAsync += LanguageHandler_OnLanguageEventAsync;
+            //Snet.Core.handler.LanguageHandler.OnLanguageEventAsync += LanguageHandler_OnLanguageEventAsync;
         }
 
         #region 属性
@@ -594,37 +593,37 @@ namespace Snet.Iot.Daq.viewModel
             }
             return "";
         }
-        /// <summary>
-        /// 当前语言
-        /// </summary>
-        private LanguageType _language;
-        /// <summary>
-        /// 是否正在内部切换语言（防止事件重入）
-        /// </summary>
-        private bool _isLanguageChanging;
-        private async Task LanguageHandler_OnLanguageEventAsync(object? sender, EventLanguageResult e)
-        {
-            // 如果是自己触发的二次事件，直接忽略
-            if (_isLanguageChanging)
-                return;
+        ///// <summary>
+        ///// 当前语言
+        ///// </summary>
+        //private LanguageType _language;
+        ///// <summary>
+        ///// 是否正在内部切换语言（防止事件重入）
+        ///// </summary>
+        //private bool _isLanguageChanging;
+        //private async Task LanguageHandler_OnLanguageEventAsync(object? sender, EventLanguageResult e)
+        //{
+        //    // 如果是自己触发的二次事件，直接忽略
+        //    //if (_isLanguageChanging)
+        //    //    return;
 
-            var lang = e.Language ??= Snet.Windows.Core.handler.LanguageHandler.GetLanguage();
-            CollectStatus = GetCollectStatusInfo(CollectStatus, lang);
+        //    //var lang = e.Language ??= Snet.Windows.Core.handler.LanguageHandler.GetLanguage();
+        //    //CollectStatus = GetCollectStatusInfo(CollectStatus, lang);
 
-            if (lang == _language)
-                return;
+        //    //if (lang == _language)
+        //    //    return;
 
-            try
-            {
-                _isLanguageChanging = true;
-                Snet.Windows.Core.handler.LanguageHandler.SetLanguage(lang);
-                _language = lang;
-            }
-            finally
-            {
-                _isLanguageChanging = false;
-            }
-        }
+        //    //try
+        //    //{
+        //    //    _isLanguageChanging = true;
+        //    //    Snet.Windows.Core.handler.LanguageHandler.SetLanguage(lang);
+        //    //    _language = lang;
+        //    //}
+        //    //finally
+        //    //{
+        //    //    _isLanguageChanging = false;
+        //    //}
+        //}
 
         #endregion
         #endregion

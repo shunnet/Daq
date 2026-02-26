@@ -4,7 +4,6 @@ using Snet.Model.data;
 using Snet.Model.@interface;
 using Snet.Utility;
 using System.Collections.Concurrent;
-using System.Text;
 
 namespace Snet.Iot.Daq.handler
 {
@@ -157,29 +156,42 @@ namespace Snet.Iot.Daq.handler
             {
                 return open.result;
             }
-
-            //生产结果
-            StringBuilder builder = new StringBuilder();
-
-            //遍历
+            IMq mq = open.operate;
+            ConcurrentBag<string> errors = new();
+            List<Task> tasks = new(values.Count);
             foreach (var item in values)
             {
-                //传输的内容
-                string content = item.Key.SimplifyValue ? item.Value.GetSimplify().ToJson() : item.Value.ToJson();
+                var key = item.Key;
+                var value = item.Value;
 
-                //生产数据
-                OperateResult result = await open.operate.ProduceAsync(item.Key.Topic, content, item.Key.EncodingType.GetEncoding());
-
-                //组织结果
-                if (!result.GetDetails(out string? msg))
+                tasks.Add(Task.Run(async () =>
                 {
-                    builder.AppendLine($"{item.Key.Address} {msg}");
-                }
+                    try
+                    {
+                        string content = key.SimplifyValue
+                            ? value.GetSimplify().ToJson()
+                            : value.ToJson();
+
+                        var result = await mq.ProduceAsync(
+                            key.Topic,
+                            content,
+                            key.EncodingType.GetEncoding());
+
+                        if (!result.GetDetails(out string? msg))
+                        {
+                            errors.Add($"{key.Address} {msg}");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        errors.Add($"{key.Address} {ex.Message}");
+                    }
+                }));
             }
-            //返回结果
-            if (builder.Length > 0)
+            await Task.WhenAll(tasks);
+            if (!errors.IsEmpty)
             {
-                return OperateResult.CreateFailureResult(builder.ToString());
+                return OperateResult.CreateFailureResult(string.Join(Environment.NewLine, errors));
             }
             return OperateResult.CreateSuccessResult("Produce success");
         }
