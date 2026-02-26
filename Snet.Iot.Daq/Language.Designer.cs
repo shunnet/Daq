@@ -61,11 +61,38 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 启动 的本地化字符串。
+        /// </summary>
+        public static string Start {
+            get {
+                return ResourceManager.GetString("Start", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 停止 的本地化字符串。
+        /// </summary>
+        public static string Stop {
+            get {
+                return ResourceManager.GetString("Stop", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 [ Shunnet.top ] Iot 轻量级数采 的本地化字符串。
         /// </summary>
         public static string SystemTitle {
             get {
                 return ResourceManager.GetString("SystemTitle", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 未知 的本地化字符串。
+        /// </summary>
+        public static string Unknown {
+            get {
+                return ResourceManager.GetString("Unknown", resourceCulture);
             }
         }
         
@@ -840,6 +867,15 @@ namespace Snet.Iot.Daq {
         public static string 未检索到对应项 {
             get {
                 return ResourceManager.GetString("未检索到对应项", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 未知 的本地化字符串。
+        /// </summary>
+        public static string 未知 {
+            get {
+                return ResourceManager.GetString("未知", resourceCulture);
             }
         }
         

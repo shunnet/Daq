@@ -56,7 +56,7 @@ namespace Snet.Iot.Daq.viewModel
         public ConsoleDeviceModel()
         {
             StartPolling(runtime);
-            //Snet.Core.handler.LanguageHandler.OnLanguageEventAsync += LanguageHandler_OnLanguageEventAsync;
+            Snet.Core.handler.LanguageHandler.OnLanguageEventAsync += LanguageHandler_OnLanguageEventAsync;
         }
 
         #region 属性
@@ -185,7 +185,7 @@ namespace Snet.Iot.Daq.viewModel
             get => collectStatus;
             set => SetProperty(ref collectStatus, value);
         }
-        private string collectStatus = GetCollectStatusInfo("未知");
+        private string collectStatus = LanguageHandler.GetLanguageValue("未知", App.LanguageOperate);
 
         /// <summary>
         /// 设备状态
@@ -434,7 +434,7 @@ namespace Snet.Iot.Daq.viewModel
                 OperateResult result = await daqHandler.SubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
                 if (result.Status)
                 {
-                    CollectStatus = GetCollectStatusInfo("启动");
+                    CollectStatus = LanguageHandler.GetLanguageValue("启动", App.LanguageOperate);
                     DeviceStatusFlashing = true;
                     DeviceStatus = true;
                     runtime.Start();
@@ -467,7 +467,7 @@ namespace Snet.Iot.Daq.viewModel
             OperateResult result = await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
             if (result.Status)
             {
-                CollectStatus = GetCollectStatusInfo("停止");
+                CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
                 DeviceStatusFlashing = false;
                 DeviceStatus = true;
                 runtime.Stop();
@@ -574,58 +574,16 @@ namespace Snet.Iot.Daq.viewModel
             _cts?.Cancel();
         }
 
-        #region 状态
-        private static readonly Dictionary<string, (string zh, string en)> StatusMap = new()
-        {
-            ["Unknown"] = ("未知", "Unknown"),
-            ["Start"] = ("启动", "Start"),
-            ["Stop"] = ("停止", "Stop"),
-            ["未知"] = ("未知", "Unknown"),
-            ["启动"] = ("启动", "Start"),
-            ["停止"] = ("停止", "Stop"),
-        };
-        private static string GetCollectStatusInfo(string msg, Model.@enum.LanguageType? type = null)
-        {
-            var lang = type ??= Snet.Windows.Core.handler.LanguageHandler.GetLanguage();
-            if (StatusMap.TryGetValue(msg, out var v))
-            {
-                return lang == Model.@enum.LanguageType.zh ? v.zh : v.en;
-            }
-            return "";
-        }
-        ///// <summary>
-        ///// 当前语言
-        ///// </summary>
-        //private LanguageType _language;
-        ///// <summary>
-        ///// 是否正在内部切换语言（防止事件重入）
-        ///// </summary>
-        //private bool _isLanguageChanging;
-        //private async Task LanguageHandler_OnLanguageEventAsync(object? sender, EventLanguageResult e)
-        //{
-        //    // 如果是自己触发的二次事件，直接忽略
-        //    //if (_isLanguageChanging)
-        //    //    return;
-
-        //    //var lang = e.Language ??= Snet.Windows.Core.handler.LanguageHandler.GetLanguage();
-        //    //CollectStatus = GetCollectStatusInfo(CollectStatus, lang);
-
-        //    //if (lang == _language)
-        //    //    return;
-
-        //    //try
-        //    //{
-        //    //    _isLanguageChanging = true;
-        //    //    Snet.Windows.Core.handler.LanguageHandler.SetLanguage(lang);
-        //    //    _language = lang;
-        //    //}
-        //    //finally
-        //    //{
-        //    //    _isLanguageChanging = false;
-        //    //}
-        //}
 
         #endregion
+
+        #region 状态
+        private async Task LanguageHandler_OnLanguageEventAsync(object? sender, EventLanguageResult e)
+        {
+            string text = CollectStatus;
+            CollectStatus = LanguageHandler.GetLanguageValue(text, App.LanguageOperate);
+        }
+
         #endregion
 
     }

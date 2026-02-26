@@ -607,4 +607,16 @@
   <data name="物联网插件化数据采集" xml:space="preserve">
     <value>Plug-in data collection for the Internet of Things</value>
   </data>
+  <data name="未知" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>Unknown</value>
+  </data>
+  <data name="Start" xml:space="preserve">
+    <value>Start</value>
+  </data>
+  <data name="Stop" xml:space="preserve">
+    <value>Stop</value>
+  </data>
 </root>

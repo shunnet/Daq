@@ -607,4 +607,16 @@
   <data name="物联网插件化数据采集" xml:space="preserve">
     <value>物联网插件化数据采集</value>
   </data>
+  <data name="未知" xml:space="preserve">
+    <value>未知</value>
+  </data>
+  <data name="Unknown" xml:space="preserve">
+    <value>未知</value>
+  </data>
+  <data name="Start" xml:space="preserve">
+    <value>启动</value>
+  </data>
+  <data name="Stop" xml:space="preserve">
+    <value>停止</value>
+  </data>
 </root>
