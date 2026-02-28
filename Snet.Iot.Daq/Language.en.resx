@@ -622,4 +622,16 @@
   <data name="布尔位索引" xml:space="preserve">
     <value>BoolBitIndex</value>
   </data>
+  <data name="OpcUa服务启动" xml:space="preserve">
+    <value>OpcUaServerStart</value>
+  </data>
+  <data name="OpcUa服务停止" xml:space="preserve">
+    <value>OpcUaServerStop</value>
+  </data>
+  <data name="未启动" xml:space="preserve">
+    <value>Not started</value>
+  </data>
+  <data name="已启动" xml:space="preserve">
+    <value>Started</value>
+  </data>
 </root>

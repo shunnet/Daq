@@ -61,6 +61,24 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 OpcUa服务停止 的本地化字符串。
+        /// </summary>
+        public static string OpcUa服务停止 {
+            get {
+                return ResourceManager.GetString("OpcUa服务停止", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 OpcUa服务启动 的本地化字符串。
+        /// </summary>
+        public static string OpcUa服务启动 {
+            get {
+                return ResourceManager.GetString("OpcUa服务启动", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 启动 的本地化字符串。
         /// </summary>
         public static string Start {
@@ -646,6 +664,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 已启动 的本地化字符串。
+        /// </summary>
+        public static string 已启动 {
+            get {
+                return ResourceManager.GetString("已启动", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 布尔位索引 的本地化字符串。
         /// </summary>
         public static string 布尔位索引 {
@@ -858,6 +885,15 @@ namespace Snet.Iot.Daq {
         public static string 最后更新时间 {
             get {
                 return ResourceManager.GetString("最后更新时间", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 未启动 的本地化字符串。
+        /// </summary>
+        public static string 未启动 {
+            get {
+                return ResourceManager.GetString("未启动", resourceCulture);
             }
         }
         

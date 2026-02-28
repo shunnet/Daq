@@ -51,40 +51,101 @@
                 </DataTemplate>
             </GroupBox.HeaderTemplate>
             <Grid>
-                <!--  刷新按钮  -->
-                <Button
-                    Width="80"
+                <StackPanel
                     Margin="0,-32,0,0"
-                    Padding="0"
                     HorizontalAlignment="Right"
                     VerticalAlignment="Top"
-                    ui:ButtonAssist.CornerRadius="0,5,0,0"
-                    Command="{Binding Refresh}"
-                    Style="{StaticResource MaterialDesignFlatSecondaryButton}">
-                    <Grid>
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="auto" />
-                            <ColumnDefinition Width="8" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Grid Grid.Column="0">
-                            <Image
-                                Width="15"
-                                Height="15"
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Source="{DynamicResource 刷新}"
-                                Stretch="Fill" />
+                    Orientation="Horizontal">
+
+                    <ui:PopupBox PlacementMode="BottomAndAlignCentres">
+                        <StackPanel>
+                            <Button Command="{Binding OpcUaServerStart}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="auto" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <Image
+                                            Width="15"
+                                            Height="15"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Source="{DynamicResource Start}"
+                                            Stretch="Fill" />
+                                    </Grid>
+                                    <Grid Grid.Column="2">
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Text="{snet:Loc OpcUa服务启动}"
+                                            TextAlignment="Center" />
+                                    </Grid>
+                                </Grid>
+                            </Button>
+                            <Button Command="{Binding OpcUaServerStop}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="auto" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid Grid.Column="0">
+                                        <Image
+                                            Width="15"
+                                            Height="15"
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Source="{DynamicResource Stop}"
+                                            Stretch="Fill" />
+                                    </Grid>
+                                    <Grid Grid.Column="2">
+                                        <TextBlock
+                                            HorizontalAlignment="Center"
+                                            VerticalAlignment="Center"
+                                            Text="{snet:Loc OpcUa服务停止}"
+                                            TextAlignment="Center" />
+                                    </Grid>
+                                </Grid>
+                            </Button>
+                        </StackPanel>
+                    </ui:PopupBox>
+
+
+
+                    <Button
+                        Padding="10,0,10,0"
+                        ui:ButtonAssist.CornerRadius="0,5,0,0"
+                        Command="{Binding Refresh}"
+                        Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="auto" />
+                                <ColumnDefinition Width="8" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid Grid.Column="0">
+                                <Image
+                                    Width="15"
+                                    Height="15"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource 刷新}"
+                                    Stretch="Fill" />
+                            </Grid>
+                            <Grid Grid.Column="2">
+                                <TextBlock
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 刷新}"
+                                    TextAlignment="Center" />
+                            </Grid>
                         </Grid>
-                        <Grid Grid.Column="2">
-                            <TextBlock
-                                HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Text="{snet:Loc 刷新}"
-                                TextAlignment="Center" />
-                        </Grid>
-                    </Grid>
-                </Button>
+                    </Button>
+
+                </StackPanel>
+
                 <ScrollViewer>
                     <ScrollViewer.Resources>
                         <Style BasedOn="{StaticResource UiScrollBar}" TargetType="ScrollBar" />

@@ -622,4 +622,16 @@
   <data name="布尔位索引" xml:space="preserve">
     <value>布尔位索引</value>
   </data>
+  <data name="OpcUa服务启动" xml:space="preserve">
+    <value>OpcUa服务启动</value>
+  </data>
+  <data name="OpcUa服务停止" xml:space="preserve">
+    <value>OpcUa服务停止</value>
+  </data>
+  <data name="未启动" xml:space="preserve">
+    <value>未启动</value>
+  </data>
+  <data name="已启动" xml:space="preserve">
+    <value>已启动</value>
+  </data>
 </root>

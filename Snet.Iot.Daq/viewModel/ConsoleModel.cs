@@ -1,14 +1,17 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using MaterialDesignThemes.Wpf;
 using ScottPlot.WPF;
 using Snet.Core.handler;
 using Snet.Iot.Daq.chart;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
+using Snet.Iot.Daq.opc.ua.service;
 using Snet.Iot.Daq.utility;
 using Snet.Iot.Daq.view;
 using Snet.Model.data;
 using Snet.Utility;
 using Snet.Windows.Controls.handler;
+using Snet.Windows.Controls.message;
 using Snet.Windows.Core.mvvm;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
@@ -255,7 +258,64 @@ namespace Snet.Iot.Daq.viewModel
             await uiMessage.ClearAsync();
         }
 
+        /// <summary>
+        /// 启动OPCUA服务
+        /// </summary>
+        public IAsyncRelayCommand OpcUaServerStart => p_OpcUaServerStart ??= new AsyncRelayCommand(OpcUaServerStartAsync);
+        IAsyncRelayCommand p_OpcUaServerStart;
+        public async Task OpcUaServerStartAsync()
+        {
+            if (GlobalConfigModel.uaService is null)
+            {
+                GlobalConfigModel.param.SetBasics(new OpcUaServiceData.Basics());
+                if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                {
+                    OpcUaServiceData.Basics basics = GlobalConfigModel.param.GetBasics().GetSource<OpcUaServiceData.Basics>();
+                    GlobalConfigModel.uaService = await OpcUaServiceOperate.InstanceAsync(basics);
+                    GlobalConfigModel.uaService.OnInfoEventAsync += UaService_OnInfoEventAsync;
+                }
+                OperateResult result = await GlobalConfigModel.uaService.OnAsync();
+                await ShowAsync(result.ToJson(true));
+                if (!result.Status)
+                {
+                    GlobalConfigModel.uaService.OnInfoEventAsync -= UaService_OnInfoEventAsync;
+                    await GlobalConfigModel.uaService.DisposeAsync();
+                    GlobalConfigModel.uaService = null;
+                }
+                await RefreshAsync();
+            }
+            else
+            {
+                await MessageBox.Show("已启动".GetLanguageValue(App.LanguageOperate), "OpcUa");
+            }
+        }
 
+        private async Task UaService_OnInfoEventAsync(object? sender, EventInfoResult e)
+        {
+            await ShowAsync(e.ToJson(true));
+        }
+
+        /// <summary>
+        /// 停止OPCUA服务
+        /// </summary>
+        public IAsyncRelayCommand OpcUaServerStop => p_OpcUaServerStop ??= new AsyncRelayCommand(OpcUaServerStopAsync);
+        IAsyncRelayCommand p_OpcUaServerStop;
+        public async Task OpcUaServerStopAsync()
+        {
+            if (GlobalConfigModel.uaService is not null)
+            {
+                OperateResult result = await GlobalConfigModel.uaService.OffAsync();
+                await ShowAsync(result.ToJson(true));
+                GlobalConfigModel.uaService.OnInfoEventAsync -= UaService_OnInfoEventAsync;
+                await GlobalConfigModel.uaService.DisposeAsync();
+                GlobalConfigModel.uaService = null;
+                await RefreshAsync();
+            }
+            else
+            {
+                await MessageBox.Show("未启动".GetLanguageValue(App.LanguageOperate), "OpcUa");
+            }
+        }
 
         /// <summary>
         /// 刷新

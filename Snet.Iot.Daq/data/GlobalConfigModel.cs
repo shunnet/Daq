@@ -1,4 +1,5 @@
 ﻿using Snet.Core.handler;
+using Snet.Iot.Daq.opc.ua.service;
 using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
 using Snet.Utility;
@@ -51,6 +52,11 @@ namespace Snet.Iot.Daq.data
         /// 数据库的操作
         /// </summary>
         public static SQLiteConnection sqliteOperate;
+
+        /// <summary>
+        /// Opcua服务端
+        /// </summary>
+        public static OpcUaServiceOperate uaService;
 
         /// <summary>
         /// 刷新插件信息方法
