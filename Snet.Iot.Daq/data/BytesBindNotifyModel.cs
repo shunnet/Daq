@@ -1,5 +1,4 @@
 ﻿using Snet.Core.handler;
-using Snet.Driver.Core;
 using Snet.Model.@enum;
 using Snet.Utility;
 using Snet.Windows.Controls.data;
@@ -29,7 +28,7 @@ namespace Snet.Iot.Daq.data
                 EncodingTypeComboBoxItemsSource.Add(new ComboBoxModel(item.Name, (Snet.Model.@enum.DataType)item.Value));
             }
             EncodingTypeComboBoxSelectedItem = EncodingTypeComboBoxItemsSource[7];
-            foreach (var item in typeof(Snet.Driver.Core.DataFormat).EnumToList())
+            foreach (var item in typeof(DataFormat).EnumToList())
             {
                 DataFormatComboBoxItemsSource.Add(new ComboBoxModel(item.Name, (Snet.Model.@enum.DataType)item.Value));
             }
@@ -145,6 +144,17 @@ namespace Snet.Iot.Daq.data
             set => SetProperty(ref length, value);
         }
         private ushort length = 1;
+
+        /// <summary>
+        /// 布尔位索引
+        /// </summary>
+        [Description("布尔位索引")]
+        public int BoolIndex
+        {
+            get => boolIndex;
+            set => SetProperty(ref boolIndex, value);
+        }
+        private int boolIndex = 0;
 
         /// <summary>
         /// 数据类型

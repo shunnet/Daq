@@ -25,8 +25,7 @@
 		<PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
 		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.3800.47" />
 		<PackageReference Include="ScottPlot.WPF" Version="5.1.57" />
-		<PackageReference Include="Snet.Driver" Version="26.43.1" />
-		<PackageReference Include="Snet.Windows.Controls" Version="26.43.1" />
+		<PackageReference Include="Snet.Windows.Controls" Version="26.59.1" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
 	</ItemGroup>
 

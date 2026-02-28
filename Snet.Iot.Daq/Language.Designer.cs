@@ -646,6 +646,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 布尔位索引 的本地化字符串。
+        /// </summary>
+        public static string 布尔位索引 {
+            get {
+                return ResourceManager.GetString("布尔位索引", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 序号 的本地化字符串。
         /// </summary>
         public static string 序号 {

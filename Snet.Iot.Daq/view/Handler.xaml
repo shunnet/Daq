@@ -351,6 +351,35 @@
                         </ui:DataGridComboBoxColumn.Header>
                     </ui:DataGridComboBoxColumn>
 
+                    <DataGridTextColumn
+                        Width="*"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                        Binding="{Binding BoolIndex}"
+                        CellStyle="{StaticResource DataGridCellStyle}"
+                        HeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
+                        <DataGridTextColumn.Header>
+                            <StackPanel
+                                HorizontalAlignment="Center"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal">
+                                <Image
+                                    Width="13"
+                                    Height="13"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Source="{DynamicResource 索引}"
+                                    Stretch="Fill" />
+                                <TextBlock
+                                    Margin="5,0,0,0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Text="{snet:Loc 布尔位索引}"
+                                    TextAlignment="Center" />
+                            </StackPanel>
+                        </DataGridTextColumn.Header>
+                    </DataGridTextColumn>
+
                 </uis:DataGrid.Columns>
             </uis:DataGrid>
         </Grid>
