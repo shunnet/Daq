@@ -20,7 +20,7 @@ namespace Snet.Iot.Daq.data
     {
         static GlobalConfigModel()
         {
-            string directory = Path.GetDirectoryName(GlobalConfigModel.dbPath);
+            string directory = Path.GetDirectoryName(dbPath);
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -140,7 +140,17 @@ namespace Snet.Iot.Daq.data
         /// <summary>
         /// 界面配置
         /// </summary>
-        public static readonly string UiConfigPath = Path.Combine(AppContext.BaseDirectory, "config", "ui");
+        public static readonly string UiConfigPath = Path.Combine(ConfigPath, "ui");
+
+        /// <summary>
+        /// 服务配置
+        /// </summary>
+        public static readonly string ServerConfigPath = Path.Combine(ConfigPath, "server");
+
+        /// <summary>
+        /// ua服务端配置
+        /// </summary>
+        public static readonly string UaServerConfigPath = Path.Combine(ServerConfigPath, "UaServerConfig.json");
 
         /// <summary>
         /// 界面插件集合配置路径

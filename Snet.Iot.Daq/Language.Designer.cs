@@ -79,6 +79,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 OpcUa服务数据修改 的本地化字符串。
+        /// </summary>
+        public static string OpcUa服务数据修改 {
+            get {
+                return ResourceManager.GetString("OpcUa服务数据修改", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 启动 的本地化字符串。
         /// </summary>
         public static string Start {

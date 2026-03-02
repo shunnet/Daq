@@ -57,57 +57,67 @@
                     VerticalAlignment="Top"
                     Orientation="Horizontal">
 
-                    <ui:PopupBox PlacementMode="BottomAndAlignCentres">
+                    <ui:PopupBox Padding="0" PlacementMode="BottomAndAlignCentres">
                         <StackPanel>
-                            <Button Command="{Binding OpcUaServerStart}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid Grid.Column="0">
-                                        <Image
-                                            Width="15"
-                                            Height="15"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"
-                                            Source="{DynamicResource Start}"
-                                            Stretch="Fill" />
-                                    </Grid>
-                                    <Grid Grid.Column="2">
-                                        <TextBlock
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"
-                                            Text="{snet:Loc OpcUa服务启动}"
-                                            TextAlignment="Center" />
-                                    </Grid>
-                                </Grid>
+                            <Button
+                                Command="{Binding OpcUaServerStart}"
+                                Style="{StaticResource MaterialDesignFlatSecondaryButton}"
+                                ToolTip="{snet:Loc OpcUa服务启动}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Image
+                                        Height="15"
+                                        Margin="0,0,5,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource OpcUa}"
+                                        Stretch="Fill" />
+                                    <Image
+                                        Height="15"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource 启动}"
+                                        Stretch="Fill" />
+                                </StackPanel>
                             </Button>
-                            <Button Command="{Binding OpcUaServerStop}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
-                                <Grid>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="auto" />
-                                        <ColumnDefinition Width="8" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <Grid Grid.Column="0">
-                                        <Image
-                                            Width="15"
-                                            Height="15"
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"
-                                            Source="{DynamicResource Stop}"
-                                            Stretch="Fill" />
-                                    </Grid>
-                                    <Grid Grid.Column="2">
-                                        <TextBlock
-                                            HorizontalAlignment="Center"
-                                            VerticalAlignment="Center"
-                                            Text="{snet:Loc OpcUa服务停止}"
-                                            TextAlignment="Center" />
-                                    </Grid>
-                                </Grid>
+                            <Button
+                                Command="{Binding OpcUaServerStop}"
+                                Style="{StaticResource MaterialDesignFlatSecondaryButton}"
+                                ToolTip="{snet:Loc OpcUa服务停止}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Image
+                                        Height="15"
+                                        Margin="0,0,5,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource OpcUa}"
+                                        Stretch="Fill" />
+                                    <Image
+                                        Height="15"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource 停止}"
+                                        Stretch="Fill" />
+                                </StackPanel>
+                            </Button>
+                            <Button
+                                Command="{Binding OpcUaServerUpdate}"
+                                Style="{StaticResource MaterialDesignFlatSecondaryButton}"
+                                ToolTip="{snet:Loc OpcUa服务数据修改}">
+                                <StackPanel Orientation="Horizontal">
+                                    <Image
+                                        Height="15"
+                                        Margin="0,0,5,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource OpcUa}"
+                                        Stretch="Fill" />
+                                    <Image
+                                        Height="15"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource 修改}"
+                                        Stretch="Fill" />
+                                </StackPanel>
                             </Button>
                         </StackPanel>
                     </ui:PopupBox>

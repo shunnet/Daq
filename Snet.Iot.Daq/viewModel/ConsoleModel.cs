@@ -15,6 +15,7 @@ using Snet.Windows.Controls.message;
 using Snet.Windows.Core.mvvm;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
+using System.IO;
 using static Snet.Iot.Daq.utility.SystemMonitoring;
 
 namespace Snet.Iot.Daq.viewModel
@@ -52,8 +53,12 @@ namespace Snet.Iot.Daq.viewModel
             //赋值插件信息
             GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;
 
+            //OPCUA服务端启动
+            _ = OpcUaServerInitAsync().ConfigureAwait(false);
+
             //刷新
             _ = RefreshAsync().ConfigureAwait(false);
+
         }
 
         #region 监控信息
@@ -258,6 +263,27 @@ namespace Snet.Iot.Daq.viewModel
             await uiMessage.ClearAsync();
         }
 
+
+        /// <summary>
+        /// OPCUA服务数据修改
+        /// </summary>
+        public IAsyncRelayCommand OpcUaServerUpdate => p_OpcUaServerUpdate ??= new AsyncRelayCommand(OpcUaServerUpdateAsync);
+        IAsyncRelayCommand p_OpcUaServerUpdate;
+        public async Task OpcUaServerUpdateAsync()
+        {
+            if (File.Exists(GlobalConfigModel.UaServerConfigPath))
+            {
+                OpcUaServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.UaServerConfigPath).ToJsonEntity<OpcUaServiceData.Basics>();
+                GlobalConfigModel.param.SetBasics(basics);
+                if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                {
+                    basics = GlobalConfigModel.param.GetBasics().GetSource<OpcUaServiceData.Basics>();
+                    //写入配置
+                    File.WriteAllText(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
+                }
+            }
+        }
+
         /// <summary>
         /// 启动OPCUA服务
         /// </summary>
@@ -272,8 +298,39 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     OpcUaServiceData.Basics basics = GlobalConfigModel.param.GetBasics().GetSource<OpcUaServiceData.Basics>();
                     GlobalConfigModel.uaService = await OpcUaServiceOperate.InstanceAsync(basics);
-                    GlobalConfigModel.uaService.OnInfoEventAsync += UaService_OnInfoEventAsync;
+                    //创建本地配置
+                    if (!Directory.Exists(GlobalConfigModel.ServerConfigPath))
+                    {
+                        Directory.CreateDirectory(GlobalConfigModel.ServerConfigPath);
+                    }
+                    File.WriteAllText(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
+
+                    await OpcUaServerInitAsync();
+                    await RefreshAsync();
                 }
+            }
+            else
+            {
+                await MessageBox.Show("已启动".GetLanguageValue(App.LanguageOperate), "OpcUa");
+            }
+        }
+        /// <summary>
+        /// OPCUA服务端初始化
+        /// </summary>
+        /// <returns></returns>
+        private async Task OpcUaServerInitAsync()
+        {
+            if (File.Exists(GlobalConfigModel.UaServerConfigPath))
+            {
+                //实例化参数
+                OpcUaServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.UaServerConfigPath).ToJsonEntity<OpcUaServiceData.Basics>();
+                //实例化
+                GlobalConfigModel.uaService = OpcUaServiceOperate.Instance(basics ??= new());
+            }
+
+            if (GlobalConfigModel.uaService is not null)
+            {
+                GlobalConfigModel.uaService.OnInfoEventAsync += UaService_OnInfoEventAsync;
                 OperateResult result = await GlobalConfigModel.uaService.OnAsync();
                 await ShowAsync(result.ToJson(true));
                 if (!result.Status)
@@ -282,11 +339,6 @@ namespace Snet.Iot.Daq.viewModel
                     await GlobalConfigModel.uaService.DisposeAsync();
                     GlobalConfigModel.uaService = null;
                 }
-                await RefreshAsync();
-            }
-            else
-            {
-                await MessageBox.Show("已启动".GetLanguageValue(App.LanguageOperate), "OpcUa");
             }
         }
 

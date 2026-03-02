@@ -165,8 +165,8 @@
         </DrawingImage.Drawing>
     </DrawingImage>
 
-    <!--  OpcUa服务  -->
-    <DrawingImage x:Key="OpcUaServer">
+    <!--  OpcUa  -->
+    <DrawingImage x:Key="OpcUa">
         <DrawingImage.Drawing>
             <DrawingGroup>
                 <GeometryDrawing Brush="{DynamicResource ImageColor}" Geometry="M215.56442 26.497035l-23.460916 23.736927 24.84097 23.184906 24.56496 23.184906 23.736927-23.460917 23.460917-23.460916L265.246361 26.221024C252.549865 13.248518 241.233423 2.760108 240.405391 2.760108c-0.828032 0-12.144474 10.76442-24.840971 23.736927zM174.990836 11.316442C170.574663 15.732615 173.610782 22.080863 179.683019 22.080863c5.520216 0 8.280323-4.692183 6.072237-10.48841-1.380054-4.140162-6.624259-4.416173-10.76442-0.276011zM177.750943 54.374124c-5.796226 2.208086-4.140162 11.868464 1.656065 11.868464 3.036119 0 6.348248-1.380054 7.452291-3.036119 2.208086-3.864151-4.692183-10.48841-9.108356-8.832345z" />
@@ -176,5 +176,35 @@
             </DrawingGroup>
         </DrawingImage.Drawing>
     </DrawingImage>
+
+    <!--  启动  -->
+    <DrawingImage x:Key="启动">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="{DynamicResource ImageColor}" Geometry="M512 64C264.576 64 64 264.576 64 512s200.576 448 448 448 448-200.576 448-448S759.424 64 512 64z m207 503.992V568l-0.432 0.24-0.089 0.049L431 728v-0.076A63.425 63.425 0 0 1 400 736c-35.2 0-64-28.8-64-64V352c0-35.2 28.8-64 64-64a63.425 63.425 0 0 1 31 8.076V296l287.477 159.71 0.093 0.052 0.43 0.238v0.008c19.676 10.917 33 31.895 33 55.992 0 24.097-13.324 45.074-33 55.992z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+    <!--  修改  -->
+    <DrawingImage x:Key="修改">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="{DynamicResource ImageColor}" Geometry="M307.465617 716.534524l162.755699-32.755864L1024.000141 129.999835 893.488495 0 340.221481 553.778825 307.465617 716.534524z" />
+                <GeometryDrawing Brush="{DynamicResource ImageColor}" Geometry="M907.307375 406.377437a409.448299 409.448299 0 1 1-289.684672-289.684672L699.000553 35.826726a511.810374 511.810374 0 1 0 289.172861 289.172862z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
+
+    <!--  停止  -->
+    <DrawingImage x:Key="停止">
+        <DrawingImage.Drawing>
+            <DrawingGroup>
+                <GeometryDrawing Brush="{DynamicResource ImageColor}" Geometry="M512 64C264.576 64 64 264.576 64 512s200.576 448 448 448 448-200.576 448-448S759.424 64 512 64z m192 544c0 52.8-43.2 96-96 96H416c-52.8 0-96-43.2-96-96V416c0-52.8 43.2-96 96-96h192c52.8 0 96 43.2 96 96v192z" />
+            </DrawingGroup>
+        </DrawingImage.Drawing>
+    </DrawingImage>
+
 
 </ResourceDictionary>

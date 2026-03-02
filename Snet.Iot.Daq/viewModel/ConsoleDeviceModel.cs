@@ -3,6 +3,7 @@ using Opc.Ua;
 using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
+using Snet.Iot.Daq.opc.ua.service;
 using Snet.Model.data;
 using Snet.Model.@enum;
 using Snet.Utility;
@@ -98,6 +99,46 @@ namespace Snet.Iot.Daq.viewModel
         /// 运行时间记录
         /// </summary>
         private RuntimeSecondsRecorderHandler runtime = new();
+
+        /// <summary>
+        /// 原始地址 -> OPCUA真实地址映射
+        /// </summary>
+        private readonly ConcurrentDictionary<string, string> _addressMap = new();
+
+        /// <summary>
+        /// 服务空间名称
+        /// </summary>
+        private string uaServerAddressSpaceName;
+
+        /// <summary>
+        /// opcua服务层级
+        /// </summary>
+        private FolderState folderState;
+
+        /// <summary>
+        /// DataType 与 BuiltInType 映射缓存
+        /// </summary>
+        private static readonly Dictionary<DataType, BuiltInType> _typeMap = new()
+        {
+            { Model.@enum.DataType.Bool, BuiltInType.Boolean },
+            { Model.@enum.DataType.Double, BuiltInType.Double },
+            { Model.@enum.DataType.Float, BuiltInType.Float },
+            { Model.@enum.DataType.Single, BuiltInType.Float },
+            { Model.@enum.DataType.Short, BuiltInType.Int16 },
+            { Model.@enum.DataType.Int16, BuiltInType.Int16 },
+            { Model.@enum.DataType.Ushort, BuiltInType.UInt16 },
+            { Model.@enum.DataType.UInt16, BuiltInType.UInt16 },
+            { Model.@enum.DataType.Int, BuiltInType.Int32 },
+            { Model.@enum.DataType.Int32, BuiltInType.Int32 },
+            { Model.@enum.DataType.Uint, BuiltInType.UInt32 },
+            { Model.@enum.DataType.UInt32, BuiltInType.UInt32 },
+            { Model.@enum.DataType.Long, BuiltInType.Int64 },
+            { Model.@enum.DataType.Int64, BuiltInType.Int64 },
+            { Model.@enum.DataType.Ulong, BuiltInType.UInt64 },
+            { Model.@enum.DataType.UInt64, BuiltInType.UInt64 },
+            { Model.@enum.DataType.String, BuiltInType.String },
+            { Model.@enum.DataType.Char, BuiltInType.String },
+        };
 
         /// <summary>
         /// 采集数据
@@ -220,7 +261,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// 数据事件（高性能优化版）
+        /// 数据事件
         /// </summary>
         private async Task DqaHandler_OnDataEventAsync(object? sender, EventDataResult e)
         {
@@ -525,101 +566,88 @@ namespace Snet.Iot.Daq.viewModel
         #region 方法
 
         /// <summary>
-        /// opcua服务中存在的地址集合
+        /// 把数据写入ua服务
         /// </summary>
-        List<string> AddressArray = new List<string>();
-
-        /// <summary>
-        /// ua服务把数据写入
-        /// </summary>
-        /// <returns></returns>
         public async Task UaServerAddressWriteAsync(string addressName, DataType dataType, object? value)
         {
-            if (GlobalConfigModel.uaService is null || !GlobalConfigModel.uaService.GetStatus().Status)
-            {
+            var service = GlobalConfigModel.uaService;
+            if (service is null || !service.GetStatus().Status)
                 return;
-            }
-            //不存在地址，创建
-            if (AddressArray.Where(c => c.Contains(addressName)).Count() == 0)
+
+            //层级
+            if (folderState == null)
             {
-                //创建
-                BuiltInType type = new BuiltInType();
-                switch (dataType)
+                FolderState folder = null;
+                //创建层级
+                foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
                 {
-                    case Model.@enum.DataType.Bool:
-                        type = BuiltInType.Boolean;
-                        break;
-                    case Model.@enum.DataType.Double:
-                        type = BuiltInType.Double;
-                        break;
-                    case Model.@enum.DataType.Float:
-                    case Model.@enum.DataType.Single:
-                        type = BuiltInType.Float;
-                        break;
-                    case Model.@enum.DataType.Short:
-                    case Model.@enum.DataType.Int16:
-                        type = BuiltInType.Int16;
-                        break;
-                    case Model.@enum.DataType.Ushort:
-                    case Model.@enum.DataType.UInt16:
-                        type = BuiltInType.UInt16;
-                        break;
-                    case Model.@enum.DataType.Int:
-                    case Model.@enum.DataType.Int32:
-                        type = BuiltInType.Int32;
-                        break;
-                    case Model.@enum.DataType.Uint:
-                    case Model.@enum.DataType.UInt32:
-                        type = BuiltInType.UInt32;
-                        break;
-                    case Model.@enum.DataType.Long:
-                    case Model.@enum.DataType.Int64:
-                        type = BuiltInType.Int64;
-                        break;
-                    case Model.@enum.DataType.Ulong:
-                    case Model.@enum.DataType.UInt64:
-                        type = BuiltInType.UInt64;
-                        break;
-                    case Model.@enum.DataType.String:
-                    case Model.@enum.DataType.Char:
-                        type = BuiltInType.String;
-                        value = value ?? string.Empty;
-                        break;
+                    folder = service.CreateFolder(item, folder).GetSource<FolderState>();
                 }
-                OperateResult operateResult = GlobalConfigModel.uaService.CreateAddress(new() { new ()
+                folderState = folder;
+            }
+
+            //比对层级
+            if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
+            {
+                uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsData().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
+            }
+
+            if (!_addressMap.ContainsKey(addressName))
+            {
+                if (!_typeMap.TryGetValue(dataType, out var builtInType))
+                    return;
+
+                if (builtInType == BuiltInType.String)
+                    value ??= string.Empty;
+
+                //创建地址
+                var createResult = service.CreateAddress(new()
                 {
-                    AddressName=addressName,
-                    Dynamic=false,
-                    DefaultValue=value,
-                    DataType=type,
-                    AccessLevel=3
-                } });
-                if (!operateResult.Status)
+                    new()
+                    {
+                        AddressName = addressName,
+                        Dynamic = false,
+                        DefaultValue = value,
+                        DataType = builtInType,
+                        AccessLevel = 3
+                    }
+                }, folderState);
+
+                if (!createResult.Status)
                 {
-                    await ShowAsync?.Invoke(operateResult.Message);
+                    await ShowAsync?.Invoke(createResult.Message);
+                    return;
                 }
 
-                //查询并赋值
-                List<string>? res = GlobalConfigModel.uaService.GetAddressArray().GetSource<List<string>>();
-                if (res != null && res.Count > 0)
+                // 只在创建成功后刷新一次地址列表
+                var res = service.GetAddressArray().GetSource<List<string>>();
+                string format = $"s={uaServerAddressSpaceName}.{Project.GetHierarchyPath(".")}.{addressName}";
+                if (res != null)
                 {
-                    AddressArray = res;
-                }
-            }
-            else
-            {
-                string? an = AddressArray.FirstOrDefault(item => item.Contains(addressName));
-                if (an is not null)
-                {
-                    ConcurrentDictionary<string, WriteModel> pairs = new ConcurrentDictionary<string, WriteModel>();
-                    pairs.TryAdd(an, new WriteModel(value, dataType, Model.@enum.EncodingType.UTF8));
-                    OperateResult operateResult = await GlobalConfigModel.uaService.WriteAsync(pairs);
-                    if (!operateResult.Status)
+                    foreach (var nodeId in res)
                     {
-                        await ShowAsync?.Invoke(operateResult.Message);
+                        if (nodeId.Contains(format, StringComparison.Ordinal))
+                        {
+                            _addressMap[addressName] = nodeId;
+                            break;
+                        }
                     }
                 }
             }
+
+            // 写入
+            if (!_addressMap.TryGetValue(addressName, out var realAddress))
+                return;
+
+            var dict = new ConcurrentDictionary<string, WriteModel>()
+            {
+                [realAddress] = new WriteModel(value, dataType)
+            };
+
+            var writeResult = await service.WriteAsync(dict);
+
+            if (!writeResult.Status && ShowAsync != null)
+                await ShowAsync.Invoke(writeResult.Message);
         }
 
 

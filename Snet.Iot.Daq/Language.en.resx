@@ -634,4 +634,7 @@
   <data name="已启动" xml:space="preserve">
     <value>Started</value>
   </data>
+  <data name="OpcUa服务数据修改" xml:space="preserve">
+    <value>OpcUaServerDataUpdate</value>
+  </data>
 </root>
