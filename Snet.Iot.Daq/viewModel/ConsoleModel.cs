@@ -50,11 +50,11 @@ namespace Snet.Iot.Daq.viewModel
             // 更新系统检测值
             _ = UpdateSystemMonitoringValueAsync(globalToken.Token).ConfigureAwait(false);
 
-            //赋值插件信息
-            GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;
-
             //OPCUA服务端启动
             _ = OpcUaServerInitAsync().ConfigureAwait(false);
+
+            //赋值插件信息
+            GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;
 
             //刷新
             _ = RefreshAsync().ConfigureAwait(false);
@@ -314,6 +314,7 @@ namespace Snet.Iot.Daq.viewModel
                 await MessageBox.Show("已启动".GetLanguageValue(App.LanguageOperate), "OpcUa");
             }
         }
+
         /// <summary>
         /// OPCUA服务端初始化
         /// </summary>

@@ -313,7 +313,6 @@ namespace Snet.Iot.Daq.handler
             int maxRetries = 5;
             int delayMilliseconds = 500; // 等待半秒
             int retries = 0;
-
             bool fileWritten = false;
 
             while (retries < maxRetries && !fileWritten)

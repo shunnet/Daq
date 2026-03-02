@@ -170,7 +170,8 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 ProjectNode.Add(item);
                 ProjectNodeSelectedItem = item;
-                _ = ProjectNodeSelectedItem?.SetAsync(ProjectNode).ConfigureAwait(false);
+                await ProjectNodeSelectedItem?.SetAsync(ProjectNode);
+                await GlobalConfigModel.RefreshAsync();
             }
         }
 
@@ -253,7 +254,8 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 ProjectNodeSelectedItem?.Children.Add(item);  //选中的节点添加子集
                 ProjectNodeSelectedItem = item; //在把子集设置为选中的节点
-                _ = ProjectNodeSelectedItem?.SetAsync(ProjectNode).ConfigureAwait(false);
+                await ProjectNodeSelectedItem?.SetAsync(ProjectNode);
+                await GlobalConfigModel.RefreshAsync();
             }
         }
 
@@ -273,7 +275,8 @@ namespace Snet.Iot.Daq.viewModel
                     await Windows.Controls.message.MessageBox.Show("存在空数据！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                     return;
                 }
-                _ = ProjectNodeSelectedItem?.SetAsync(ProjectNode).ConfigureAwait(false);
+                await ProjectNodeSelectedItem?.SetAsync(ProjectNode);
+                await GlobalConfigModel.RefreshAsync();
             }
         }
 
@@ -294,11 +297,9 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     ProjectNodeSelectedItem?.Children.Add(item);  //选中的节点添加子集
                     ProjectNodeSelectedItem = item; //在把子集设置为选中的节点
-                    _ = ProjectNodeSelectedItem?.SetAsync(ProjectNode).ConfigureAwait(false);
-
-
+                    await ProjectNodeSelectedItem?.SetAsync(ProjectNode);
                     _ = AddSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
-
+                    await GlobalConfigModel.RefreshAsync();
                 }
                 else
                 {

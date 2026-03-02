@@ -1,5 +1,6 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Opc.Ua;
+using Snet.Core.channel;
 using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
@@ -116,6 +117,11 @@ namespace Snet.Iot.Daq.viewModel
         private FolderState folderState;
 
         /// <summary>
+        /// 层级集合
+        /// </summary>
+        private List<FolderState> folderStates = new();
+
+        /// <summary>
         /// DataType 与 BuiltInType 映射缓存
         /// </summary>
         private static readonly Dictionary<DataType, BuiltInType> _typeMap = new()
@@ -139,6 +145,11 @@ namespace Snet.Iot.Daq.viewModel
             { Model.@enum.DataType.String, BuiltInType.String },
             { Model.@enum.DataType.Char, BuiltInType.String },
         };
+
+        /// <summary>
+        /// 通道操作
+        /// </summary>
+        private ChannelOperate<(string addressName, DataType dataType, object? value)> UaServerValueChannel;
 
         /// <summary>
         /// 采集数据
@@ -331,14 +342,20 @@ namespace Snet.Iot.Daq.viewModel
                                 };
                                 //赋值结果
                                 inParam[newModel] = item.Value;
-                                await UaServerAddressWriteAsync(newModel.Address, newModel.Type, item.Value.ResultValue);
+                                if (UaServerValueChannel != null)
+                                {
+                                    await UaServerValueChannel.WriteAsync((newModel.Address, newModel.Type, item.Value.ResultValue), CancellationToken.None);
+                                }
                             }
                         }
                     }
                     else
                     {
                         inParam[addressModel] = kv.Value;
-                        await UaServerAddressWriteAsync(addressModel.Address, addressModel.Type, kv.Value.ResultValue);
+                        if (UaServerValueChannel != null)
+                        {
+                            await UaServerValueChannel.WriteAsync((addressModel.Address, addressModel.Type, kv.Value.ResultValue), CancellationToken.None);
+                        }
                     }
                 }
             }
@@ -484,6 +501,24 @@ namespace Snet.Iot.Daq.viewModel
                     DeviceStatusFlashing = true;
                     DeviceStatus = true;
                     runtime.Start();
+
+                    if (UaServerValueChannel == null)
+                    {
+                        UaServerValueChannel = ChannelOperate<(string addressName, DataType dataType, object? value)>.Instance(new ChannelData { SN = $"{DeviceName}.{DeviceType}", IsSync = false });
+                        UaServerValueChannel.OnDataEventAsync += UaServerValueChannel_OnDataEventAsync;
+                    }
+
+                    if (folderStates.Count > 0)
+                    {
+                        GlobalConfigModel.uaService.RemoveFolder(new List<NodeId>() { folderStates[0].NodeId });
+                        folderStates[0].Dispose();
+                        folderStates.Clear();
+                        folderState.Dispose();
+                        folderState = null;
+                    }
+
+                    _addressMap.Clear();
+
                     ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + "启动采集".GetLanguageValue(App.LanguageOperate));
                 }
                 else
@@ -517,6 +552,12 @@ namespace Snet.Iot.Daq.viewModel
                 DeviceStatusFlashing = false;
                 DeviceStatus = true;
                 runtime.Stop();
+
+                if (UaServerValueChannel != null)
+                {
+                    await UaServerValueChannel.DisposeAsync();
+                    UaServerValueChannel = null;
+                }
 
                 ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + "停止采集".GetLanguageValue(App.LanguageOperate));
             }
@@ -564,27 +605,60 @@ namespace Snet.Iot.Daq.viewModel
         #endregion
 
         #region 方法
-
         /// <summary>
-        /// 把数据写入ua服务
+        /// 通道数据事件触发
         /// </summary>
-        public async Task UaServerAddressWriteAsync(string addressName, DataType dataType, object? value)
+        /// <param name="sender"></param>
+        /// <param name="e"></param>
+        /// <returns></returns>
+        private async Task UaServerValueChannel_OnDataEventAsync(object? sender, EventDataResult e)
         {
+            if (!e.Status)
+                return;
+
+            if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)
+            {
+                //层级
+                if (folderState == null)
+                {
+                    FolderState folder = null;
+                    //创建层级
+                    foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
+                    {
+                        OperateResult operateResult = GlobalConfigModel.uaService.CreateFolder(item, folder);
+                        if (operateResult.GetDetails(out string? msg))
+                        {
+                            folder = operateResult.GetSource<FolderState>();
+                            folderStates.Add(folder);
+                        }
+                        else
+                        {
+                            await ShowAsync?.Invoke(msg);
+                        }
+                    }
+                    folderState = folder;
+                }
+            }
+            else
+            {
+                return;
+            }
+
+            if (folderState == null)
+            {
+                return;
+            }
+
+            //数据源
+            var result = e.GetSource<(string addressName, DataType dataType, object? value)>();
+            string addressName = result.addressName;
+            DataType dataType = result.dataType;
+            object? value = result.value;
+
+            //服务
             var service = GlobalConfigModel.uaService;
             if (service is null || !service.GetStatus().Status)
                 return;
-
-            //层级
-            if (folderState == null)
-            {
-                FolderState folder = null;
-                //创建层级
-                foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
-                {
-                    folder = service.CreateFolder(item, folder).GetSource<FolderState>();
-                }
-                folderState = folder;
-            }
 
             //比对层级
             if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
@@ -650,7 +724,6 @@ namespace Snet.Iot.Daq.viewModel
                 await ShowAsync.Invoke(writeResult.Message);
         }
 
-
         private int AddressCount = 0;
 
         /// <summary>
@@ -670,6 +743,7 @@ namespace Snet.Iot.Daq.viewModel
             AddressDatas = model.Details.ToAddressMqDictionary();
             AddressCount = AddressDatas.Count();
             DaqData = model.DaqDetails;
+
             if (model.IsSoftStart)
             {
                 await CollectAsync();
@@ -679,6 +753,8 @@ namespace Snet.Iot.Daq.viewModel
                 _ = RetryAsync().ConfigureAwait(false);
             }
         }
+
+
 
         /// <summary>
         /// 开始每秒获取运行时间
