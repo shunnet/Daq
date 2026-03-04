@@ -32,6 +32,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Opc.Ua;
 using Opc.Ua.Server;
+using Snet.Utility;
 using System.Collections.Concurrent;
 using System.IO;
 
@@ -147,7 +148,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
                         string result = JsonConvert.SerializeObject(
                             queue.ToStorableQueue(),
                             s_settings);
-                        File.WriteAllText(Path.Combine(targetPath, id + kBase_filename), result);
+                        FileHandler.StringToFile(Path.Combine(targetPath, id + kBase_filename), result);
                         continue;
                     }
 
@@ -159,7 +160,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
                         string result = JsonConvert.SerializeObject(
                             eventQueue.ToStorableQueue(),
                             s_settings);
-                        File.WriteAllText(Path.Combine(targetPath, id + kBase_filename), result);
+                        FileHandler.StringToFile(Path.Combine(targetPath, id + kBase_filename), result);
                         continue;
                     }
                     m_logger.LogWarning(
@@ -193,7 +194,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
                 {
                     return null;
                 }
-                string result = File.ReadAllText(targetFile);
+                string result = FileHandler.FileToString(targetFile);
                 File.Delete(targetFile);
                 StorableEventQueue template = JsonConvert.DeserializeObject<StorableEventQueue>(
                     result,
@@ -226,7 +227,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
                 {
                     return null;
                 }
-                string result = File.ReadAllText(targetFile);
+                string result = FileHandler.FileToString(targetFile);
                 File.Delete(targetFile);
                 StorableDataChangeQueue template = JsonConvert.DeserializeObject<StorableDataChangeQueue>(
                     result,

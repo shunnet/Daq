@@ -8,6 +8,7 @@ using Snet.Iot.Daq.handler;
 using Snet.Iot.Daq.opc.ua.service;
 using Snet.Iot.Daq.utility;
 using Snet.Iot.Daq.view;
+using Snet.Log;
 using Snet.Model.data;
 using Snet.Utility;
 using Snet.Windows.Controls.handler;
@@ -22,44 +23,15 @@ namespace Snet.Iot.Daq.viewModel
 {
     public class ConsoleModel : BindNotify
     {
+        #region 构造函数
         /// <summary>
         /// 构造函数
         /// </summary>
         public ConsoleModel()
         {
-            // 界面消息处理
-            uiMessage.OnInfoEventAsync += async (object? sender, Model.data.EventInfoResult e) => Info = e.Message;
-            uiMessage.StartAsync().ConfigureAwait(false);
-
-            // 图表操作
-            chartOperate = ChartOperate.Instance(new()
-            {
-                ChartControl = ChartControl,
-                LineAdjust = true,
-                HideGrid = true,
-                RefreshTime = _interval
-            });
-            chartOperate.On();
-            chartOperate.Create(new() { SN = "Cpu", Title = "处理器", TitleEN = "Cpu", Color = "#4CAF50" });
-            chartOperate.Create(new() { SN = "Gpu", Title = "显卡", TitleEN = "Gpu", Color = "#F44336" });
-            chartOperate.Create(new() { SN = "RAM", Title = "内存", TitleEN = "RAM", Color = "#2196F3" });
-
-            // 系统监控
-            systemMonitoring = SystemMonitoring.Instance();
-
-            // 更新系统检测值
-            _ = UpdateSystemMonitoringValueAsync(globalToken.Token).ConfigureAwait(false);
-
-            //OPCUA服务端启动
-            _ = OpcUaServerInitAsync().ConfigureAwait(false);
-
-            //赋值插件信息
-            GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;
-
-            //刷新
-            _ = RefreshAsync().ConfigureAwait(false);
-
+            _ = InitAsync();
         }
+        #endregion
 
         #region 监控信息
         public double Cpu
@@ -279,7 +251,7 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     basics = GlobalConfigModel.param.GetBasics().GetSource<OpcUaServiceData.Basics>();
                     //写入配置
-                    File.WriteAllText(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
+                    FileHandler.StringToFile(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
                 }
             }
         }
@@ -303,7 +275,7 @@ namespace Snet.Iot.Daq.viewModel
                     {
                         Directory.CreateDirectory(GlobalConfigModel.ServerConfigPath);
                     }
-                    File.WriteAllText(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
+                    FileHandler.StringToFile(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
 
                     await OpcUaServerInitAsync();
                     await RefreshAsync();
@@ -450,6 +422,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 string msg = $"[ Error ] {result.Time} : [ {model.Type} ] : {result.Message}";
                 await uiMessage.ShowAsync(msg, withTime: false);
+                LogHelper.Error(msg, foldername: "msg");
             }
         }
 
@@ -462,6 +435,46 @@ namespace Snet.Iot.Daq.viewModel
         {
             string msg = $"[ Info ] {DateTime.Now} : {message}";
             await uiMessage.ShowAsync(msg, withTime: false);
+            LogHelper.Info(msg, foldername: "msg");
+        }
+
+
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <returns></returns>
+        private async Task InitAsync()
+        {
+            // 界面消息处理
+            uiMessage.OnInfoEventAsync += async (object? sender, Model.data.EventInfoResult e) => Info = e.Message;
+            await uiMessage.StartAsync();
+
+            // 图表操作
+            chartOperate = ChartOperate.Instance(new()
+            {
+                ChartControl = ChartControl,
+                LineAdjust = true,
+                HideGrid = true,
+                RefreshTime = _interval
+            });
+            chartOperate.On();
+            chartOperate.Create(new() { SN = "Cpu", Title = "处理器", TitleEN = "Cpu", Color = "#4CAF50" });
+            chartOperate.Create(new() { SN = "Gpu", Title = "显卡", TitleEN = "Gpu", Color = "#F44336" });
+            chartOperate.Create(new() { SN = "RAM", Title = "内存", TitleEN = "RAM", Color = "#2196F3" });
+
+            // 系统监控
+            systemMonitoring = SystemMonitoring.Instance();
+            // 更新系统检测值
+            _ = UpdateSystemMonitoringValueAsync(globalToken.Token).ConfigureAwait(false);
+
+            //OPCUA服务端启动
+            await OpcUaServerInitAsync();
+
+            //赋值插件信息
+            GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;
+
+            //刷新
+            await RefreshAsync();
         }
         #endregion
     }

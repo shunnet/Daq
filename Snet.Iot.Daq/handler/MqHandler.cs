@@ -134,7 +134,7 @@ namespace Snet.Iot.Daq.handler
             }
 
             //传输的内容
-            string content = address.SimplifyValue ? value.GetSimplify().ToJson() : value.ToJson();
+            string content = address.SimplifyValue ? value.GetSimplify().ToJson(true) : value.ToJson(true);
 
             //生产数据
             return await open.operate.ProduceAsync(address.Topic, content, address.EncodingType.GetEncoding());
@@ -169,8 +169,8 @@ namespace Snet.Iot.Daq.handler
                     try
                     {
                         string content = key.SimplifyValue
-                            ? value.GetSimplify().ToJson()
-                            : value.ToJson();
+                            ? value.GetSimplify().ToJson(true)
+                            : value.ToJson(true);
 
                         var result = await mq.ProduceAsync(
                             key.Topic,

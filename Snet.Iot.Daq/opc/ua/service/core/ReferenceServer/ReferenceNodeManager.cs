@@ -484,7 +484,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
                 AddPredefinedNode(SystemContext, fs);
                 if (FailMessage.Count > 0)
                 {
-                    return new OperateResult(false, FailMessage.ToJson(), new Random().Next(1, 50), addressArray);
+                    return new OperateResult(false, FailMessage.ToJson(true), new Random().Next(1, 50), addressArray);
                 }
                 return new OperateResult(true, "地址创建成功", new Random().Next(1, 50), addressArray);
             }
@@ -544,7 +544,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
                 }
                 if (FailMessage.Count > 0)
                 {
-                    return new OperateResult(false, FailMessage.ToJson(), new Random().Next(1, 50), param);
+                    return new OperateResult(false, FailMessage.ToJson(true), new Random().Next(1, 50), param);
                 }
                 return new OperateResult(true, "读取成功", new Random().Next(1, 50), param);
             }
@@ -601,7 +601,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
                 if (writeValues.Count == 0)
                 {
                     return new OperateResult(false,
-                        failMessages.Count > 0 ? failMessages.ToJson() : "无可写节点",
+                        failMessages.Count > 0 ? failMessages.ToJson(true) : "无可写节点",
                         Random.Shared.Next(1, 50),
                         failMessages);
                 }
@@ -622,7 +622,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
                 if (failMessages.Count > 0)
                 {
                     return new OperateResult(false,
-                        failMessages.ToJson(),
+                        failMessages.ToJson(true),
                         Random.Shared.Next(1, 50),
                         failMessages);
                 }
@@ -673,7 +673,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
                 }
                 if (FailMessage.Count() > 0)
                 {
-                    return new OperateResult(false, FailMessage.ToJson(), new Random().Next(1, 50));
+                    return new OperateResult(false, FailMessage.ToJson(true), new Random().Next(1, 50));
                 }
                 return new OperateResult(true, "移除成功", new Random().Next(1, 50));
             }

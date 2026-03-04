@@ -320,7 +320,7 @@ namespace Snet.Iot.Daq.handler
                 try
                 {
                     // 尝试打开文件并进行写入
-                    await WriteToFileAsync(path, data.ToJson());
+                    await WriteToFileAsync(path, data.ToJson(true));
                     fileWritten = true;  // 文件成功写入
                     _ = GlobalConfigModel.RefreshAsync().ConfigureAwait(false);
                 }

@@ -409,6 +409,5 @@ namespace Snet.Iot.Daq.viewModel
             return Task.CompletedTask;
         }
         #endregion
-
     }
 }

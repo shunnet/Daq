@@ -18,14 +18,12 @@ namespace Snet.Iot.Daq.viewModel
 {
     public class ProjectSettingsModel : BindNotify
     {
+        #region 构造函数
         public ProjectSettingsModel()
         {
-            ProjectNode = GlobalConfigModel.ProjectDict;
-
-            ProjectNodeSelectedItem = ProjectHandler.GetFirstSelectItem(ProjectNode);
-            if (ProjectNodeSelectedItem?.NodeType == ProjectNodeType.Device)
-                _ = AddSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
+            _ = InitAsync();
         }
+        #endregion
 
         #region 属性
         /// <summary>
@@ -479,6 +477,18 @@ namespace Snet.Iot.Daq.viewModel
         #endregion
 
         #region 方法
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <returns></returns>
+        private async Task InitAsync()
+        {
+            ProjectNode = GlobalConfigModel.ProjectDict;
+
+            ProjectNodeSelectedItem = ProjectHandler.GetFirstSelectItem(ProjectNode);
+            if (ProjectNodeSelectedItem?.NodeType == ProjectNodeType.Device)
+                await AddSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
+        }
         /// <summary>
         /// 移除设备节点
         /// </summary>

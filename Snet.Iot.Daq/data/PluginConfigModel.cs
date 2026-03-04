@@ -167,7 +167,7 @@ namespace Snet.Iot.Daq.data
         {
             try
             {
-                File.WriteAllText(Path.Combine(ConfigPath, SN), Param);
+                FileHandler.StringToFile(Path.Combine(ConfigPath, SN), Param);
                 return true;
             }
             catch (Exception ex)

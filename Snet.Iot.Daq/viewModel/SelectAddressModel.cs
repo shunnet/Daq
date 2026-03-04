@@ -13,7 +13,6 @@ namespace Snet.Iot.Daq.viewModel
 {
     public class SelectAddressModel : BindNotify
     {
-
         #region 属性
         /// <summary>
         /// 地址配置集合

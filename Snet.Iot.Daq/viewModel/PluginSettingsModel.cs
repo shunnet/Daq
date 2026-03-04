@@ -25,7 +25,18 @@ namespace Snet.Iot.Daq.viewModel
 {
     public class PluginSettingsModel : BindNotify
     {
+        #region 构造函数
         public PluginSettingsModel()
+        {
+            _ = InitAsync();
+        }
+        #endregion
+
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <returns></returns>
+        private async Task InitAsync()
         {
             //设置默认数据
             ComboBoxItemsSource.Add(new(PluginType.Daq.ToString(), PluginType.Daq));
@@ -267,7 +278,7 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     Directory.CreateDirectory(GlobalConfigModel.TaskPath);
                 }
-                File.WriteAllText(Path.Combine(GlobalConfigModel.TaskPath, $"Remove{name}Plugin.bat"), stringBuilder.ToString());
+                FileHandler.StringToFile(Path.Combine(GlobalConfigModel.TaskPath, $"Remove{name}Plugin.bat"), stringBuilder.ToString());
                 //查询插件路径是否还有一致的，有的话一并删除
                 for (int i = 0; i < PluginList.Count; i++)
                 {
@@ -313,7 +324,7 @@ namespace Snet.Iot.Daq.viewModel
                 string path = Path.Combine(libConfigPath, fileName);
                 if (!File.Exists(path))
                 {
-                    File.WriteAllText(path, obj.ToJson());
+                    FileHandler.StringToFile(path, obj.ToJson(true));
                     //添加到集合
                     PluginConfigModel p = new PluginConfigModel(PluginConfig.Count + 1, false, fileName, plugin, details.Name, DateTime.Now, obj.ToJson(), libConfigPath);
                     //添加到全局集合

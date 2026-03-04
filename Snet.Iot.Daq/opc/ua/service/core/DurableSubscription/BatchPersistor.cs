@@ -31,6 +31,7 @@
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Opc.Ua;
+using Snet.Utility;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -110,7 +111,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
             {
                 if (File.Exists(filePath))
                 {
-                    string json = File.ReadAllText(filePath);
+                    string json = FileHandler.FileToString(filePath);
                     result = JsonConvert.DeserializeObject(json, batch.GetType(), s_settings);
                     File.Delete(filePath);
                 }
@@ -158,7 +159,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
                     s_storage_path,
                     $"{batch.MonitoredItemId}_{batch.Id}{kBaseFilename}");
 
-                File.WriteAllText(filePath, result);
+                FileHandler.StringToFile(filePath, result);
 
                 if (cancellationTokenSource.IsCancellationRequested)
                 {

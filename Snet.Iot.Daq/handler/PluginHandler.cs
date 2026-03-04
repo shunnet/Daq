@@ -109,8 +109,6 @@ namespace Snet.Iot.Daq.handler
             {
                 try
                 {
-
-
                     //类名
                     string className = item.Value.Name;
                     //命名空间
@@ -374,7 +372,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="path">保存的路径</param>
         public static void SavePluginUIConfig(ObservableCollection<PluginConfigModel> data, string path)
         {
-            File.WriteAllText(path, data.ToJson());
+            FileHandler.StringToFile(path, data.ToJson(true));
         }
 
         /// <summary>
@@ -384,7 +382,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="path">保存的路径</param>
         public static void SavePluginUIConfig(ObservableCollection<PluginListModel> data, string path)
         {
-            File.WriteAllText(path, data.ToJson());
+            FileHandler.StringToFile(path, data.ToJson(true));
         }
 
         /// <summary>
@@ -399,7 +397,7 @@ namespace Snet.Iot.Daq.handler
             {
                 return default;
             }
-            string json = File.ReadAllText(filePath);
+            string json = FileHandler.FileToString(filePath);
             return json.ToJsonEntity<T>();
         }
 
@@ -556,7 +554,7 @@ namespace Snet.Iot.Daq.handler
             if (operateResult.Status)
             {
                 //转换数据
-                string content = address.SimplifyValue ? data.GetSimplify().ToJson() : data.ToJson();
+                string content = address.SimplifyValue ? data.GetSimplify().ToJson(true) : data.ToJson(true);
                 //读取数据
                 operateResult = await mqNew.ProduceAsync(address.Topic, content);
                 //释放掉这个连接

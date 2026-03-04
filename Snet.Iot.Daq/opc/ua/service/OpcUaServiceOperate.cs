@@ -214,7 +214,7 @@ namespace Snet.Iot.Daq.opc.ua.service
                     }
                     if (FailMessage.Count > 0)
                     {
-                        return EndOperate(false, $"内部异常：{FailMessage.ToJson()}");
+                        return EndOperate(false, $"内部异常：{FailMessage.ToJson(true)}");
                     }
                     return EndOperate(true);
                 }

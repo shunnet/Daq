@@ -1,6 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Opc.Ua;
-using Snet.Core.channel;
 using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
@@ -11,49 +10,13 @@ using Snet.Utility;
 using Snet.Windows.Core.mvvm;
 using System.Collections.Concurrent;
 using System.IO;
+using System.Threading.Channels;
 
 namespace Snet.Iot.Daq.viewModel
 {
     public class ConsoleDeviceModel : BindNotify, IDisposable, IAsyncDisposable
     {
-        public override string ToString()
-        {
-            return DaqData.Guid;
-        }
-
-        public void Dispose()
-        {
-            daqHandler.Dispose();
-            daqHandler = null;
-            foreach (var item in mqHandlers)
-            {
-                item.Value.Dispose();
-            }
-            mqHandlers.Clear();
-            runtime.Stop();
-            StopPolling();
-            bytesHandler?.Dispose();
-            bytesModels.Clear();
-        }
-
-        public async ValueTask DisposeAsync()
-        {
-            await daqHandler.DisposeAsync();
-            daqHandler = null;
-            foreach (var item in mqHandlers)
-            {
-                await item.Value.DisposeAsync();
-            }
-            mqHandlers.Clear();
-            runtime.Stop();
-            StopPolling();
-            if (bytesHandler != null)
-            {
-                await bytesHandler.DisposeAsync();
-            }
-            bytesModels.Clear();
-        }
-
+        #region 构造函数
         /// <summary>
         /// 无参构造函数
         /// </summary>
@@ -62,6 +25,7 @@ namespace Snet.Iot.Daq.viewModel
             StartPolling(runtime);
             Snet.Core.handler.LanguageHandler.OnLanguageEventAsync += LanguageHandler_OnLanguageEventAsync;
         }
+        #endregion
 
         #region 属性
 
@@ -146,10 +110,47 @@ namespace Snet.Iot.Daq.viewModel
             { Model.@enum.DataType.Char, BuiltInType.String },
         };
 
+
         /// <summary>
-        /// 通道操作
+        /// 通道配置（延迟创建）
         /// </summary>
-        private ChannelOperate<(string addressName, DataType dataType, object? value)> UaServerValueChannel;
+        private BoundedChannelOptions channel
+        {
+            get
+            {
+                BoundedChannelOptions boundedChannelOptions = p_Channel;
+                if (boundedChannelOptions == null)
+                {
+                    BoundedChannelOptions obj = new BoundedChannelOptions(int.MaxValue)
+                    {
+                        FullMode = BoundedChannelFullMode.Wait,
+                        SingleReader = false,
+                        SingleWriter = false
+                    };
+                    BoundedChannelOptions boundedChannelOptions2 = obj;
+                    p_Channel = obj;
+                    boundedChannelOptions = boundedChannelOptions2;
+                }
+
+                return boundedChannelOptions;
+            }
+        }
+        private BoundedChannelOptions? p_Channel;
+
+        /// <summary>
+        /// Ua服务同步通道
+        /// </summary>
+        private Channel<AddressValue> UaSyncChannel;
+
+        /// <summary>
+        /// 数据事件通道
+        /// </summary>
+        private Channel<EventDataResult> DataSyncChannel;
+
+        /// <summary>
+        /// 全局消息取消通知
+        /// </summary>
+        private CancellationTokenSource TokenSource;
 
         /// <summary>
         /// 采集数据
@@ -259,6 +260,16 @@ namespace Snet.Iot.Daq.viewModel
             get => GetProperty(() => UpdateTime);
             set => SetProperty(() => UpdateTime, value);
         }
+
+        /// <summary>
+        /// LED颜色
+        /// </summary>
+        public System.Windows.Media.Color LedColor
+        {
+            get => ledColor;
+            set => SetProperty(ref ledColor, value);
+        }
+        private System.Windows.Media.Color ledColor = System.Windows.Media.Colors.Green;
         #endregion
 
         #region 事件
@@ -268,7 +279,7 @@ namespace Snet.Iot.Daq.viewModel
         private async Task DqaHandler_OnInfoEventAsync(object? sender, EventInfoResult e)
         {
             //回写结果数据
-            ResultAsync?.Invoke(DaqData, new ResultModel(e.Status, e.Message) { Time = e.Time });
+            await ResultAsync.Invoke(DaqData, new ResultModel(e.Status, e.Message) { Time = e.Time });
         }
 
         /// <summary>
@@ -276,122 +287,9 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         private async Task DqaHandler_OnDataEventAsync(object? sender, EventDataResult e)
         {
-            if (!e.Status)
-            {
-                ResultAsync?.Invoke(DaqData, e);
-                return;
-            }
-
-            var keys = e.GetSource<ConcurrentDictionary<string, AddressValue>>();
-            if (keys == null || keys.Count == 0)
-                return;
-
-            //构建 Address 索引
-
-            // Address(string) -> AddressModel
-            var addressIndex = AddressDatas.Keys
-                .Where(a => !string.IsNullOrEmpty(a.Address))
-                .ToDictionary(a => a.Address!);
-
-            //构建输入参数
-
-            var inParam = new Dictionary<AddressModel, AddressValue>(keys.Count);
-
-            foreach (var kv in keys)
-            {
-                if (addressIndex.TryGetValue(kv.Key, out var addressModel))
-                {
-                    //处理字节操作
-                    if (addressModel.ExpandParam != null)
-                    {
-                        if (!File.Exists(addressModel.ExpandParam))
-                        {
-                            ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展参数文件不存在".GetLanguageValue(App.LanguageOperate));
-                            continue;
-                        }
-                        //从文件中读取字节处理模型
-                        if (!bytesModels.TryGetValue(addressModel.Address, out List<BytesModel>? bm))
-                        {
-                            bm = FileHandler.FileToString(addressModel.ExpandParam).ToJsonEntity<List<BytesModel>>();
-                            bytesModels[addressModel.Address] = bm;
-                        }
-                        //实例化处理对象
-                        if (bytesHandler == null)
-                        {
-                            bytesHandler = await BytesHandler.InstanceAsync(DeviceName);
-                        }
-                        //数据转换
-                        OperateResult result = await bytesHandler.TransformAsync(kv.Value.ResultValue.GetSource<byte[]>(), kv.Value.Time, bm);
-                        //获取结果
-                        if (result.GetDetails(out ConcurrentDictionary<string, AddressValue>? res))
-                        {
-                            foreach (var item in res)
-                            {
-                                //转换结果
-                                AddressModel newModel = new()
-                                {
-                                    Address = item.Key,
-                                    Describe = item.Value.AddressDescribe,
-                                    EncodingType = item.Value.EncodingType,
-                                    Guid = item.Value.SN,
-                                    SimplifyValue = addressModel.SimplifyValue,
-                                    Length = item.Value.Length,
-                                    Time = item.Value.Time,
-                                    Topic = addressModel.Topic,
-                                    Type = item.Value.AddressDataType,
-                                };
-                                //赋值结果
-                                inParam[newModel] = item.Value;
-                                if (UaServerValueChannel != null)
-                                {
-                                    await UaServerValueChannel.WriteAsync((newModel.Address, newModel.Type, item.Value.ResultValue), CancellationToken.None);
-                                }
-                            }
-                        }
-                    }
-                    else
-                    {
-                        inParam[addressModel] = kv.Value;
-                        if (UaServerValueChannel != null)
-                        {
-                            await UaServerValueChannel.WriteAsync((addressModel.Address, addressModel.Type, kv.Value.ResultValue), CancellationToken.None);
-                        }
-                    }
-                }
-            }
-
-            if (inParam.Count == 0)
-                return;
-
-            //预构建 Address → PluginConfigs 映射
-
-            var pluginMap = AddressDatas
-                .Where(kv => !string.IsNullOrEmpty(kv.Key.Address))
-                .GroupBy(kv => kv.Key.Address!)
-                .ToDictionary(
-                    g => g.Key,
-                    g => g.SelectMany(x => x.Value).ToList()
-                );
-
-            //处理 MQ
-            foreach (var kv in keys)
-            {
-                if (!pluginMap.TryGetValue(kv.Key, out var pluginConfigs))
-                    continue;
-
-                foreach (var item in pluginConfigs)
-                {
-                    if (!mqHandlers.TryGetValue(item.Guid, out var mq))
-                    {
-                        mq = await MqHandler.InstanceAsync(item);
-                        mqHandlers[item.Guid] = mq;
-                    }
-
-                    var result = await mq.ProduceAsync(item.Guid, inParam);
-                    ResultAsync?.Invoke(item, result);
-                }
-            }
+            await DataSyncChannel.Writer.WriteAsync(e, TokenSource.Token);
         }
+
         #endregion
 
         #region 命令
@@ -482,6 +380,23 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (!DeviceStatusFlashing)
             {
+                if (TokenSource == null)
+                {
+                    TokenSource = new CancellationTokenSource();
+                }
+
+                if (UaSyncChannel == null)
+                {
+                    UaSyncChannel = Channel.CreateBounded<AddressValue>(channel);
+                    _ = UaSyncChannelDataEventAsync(TokenSource.Token);
+                }
+
+                if (DataSyncChannel == null)
+                {
+                    DataSyncChannel = Channel.CreateBounded<EventDataResult>(channel);
+                    _ = DataSyncChannelDataEventAsync(TokenSource.Token);
+                }
+
                 if (daqHandler == null)
                 {
                     daqHandler = await DqaHandler.InstanceAsync(DaqData);
@@ -490,6 +405,7 @@ namespace Snet.Iot.Daq.viewModel
                     daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
                     daqHandler.OnInfoEventAsync += DqaHandler_OnInfoEventAsync;
                 }
+
                 if (DaqData.WebApi != null)
                 {
                     await WASatrtAsync();
@@ -497,20 +413,9 @@ namespace Snet.Iot.Daq.viewModel
                 OperateResult result = await daqHandler.SubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
                 if (result.Status)
                 {
-                    CollectStatus = LanguageHandler.GetLanguageValue("启动", App.LanguageOperate);
-                    DeviceStatusFlashing = true;
-                    DeviceStatus = true;
-                    runtime.Start();
-
-                    if (UaServerValueChannel == null)
-                    {
-                        UaServerValueChannel = ChannelOperate<(string addressName, DataType dataType, object? value)>.Instance(new ChannelData { SN = $"{DeviceName}.{DeviceType}", IsSync = false });
-                        UaServerValueChannel.OnDataEventAsync += UaServerValueChannel_OnDataEventAsync;
-                    }
-
                     if (folderStates.Count > 0)
                     {
-                        GlobalConfigModel.uaService.RemoveFolder(new List<NodeId>() { folderStates[0].NodeId });
+                        GlobalConfigModel.uaService.RemoveFolder([folderStates[0].NodeId]);
                         folderStates[0].Dispose();
                         folderStates.Clear();
                         folderState.Dispose();
@@ -520,13 +425,18 @@ namespace Snet.Iot.Daq.viewModel
                     _addressMap.Clear();
 
                     ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + "启动采集".GetLanguageValue(App.LanguageOperate));
+
+                    CollectStatus = LanguageHandler.GetLanguageValue("启动", App.LanguageOperate);
+                    DeviceStatusFlashing = true;
+                    DeviceStatus = true;
+                    runtime.Start();
                 }
                 else
                 {
                     DeviceStatus = false;
                 }
                 //回写结果数据
-                ResultAsync?.Invoke(DaqData, result);
+                await ResultAsync.Invoke(DaqData, result);
             }
         }
 
@@ -553,17 +463,38 @@ namespace Snet.Iot.Daq.viewModel
                 DeviceStatus = true;
                 runtime.Stop();
 
-                if (UaServerValueChannel != null)
+                // 取消
+                if (TokenSource != null)
                 {
-                    await UaServerValueChannel.DisposeAsync();
-                    UaServerValueChannel = null;
+                    TokenSource.Cancel();
+                    TokenSource = null;
+                }
+
+                if (UaSyncChannel != null)
+                {
+                    //停止
+                    UaSyncChannel.Writer.TryComplete();
+                    //读出残余
+                    while (UaSyncChannel.Reader.TryRead(out AddressValue? item)) { }
+                    //置空
+                    UaSyncChannel = null;
+                }
+
+                if (DataSyncChannel != null)
+                {
+                    //停止
+                    DataSyncChannel.Writer.TryComplete();
+                    //读出残余
+                    while (DataSyncChannel.Reader.TryRead(out EventDataResult? item)) { }
+                    //置空
+                    DataSyncChannel = null;
                 }
 
                 ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + "停止采集".GetLanguageValue(App.LanguageOperate));
             }
 
             //回写结果数据
-            ResultAsync?.Invoke(DaqData, result);
+            await ResultAsync.Invoke(DaqData, result);
         }
 
         /// <summary>
@@ -608,57 +539,118 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 通道数据事件触发
         /// </summary>
-        /// <param name="sender"></param>
-        /// <param name="e"></param>
-        /// <returns></returns>
-        private async Task UaServerValueChannel_OnDataEventAsync(object? sender, EventDataResult e)
+        private async Task UaSyncChannelDataEventAsync(CancellationToken token)
         {
-            if (!e.Status)
-                return;
-
-            if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)
+            try
             {
-                //层级
-                if (folderState == null)
+                while (await UaSyncChannel.Reader.WaitToReadAsync(token))
                 {
-                    FolderState folder = null;
-                    //创建层级
-                    foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
+                    while (UaSyncChannel.Reader.TryRead(out AddressValue? addressValue))
                     {
-                        OperateResult operateResult = GlobalConfigModel.uaService.CreateFolder(item, folder);
-                        if (operateResult.GetDetails(out string? msg))
+                        if (token.IsCancellationRequested)
+                            continue;
+
+                        FolderState fs = await UaCreateFolder();
+                        if (fs == null)
                         {
-                            folder = operateResult.GetSource<FolderState>();
-                            folderStates.Add(folder);
+                            continue;
                         }
-                        else
+
+                        //数据源
+                        string addressName = addressValue.AddressName;
+                        DataType dataType = addressValue.AddressDataType;
+                        object? value = addressValue.ResultValue;
+
+                        //服务
+                        var service = GlobalConfigModel.uaService;
+                        if (service is null || !service.GetStatus().Status)
+                            continue;
+
+                        if (!_addressMap.ContainsKey(addressName))
                         {
-                            await ShowAsync?.Invoke(msg);
+                            if (!_typeMap.TryGetValue(dataType, out var builtInType))
+                                continue;
+
+                            if (builtInType == BuiltInType.String)
+                                value ??= string.Empty;
+
+                            //创建地址
+                            var createResult = service.CreateAddress(new()
+                            {
+                                new()
+                                {
+                                    AddressName = addressName,
+                                    Dynamic = false,
+                                    DefaultValue = value,
+                                    DataType = builtInType,
+                                    AccessLevel = 3
+                                }
+                            }, folderState);
+
+                            if (!createResult.Status)
+                            {
+                                await ShowAsync?.Invoke(createResult.Message);
+                                continue;
+                            }
+
+                            // 只在创建成功后刷新一次地址列表
+                            var res = service.GetAddressArray().GetSource<List<string>>();
+                            string format = $"s={uaServerAddressSpaceName}.{Project.GetHierarchyPath(".")}.{addressName}";
+                            if (res != null)
+                            {
+                                foreach (var nodeId in res)
+                                {
+                                    if (nodeId.Contains(format, StringComparison.Ordinal))
+                                    {
+                                        _addressMap[addressName] = nodeId;
+                                        break;
+                                    }
+                                }
+                            }
                         }
+
+                        // 写入
+                        if (!_addressMap.TryGetValue(addressName, out var realAddress))
+                            continue;
+
+                        var dict = new ConcurrentDictionary<string, WriteModel>()
+                        {
+                            [realAddress] = new WriteModel(value, dataType)
+                        };
+
+                        var writeResult = await service.WriteAsync(dict);
+
+                        if (!writeResult.Status && ShowAsync != null)
+                            await ShowAsync.Invoke(writeResult.Message);
                     }
-                    folderState = folder;
                 }
             }
-            else
+            catch (TaskCanceledException)
             {
-                return;
             }
-
-            if (folderState == null)
+            catch (ChannelClosedException ex2)
             {
-                return;
+                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
             }
-
-            //数据源
-            var result = e.GetSource<(string addressName, DataType dataType, object? value)>();
-            string addressName = result.addressName;
-            DataType dataType = result.dataType;
-            object? value = result.value;
-
-            //服务
-            var service = GlobalConfigModel.uaService;
-            if (service is null || !service.GetStatus().Status)
-                return;
+            catch (OperationCanceledException ex3)
+            {
+                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 任务被取消：" + ex3.Message));
+            }
+            catch (Exception ex4)
+            {
+                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 异常：" + ex4.Message));
+            }
+        }
+        /// <summary>
+        /// 创建UA层级
+        /// </summary>
+        /// <returns></returns>
+        private async Task<FolderState> UaCreateFolder()
+        {
+            if (folderState != null)
+            {
+                return folderState;
+            }
 
             //比对层级
             if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
@@ -666,63 +658,151 @@ namespace Snet.Iot.Daq.viewModel
                 uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsData().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
             }
 
-            if (!_addressMap.ContainsKey(addressName))
+            if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)
             {
-                if (!_typeMap.TryGetValue(dataType, out var builtInType))
-                    return;
-
-                if (builtInType == BuiltInType.String)
-                    value ??= string.Empty;
-
-                //创建地址
-                var createResult = service.CreateAddress(new()
+                FolderState folder = null;
+                //创建层级
+                foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
                 {
-                    new()
+                    OperateResult operateResult = GlobalConfigModel.uaService.CreateFolder(item, folder);
+                    if (operateResult.GetDetails(out string? msg))
                     {
-                        AddressName = addressName,
-                        Dynamic = false,
-                        DefaultValue = value,
-                        DataType = builtInType,
-                        AccessLevel = 3
+                        folder = operateResult.GetSource<FolderState>();
+                        folderStates.Add(folder);
                     }
-                }, folderState);
-
-                if (!createResult.Status)
-                {
-                    await ShowAsync?.Invoke(createResult.Message);
-                    return;
-                }
-
-                // 只在创建成功后刷新一次地址列表
-                var res = service.GetAddressArray().GetSource<List<string>>();
-                string format = $"s={uaServerAddressSpaceName}.{Project.GetHierarchyPath(".")}.{addressName}";
-                if (res != null)
-                {
-                    foreach (var nodeId in res)
+                    else
                     {
-                        if (nodeId.Contains(format, StringComparison.Ordinal))
+                        await ShowAsync.Invoke(msg);
+                    }
+                }
+                folderState = folder;
+            }
+            else
+            {
+                return null;
+            }
+            return folderState;
+        }
+
+        /// <summary>
+        /// 通道数据事件触发
+        /// </summary>
+        private async Task DataSyncChannelDataEventAsync(CancellationToken token)
+        {
+            try
+            {
+                while (await DataSyncChannel.Reader.WaitToReadAsync(token))
+                {
+                    while (DataSyncChannel.Reader.TryRead(out EventDataResult? e))
+                    {
+                        if (token.IsCancellationRequested)
+                            continue;
+
+                        if (!e.Status)
                         {
-                            _addressMap[addressName] = nodeId;
-                            break;
+                            await ResultAsync.Invoke(DaqData, e);
+                            continue;
+                        }
+
+                        var keys = e.GetSource<ConcurrentDictionary<string, AddressValue>>();
+                        if (keys == null || keys.Count == 0)
+                            continue;
+
+                        Dictionary<string, AddressModel> addressIndex = AddressDatas.Keys.Where(a => !string.IsNullOrEmpty(a.Address)).ToDictionary(a => a.Address!);
+
+                        Dictionary<string, List<PluginConfigModel>> mqPluginMap = AddressDatas.Where(kv => !string.IsNullOrEmpty(kv.Key.Address)).GroupBy(kv => kv.Key.Address!).ToDictionary(g => g.Key, g => g.SelectMany(x => x.Value).ToList());
+
+                        foreach (var kv in keys)
+                        {
+                            if (addressIndex.TryGetValue(kv.Key, out var addressModel) && mqPluginMap.TryGetValue(kv.Key, out var pluginConfigs))
+                            {
+                                if (addressModel.ExpandParam != null)
+                                {
+                                    if (!File.Exists(addressModel.ExpandParam))
+                                    {
+                                        ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展参数文件不存在".GetLanguageValue(App.LanguageOperate));
+                                        continue;
+                                    }
+                                    //从文件中读取字节处理模型
+                                    if (!bytesModels.TryGetValue(addressModel.Address, out List<BytesModel>? bm))
+                                    {
+                                        bm = FileHandler.FileToString(addressModel.ExpandParam).ToJsonEntity<List<BytesModel>>();
+                                        bytesModels[addressModel.Address] = bm;
+                                    }
+                                    //实例化处理对象
+                                    if (bytesHandler == null)
+                                    {
+                                        bytesHandler = await BytesHandler.InstanceAsync(DeviceName);
+                                    }
+                                    //数据转换
+                                    OperateResult result = await bytesHandler.TransformAsync(kv.Value.ResultValue.GetSource<byte[]>(), kv.Value.Time, bm);
+                                    //获取结果
+                                    if (result.GetDetails(out ConcurrentDictionary<string, AddressValue>? res))
+                                    {
+                                        foreach (var item in res)
+                                        {
+                                            //转换结果
+                                            AddressModel newModel = new()
+                                            {
+                                                Address = item.Key,
+                                                Describe = item.Value.AddressDescribe,
+                                                EncodingType = item.Value.EncodingType,
+                                                Guid = item.Value.SN,
+                                                SimplifyValue = addressModel.SimplifyValue,
+                                                Length = item.Value.Length,
+                                                Time = item.Value.Time,
+                                                Topic = addressModel.Topic,
+                                                Type = item.Value.AddressDataType,
+                                            };
+                                            await UaSyncChannel.Writer.WriteAsync(item.Value, TokenSource.Token);
+                                            await MqTransmissionAsync(new() { [newModel] = item.Value }, pluginConfigs);
+                                        }
+                                    }
+                                }
+                                else
+                                {
+                                    await UaSyncChannel.Writer.WriteAsync(kv.Value, TokenSource.Token);
+                                    await MqTransmissionAsync(new() { [addressModel] = kv.Value }, pluginConfigs);
+                                }
+                            }
                         }
                     }
                 }
             }
-
-            // 写入
-            if (!_addressMap.TryGetValue(addressName, out var realAddress))
-                return;
-
-            var dict = new ConcurrentDictionary<string, WriteModel>()
+            catch (TaskCanceledException)
             {
-                [realAddress] = new WriteModel(value, dataType)
-            };
-
-            var writeResult = await service.WriteAsync(dict);
-
-            if (!writeResult.Status && ShowAsync != null)
-                await ShowAsync.Invoke(writeResult.Message);
+            }
+            catch (ChannelClosedException ex2)
+            {
+                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
+            }
+            catch (OperationCanceledException ex3)
+            {
+                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 任务被取消：" + ex3.Message));
+            }
+            catch (Exception ex4)
+            {
+                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 异常：" + ex4.Message));
+            }
         }
+
+        /// <summary>
+        /// MQ传输
+        /// </summary>
+        private async Task MqTransmissionAsync(Dictionary<AddressModel, AddressValue> inParam, List<PluginConfigModel> pluginConfigs)
+        {
+            foreach (var item in pluginConfigs)
+            {
+                if (!mqHandlers.TryGetValue(item.Guid, out var mq))
+                {
+                    mq = await MqHandler.InstanceAsync(item);
+                    mqHandlers[item.Guid] = mq;
+                }
+                var result = await mq.ProduceAsync(item.Guid, inParam);
+                await ResultAsync.Invoke(item, result);
+            }
+        }
+
 
         private int AddressCount = 0;
 
@@ -743,18 +823,15 @@ namespace Snet.Iot.Daq.viewModel
             AddressDatas = model.Details.ToAddressMqDictionary();
             AddressCount = AddressDatas.Count();
             DaqData = model.DaqDetails;
-
+            if (DeviceStatusFlashing)
+            {
+                await RetryAsync();
+            }
             if (model.IsSoftStart)
             {
                 await CollectAsync();
             }
-            if (DeviceStatusFlashing)
-            {
-                _ = RetryAsync().ConfigureAwait(false);
-            }
         }
-
-
 
         /// <summary>
         /// 开始每秒获取运行时间
@@ -782,7 +859,45 @@ namespace Snet.Iot.Daq.viewModel
             _cts?.Cancel();
         }
 
+        public override string ToString()
+        {
+            return DaqData.Guid;
+        }
 
+        public void Dispose()
+        {
+            daqHandler.Dispose();
+            daqHandler = null;
+            foreach (var item in mqHandlers)
+            {
+                item.Value.Dispose();
+            }
+            mqHandlers.Clear();
+            runtime.Stop();
+            StopPolling();
+            bytesHandler?.Dispose();
+            bytesModels.Clear();
+            _ = StopAsync().ConfigureAwait(false);
+        }
+
+        public async ValueTask DisposeAsync()
+        {
+            await daqHandler.DisposeAsync();
+            daqHandler = null;
+            foreach (var item in mqHandlers)
+            {
+                await item.Value.DisposeAsync();
+            }
+            mqHandlers.Clear();
+            runtime.Stop();
+            StopPolling();
+            if (bytesHandler != null)
+            {
+                await bytesHandler.DisposeAsync();
+            }
+            bytesModels.Clear();
+            await StopAsync();
+        }
         #endregion
 
         #region 状态
@@ -793,6 +908,5 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         #endregion
-
     }
 }

@@ -32,6 +32,7 @@ using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Opc.Ua;
 using Opc.Ua.Server;
+using Snet.Utility;
 using System.IO;
 
 namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
@@ -72,7 +73,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
                     Directory.CreateDirectory(s_storage_path);
                 }
 
-                File.WriteAllText(Path.Combine(s_storage_path, kFilename), result);
+                FileHandler.StringToFile(Path.Combine(s_storage_path, kFilename), result);
 
                 if (m_durableMonitoredItemQueueFactory != null)
                 {
@@ -96,7 +97,7 @@ namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
             {
                 if (File.Exists(filePath))
                 {
-                    string json = File.ReadAllText(filePath);
+                    string json = FileHandler.FileToString(filePath);
                     List<IStoredSubscription> result =
                         JsonConvert.DeserializeObject<List<IStoredSubscription>>(json, s_settings);
 
