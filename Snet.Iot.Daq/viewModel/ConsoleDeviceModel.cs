@@ -279,7 +279,7 @@ namespace Snet.Iot.Daq.viewModel
         private async Task DqaHandler_OnInfoEventAsync(object? sender, EventInfoResult e)
         {
             //回写结果数据
-            await ResultAsync.Invoke(DaqData, new ResultModel(e.Status, e.Message) { Time = e.Time });
+            await ResultMsgAsync(DaqData, new ResultModel(e.Status, e.Message) { Time = e.Time });
         }
 
         /// <summary>
@@ -400,11 +400,11 @@ namespace Snet.Iot.Daq.viewModel
                 if (daqHandler == null)
                 {
                     daqHandler = await DqaHandler.InstanceAsync(DaqData);
-                    daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
-                    daqHandler.OnDataEventAsync += DqaHandler_OnDataEventAsync;
-                    daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
-                    daqHandler.OnInfoEventAsync += DqaHandler_OnInfoEventAsync;
                 }
+                daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
+                daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
+                daqHandler.OnDataEventAsync += DqaHandler_OnDataEventAsync;
+                daqHandler.OnInfoEventAsync += DqaHandler_OnInfoEventAsync;
 
                 if (DaqData.WebApi != null)
                 {
@@ -436,7 +436,7 @@ namespace Snet.Iot.Daq.viewModel
                     DeviceStatus = false;
                 }
                 //回写结果数据
-                await ResultAsync.Invoke(DaqData, result);
+                await ResultMsgAsync(DaqData, result);
             }
         }
 
@@ -451,50 +451,49 @@ namespace Snet.Iot.Daq.viewModel
             {
                 return;
             }
+            daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
+            daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
+            // 取消
+            if (TokenSource != null)
+            {
+                TokenSource.Cancel();
+                TokenSource = null;
+            }
+
             if (DaqData.WebApi != null)
             {
                 await WAStopAsync();
             }
-            OperateResult result = await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
-            if (result.Status)
+
+            await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
+
+            CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
+            DeviceStatusFlashing = false;
+            DeviceStatus = true;
+            runtime.Stop();
+
+            if (UaSyncChannel != null)
             {
-                CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
-                DeviceStatusFlashing = false;
-                DeviceStatus = true;
-                runtime.Stop();
-
-                // 取消
-                if (TokenSource != null)
-                {
-                    TokenSource.Cancel();
-                    TokenSource = null;
-                }
-
-                if (UaSyncChannel != null)
-                {
-                    //停止
-                    UaSyncChannel.Writer.TryComplete();
-                    //读出残余
-                    while (UaSyncChannel.Reader.TryRead(out AddressValue? item)) { }
-                    //置空
-                    UaSyncChannel = null;
-                }
-
-                if (DataSyncChannel != null)
-                {
-                    //停止
-                    DataSyncChannel.Writer.TryComplete();
-                    //读出残余
-                    while (DataSyncChannel.Reader.TryRead(out EventDataResult? item)) { }
-                    //置空
-                    DataSyncChannel = null;
-                }
-
-                ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + "停止采集".GetLanguageValue(App.LanguageOperate));
+                //停止
+                UaSyncChannel.Writer.TryComplete();
+                //读出残余
+                while (UaSyncChannel.Reader.TryRead(out AddressValue? item)) { }
+                //置空
+                UaSyncChannel = null;
             }
 
-            //回写结果数据
-            await ResultAsync.Invoke(DaqData, result);
+            if (DataSyncChannel != null)
+            {
+                //停止
+                DataSyncChannel.Writer.TryComplete();
+                //读出残余
+                while (DataSyncChannel.Reader.TryRead(out EventDataResult? item)) { }
+                //置空
+                DataSyncChannel = null;
+            }
+
+            ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + "停止采集".GetLanguageValue(App.LanguageOperate));
+
         }
 
         /// <summary>
@@ -630,15 +629,15 @@ namespace Snet.Iot.Daq.viewModel
             }
             catch (ChannelClosedException ex2)
             {
-                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
             }
             catch (OperationCanceledException ex3)
             {
-                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 任务被取消：" + ex3.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 任务被取消：" + ex3.Message));
             }
             catch (Exception ex4)
             {
-                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 异常：" + ex4.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 异常：" + ex4.Message));
             }
         }
         /// <summary>
@@ -700,7 +699,7 @@ namespace Snet.Iot.Daq.viewModel
 
                         if (!e.Status)
                         {
-                            await ResultAsync.Invoke(DaqData, e);
+                            await ResultMsgAsync(DaqData, e);
                             continue;
                         }
 
@@ -774,15 +773,15 @@ namespace Snet.Iot.Daq.viewModel
             }
             catch (ChannelClosedException ex2)
             {
-                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
             }
             catch (OperationCanceledException ex3)
             {
-                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 任务被取消：" + ex3.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 任务被取消：" + ex3.Message));
             }
             catch (Exception ex4)
             {
-                await ResultAsync.Invoke(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 异常：" + ex4.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 异常：" + ex4.Message));
             }
         }
 
@@ -799,7 +798,7 @@ namespace Snet.Iot.Daq.viewModel
                     mqHandlers[item.Guid] = mq;
                 }
                 var result = await mq.ProduceAsync(item.Guid, inParam);
-                await ResultAsync.Invoke(item, result);
+                await ResultMsgAsync(item, result);
             }
         }
 
@@ -831,6 +830,18 @@ namespace Snet.Iot.Daq.viewModel
             {
                 await CollectAsync();
             }
+        }
+
+        /// <summary>
+        /// 结果消息抛出
+        /// </summary>
+        public async Task ResultMsgAsync(PluginConfigModel pcm, BaseModel bm)
+        {
+            if (bm.Status)
+                LedColor = System.Windows.Media.Colors.Green;
+            else
+                LedColor = System.Windows.Media.Colors.Red;
+            await ResultAsync.Invoke(pcm, bm);
         }
 
         /// <summary>
