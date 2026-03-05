@@ -70,6 +70,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 正常 的本地化字符串。
+        /// </summary>
+        public static string Normal {
+            get {
+                return ResourceManager.GetString("Normal", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 OpcUa服务停止 的本地化字符串。
         /// </summary>
         public static string OpcUa服务停止 {

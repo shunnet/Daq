@@ -844,7 +844,10 @@ namespace Snet.Iot.Daq.viewModel
         public async Task ResultMsgAsync(PluginConfigModel pcm, BaseModel bm)
         {
             if (bm.Status)
+            {
                 LedColor = System.Windows.Media.Colors.Green;
+                CollectStatus = LanguageHandler.GetLanguageValue("正常", App.LanguageOperate);
+            }
             else
             {
                 LedColor = System.Windows.Media.Colors.Red;
