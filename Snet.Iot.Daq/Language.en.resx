@@ -637,4 +637,7 @@
   <data name="OpcUa服务数据修改" xml:space="preserve">
     <value>OpcUaServerDataUpdate</value>
   </data>
+  <data name="Exception" xml:space="preserve">
+    <value>Exception</value>
+  </data>
 </root>

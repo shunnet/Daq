@@ -287,6 +287,9 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         private async Task DqaHandler_OnDataEventAsync(object? sender, EventDataResult e)
         {
+            if (DataSyncChannel is null)
+                return;
+
             await DataSyncChannel.Writer.WriteAsync(e, TokenSource.Token);
         }
 
@@ -380,35 +383,13 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (!DeviceStatusFlashing)
             {
-                if (TokenSource == null)
-                {
-                    TokenSource = new CancellationTokenSource();
-                }
-
-                if (UaSyncChannel == null)
-                {
-                    UaSyncChannel = Channel.CreateBounded<AddressValue>(channel);
-                    _ = UaSyncChannelDataEventAsync(TokenSource.Token);
-                }
-
-                if (DataSyncChannel == null)
-                {
-                    DataSyncChannel = Channel.CreateBounded<EventDataResult>(channel);
-                    _ = DataSyncChannelDataEventAsync(TokenSource.Token);
-                }
-
                 if (daqHandler == null)
                 {
                     daqHandler = await DqaHandler.InstanceAsync(DaqData);
-                }
-                daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
-                daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
-                daqHandler.OnDataEventAsync += DqaHandler_OnDataEventAsync;
-                daqHandler.OnInfoEventAsync += DqaHandler_OnInfoEventAsync;
-
-                if (DaqData.WebApi != null)
-                {
-                    await WASatrtAsync();
+                    daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
+                    daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
+                    daqHandler.OnDataEventAsync += DqaHandler_OnDataEventAsync;
+                    daqHandler.OnInfoEventAsync += DqaHandler_OnInfoEventAsync;
                 }
                 OperateResult result = await daqHandler.SubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
                 if (result.Status)
@@ -430,6 +411,28 @@ namespace Snet.Iot.Daq.viewModel
                     DeviceStatusFlashing = true;
                     DeviceStatus = true;
                     runtime.Start();
+
+                    if (DaqData.WebApi != null)
+                    {
+                        await WASatrtAsync();
+                    }
+
+                    if (TokenSource == null)
+                    {
+                        TokenSource = new CancellationTokenSource();
+                    }
+
+                    if (UaSyncChannel == null)
+                    {
+                        UaSyncChannel = Channel.CreateBounded<AddressValue>(channel);
+                        _ = UaSyncChannelDataEventAsync(TokenSource.Token);
+                    }
+
+                    if (DataSyncChannel == null)
+                    {
+                        DataSyncChannel = Channel.CreateBounded<EventDataResult>(channel);
+                        _ = DataSyncChannelDataEventAsync(TokenSource.Token);
+                    }
                 }
                 else
                 {
@@ -472,7 +475,7 @@ namespace Snet.Iot.Daq.viewModel
 
             CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
             DeviceStatusFlashing = false;
-            DeviceStatus = true;
+            DeviceStatus = false;
             runtime.Stop();
 
             if (UaSyncChannel != null)
@@ -843,7 +846,10 @@ namespace Snet.Iot.Daq.viewModel
             if (bm.Status)
                 LedColor = System.Windows.Media.Colors.Green;
             else
+            {
                 LedColor = System.Windows.Media.Colors.Red;
+                CollectStatus = LanguageHandler.GetLanguageValue("异常", App.LanguageOperate);
+            }
             await ResultAsync.Invoke(pcm, bm);
         }
 
