@@ -451,8 +451,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 return;
             }
-            daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
-            daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
+
             // 取消
             if (TokenSource != null)
             {
@@ -466,6 +465,10 @@ namespace Snet.Iot.Daq.viewModel
             }
 
             await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
+            daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
+            daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
+            await daqHandler.DisposeAsync();
+            daqHandler = null;
 
             CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
             DeviceStatusFlashing = false;
