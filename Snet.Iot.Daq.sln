@@ -7,6 +7,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq", "Snet.Iot.Da
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.AddressTest", "Snet.Iot.Daq.AddressTest\Snet.Iot.Daq.AddressTest.csproj", "{295DC98C-E8FE-400E-959D-C9048771E74F}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.MqPerformanceTesting", "Snet.Iot.Daq.MqPerformanceTesting\Snet.Iot.Daq.MqPerformanceTesting.csproj", "{766A4681-0AC6-4312-960B-E079ADB11EEE}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,6 +23,10 @@ Global
 		{295DC98C-E8FE-400E-959D-C9048771E74F}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{295DC98C-E8FE-400E-959D-C9048771E74F}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{295DC98C-E8FE-400E-959D-C9048771E74F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{766A4681-0AC6-4312-960B-E079ADB11EEE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{766A4681-0AC6-4312-960B-E079ADB11EEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{766A4681-0AC6-4312-960B-E079ADB11EEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{766A4681-0AC6-4312-960B-E079ADB11EEE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
