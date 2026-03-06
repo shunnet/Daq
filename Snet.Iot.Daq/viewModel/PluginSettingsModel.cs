@@ -32,30 +32,6 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        /// <summary>
-        /// 初始化
-        /// </summary>
-        /// <returns></returns>
-        private async Task InitAsync()
-        {
-            //设置默认数据
-            ComboBoxItemsSource.Add(new(PluginType.Daq.ToString(), PluginType.Daq));
-            ComboBoxItemsSource.Add(new(PluginType.Mq.ToString(), PluginType.Mq));
-            ComboBoxSelectedItem = ComboBoxItemsSource[0];
-
-            //获取本地配置
-            PluginList = PluginHandler.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
-            //插件配置
-            if (GlobalConfigModel.PluginDict.Count > 0)
-            {
-                PluginConfig = new ObservableCollection<PluginConfigModel>(GlobalConfigModel.PluginDict.Values);
-            }
-            else
-            {
-                PluginConfig = new();
-            }
-        }
-
         #region 属性
         /// <summary>
         /// 下拉框数据源
@@ -560,6 +536,30 @@ namespace Snet.Iot.Daq.viewModel
         #endregion
 
         #region 方法
+        /// <summary>
+        /// 初始化
+        /// </summary>
+        /// <returns></returns>
+        private async Task InitAsync()
+        {
+            //设置默认数据
+            ComboBoxItemsSource.Add(new(PluginType.Daq.ToString(), PluginType.Daq));
+            ComboBoxItemsSource.Add(new(PluginType.Mq.ToString(), PluginType.Mq));
+            ComboBoxSelectedItem = ComboBoxItemsSource[0];
+
+            //获取本地配置
+            PluginList = PluginHandler.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
+            //插件配置
+            if (GlobalConfigModel.PluginDict.Count > 0)
+            {
+                PluginConfig = new ObservableCollection<PluginConfigModel>(GlobalConfigModel.PluginDict.Values);
+            }
+            else
+            {
+                PluginConfig = new();
+            }
+        }
+
         /// <summary>
         /// 使用检查
         /// </summary>
