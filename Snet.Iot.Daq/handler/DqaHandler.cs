@@ -350,5 +350,25 @@ namespace Snet.Iot.Daq.handler
             return await open.operate.UnSubscribeAsync(address.AddressConvert());
         }
 
+        /// <summary>
+        /// 获取状态
+        /// </summary>
+        /// <param name="guid">唯一标识符</param>
+        /// <returns>操作状态</returns>
+        public async Task<OperateResult> GetStatusAsync(string guid)
+        {
+            //打开
+            (IDaq operate, OperateResult result) open = await OpenAsync(guid);
+
+            //状态
+            if (!open.result.Status)
+            {
+                return open.result;
+            }
+
+            //读取数据
+            return await open.operate.GetStatusAsync();
+        }
+
     }
 }
