@@ -203,12 +203,9 @@ namespace Snet.Iot.Daq.opc.ua.service
                         List<KeyValuePair<string, FolderState>> pair = FolderInfo.Where(c => c.Value.NodeId.ToString() == item.ToString() || c.Value.NodeId.ToString().Contains(item.ToString())).ToList();
                         foreach (var index in pair)
                         {
-                            lock (FolderInfo)
+                            if (!FolderInfo.TryRemove(index))
                             {
-                                if (!FolderInfo.TryRemove(index))
-                                {
-                                    FailMessage.Add($"{index.Value.NodeId.Identifier} 删除失败");
-                                }
+                                FailMessage.Add($"{index.Value.NodeId.Identifier} 删除失败");
                             }
                         }
                     }
@@ -556,6 +553,13 @@ namespace Snet.Iot.Daq.opc.ua.service
                         return EndOperate(false, message);
                     }
                 }
+                // 取消并释放令牌
+                if (tokenSource != null)
+                {
+                    tokenSource.Cancel();
+                    tokenSource.Dispose();
+                    tokenSource = null;
+                }
                 if (service != null)
                 {
                     FolderInfo.Clear();
@@ -589,11 +593,10 @@ namespace Snet.Iot.Daq.opc.ua.service
                 }
                 // 创建目标字典
                 ConcurrentDictionary<string, object> targetDict = new ConcurrentDictionary<string, object>();
-                // 并行遍历原始字典
-                Parallel.ForEach(values, kvp =>
+                foreach (var kvp in values)
                 {
-                    targetDict.TryAdd(kvp.Key, kvp.Value); // 线程安全添加‌:ml-citation{ref="1,2" data="citationList"}
-                });
+                    targetDict.TryAdd(kvp.Key, kvp.Value);
+                }
                 return Write(targetDict);
             }
             catch (Exception ex)
@@ -727,7 +730,6 @@ namespace Snet.Iot.Daq.opc.ua.service
         {
             //开始记录运行时间
             BegOperate();
-            List<AddressDetails> Nodes = address.AddressArray;
             try
             {
                 if (!GetStatus().GetDetails(out string? message))

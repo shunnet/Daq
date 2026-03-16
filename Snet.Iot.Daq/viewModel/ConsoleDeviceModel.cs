@@ -459,6 +459,7 @@ namespace Snet.Iot.Daq.viewModel
             if (TokenSource != null)
             {
                 TokenSource.Cancel();
+                TokenSource.Dispose();
                 TokenSource = null;
             }
 
@@ -896,6 +897,8 @@ namespace Snet.Iot.Daq.viewModel
         public void StopPolling()
         {
             _cts?.Cancel();
+            _cts?.Dispose();
+            _cts = null;
         }
 
         public override string ToString()

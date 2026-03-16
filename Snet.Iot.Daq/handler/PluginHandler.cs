@@ -212,7 +212,7 @@ namespace Snet.Iot.Daq.handler
                 JObject? jsonObject = Newtonsoft.Json.JsonConvert.DeserializeObject<JObject>(content);
                 object[]? objs = [jsonObject];
                 //获取构造函数信息
-                ConstructorInfo? constructorInfo = type?.GetConstructors().Where(c => c.GetParameters().Length > 0).FirstOrDefault();
+                ConstructorInfo? constructorInfo = type.GetConstructors().Where(c => c.GetParameters().Length > 0).FirstOrDefault();
                 //返回数据
                 return ParamTypeConvert(objs, constructorInfo).FirstOrDefault();
             }
@@ -311,7 +311,7 @@ namespace Snet.Iot.Daq.handler
                     JToken? token = jObj[prop.Name];
                     if (token == null) continue;
 
-                    object? converted = Convert.ChangeType(token.ToObject(prop.PropertyType), prop.PropertyType);
+                    object? converted = token.ToObject(prop.PropertyType);
                     prop.SetValue(model, converted);
                 }
 
@@ -348,15 +348,19 @@ namespace Snet.Iot.Daq.handler
                 object? obj = ConvertPluginJsonParam(className, data);
                 if (iName.Contains(PluginType.Mq.ToString()))
                 {
-                    IMq mq = Activator.CreateInstance(type, [obj]) as IMq;
-                    result = await mq.OnAsync();
-                    await mq.DisposeAsync();
+                    if (Activator.CreateInstance(type, [obj]) is IMq mq)
+                    {
+                        result = await mq.OnAsync();
+                        await mq.DisposeAsync();
+                    }
                 }
                 else if (iName.Contains(PluginType.Daq.ToString()))
                 {
-                    IDaq daq = Activator.CreateInstance(type, [obj]) as IDaq;
-                    result = await daq.OnAsync();
-                    await daq.DisposeAsync();
+                    if (Activator.CreateInstance(type, [obj]) is IDaq daq)
+                    {
+                        result = await daq.OnAsync();
+                        await daq.DisposeAsync();
+                    }
                 }
             }
             return result;
@@ -454,6 +458,8 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestProduceAsync(this PluginConfigModel plugin, string topic, string content)
         {
             IMq? mqNew = await plugin.CreateNewObjetcAsync<IMq>();
+            if (mqNew is null)
+                return OperateResult.CreateFailureResult("Failed to create MQ instance");
             OperateResult operateResult = await mqNew.GetStatusAsync();
             if (!operateResult.Status)
             {
@@ -481,6 +487,8 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestReadAddressAsync(this AddressModel model, PluginConfigModel plugin)
         {
             IDaq? daqNew = await plugin.CreateNewObjetcAsync<IDaq>();
+            if (daqNew is null)
+                return OperateResult.CreateFailureResult("Failed to create DAQ instance");
             OperateResult operateResult = await daqNew.GetStatusAsync();
             if (!operateResult.Status)
             {
@@ -513,6 +521,8 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestWriteAddressAsync(this AddressModel model, PluginConfigModel plugin, WriteModel write)
         {
             IDaq? daqNew = await plugin.CreateNewObjetcAsync<IDaq>();
+            if (daqNew is null)
+                return OperateResult.CreateFailureResult("Failed to create DAQ instance");
             OperateResult operateResult = await daqNew.GetStatusAsync();
             if (!operateResult.Status)
             {
@@ -541,6 +551,8 @@ namespace Snet.Iot.Daq.handler
         public static async Task<OperateResult> TestTransmitDataAsync(this AddressModel address, PluginConfigModel plugin, AddressValue data)
         {
             IMq? mqNew = await plugin.CreateNewObjetcAsync<IMq>();
+            if (mqNew is null)
+                return OperateResult.CreateFailureResult("Failed to create MQ instance");
             OperateResult operateResult = await mqNew.GetStatusAsync();
             if (!operateResult.Status)
             {

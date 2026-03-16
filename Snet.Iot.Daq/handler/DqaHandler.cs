@@ -95,7 +95,7 @@ namespace Snet.Iot.Daq.handler
             {
                 // 注销旧事件处理程序，避免重复订阅
                 if (AnonymityDataEventHandlerAsync != null)
-                    operate.OnDataEventAsync -= OnDataEventHandlerAsync;
+                    operate.OnDataEventAsync -= AnonymityDataEventHandlerAsync;
                 // 创建新的委托实例并缓存引用
                 AnonymityDataEventHandlerAsync = async (sender, e) => await Operate_OnDataEventAsync(sender, e, guid);
                 // 注册事件
@@ -104,7 +104,7 @@ namespace Snet.Iot.Daq.handler
 
                 // 注销旧事件处理程序，避免重复订阅
                 if (AnonymityInfoEventHandlerAsync != null)
-                    operate.OnInfoEventAsync -= OnInfoEventHandlerAsync;
+                    operate.OnInfoEventAsync -= AnonymityInfoEventHandlerAsync;
                 // 创建新的委托实例并缓存引用
                 AnonymityInfoEventHandlerAsync = async (sender, e) => await Operate_OnInfoEventAsync(sender, e, guid);
                 // 注册事件
