@@ -152,11 +152,15 @@ namespace Snet.Iot.Daq.effects
                 double x2 = flake.X;
                 double y2 = flake.Y;
 
-                double dist = Math.Sqrt(((x2 - x) * (x2 - x)) + ((y2 - y) * (y2 - y)));
+                double dx = x2 - x;
+                double dy = y2 - y;
+                double distSq = dx * dx + dy * dy;
+                double minDistSq = minDist * minDist;
 
-                if (dist < minDist)
+                if (distSq < minDistSq)
                 {
-                    double force = minDist / (dist * dist);
+                    double dist = Math.Sqrt(distSq);
+                    double force = minDist / (distSq);
                     double xcomp = (x - x2) / dist;
                     double ycomp = (y - y2) / dist;
                     double deltaV = force / 2;

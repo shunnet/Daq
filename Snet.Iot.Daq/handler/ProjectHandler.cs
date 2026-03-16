@@ -352,12 +352,8 @@ namespace Snet.Iot.Daq.handler
         /// </summary>
         private static async Task WriteToFileAsync(string path, string data)
         {
-            // 以异步方式写入文件，确保不阻塞主线程
-            using (FileStream fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
-            {
-                byte[] bytes = Encoding.UTF8.GetBytes(data);
-                await fs.WriteAsync(bytes, 0, bytes.Length);
-            }
+            await using var writer = new StreamWriter(path, false, Encoding.UTF8);
+            await writer.WriteAsync(data);
         }
 
         /// <summary>

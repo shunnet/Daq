@@ -34,10 +34,12 @@ namespace Snet.Iot.Daq.handler
 
             var sb = new StringBuilder();
             int currentBytes = 0;
+            Span<char> singleChar = stackalloc char[1];
 
             foreach (char c in text)
             {
-                int charBytes = encoding.GetByteCount(new[] { c });
+                singleChar[0] = c;
+                int charBytes = encoding.GetByteCount(singleChar);
 
                 if (currentBytes + charBytes > allowedBytes)
                     break;

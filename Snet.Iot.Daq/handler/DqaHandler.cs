@@ -255,10 +255,8 @@ namespace Snet.Iot.Daq.handler
             }
 
             //组织写入数据
-            ConcurrentDictionary<string, WriteModel> keys = new()
-            {
-                [address.Address] = write
-            };
+            ConcurrentDictionary<string, WriteModel> keys = new();
+            keys[address.Address] = write;
 
             //写入数据
             return await open.operate.WriteAsync(keys);

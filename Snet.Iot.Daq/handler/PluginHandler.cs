@@ -43,10 +43,7 @@ namespace Snet.Iot.Daq.handler
         /// </summary>
         private static bool InterfaceFilter(Type typeObj, Object criteriaObj)
         {
-            if (typeObj.ToString() == criteriaObj.ToString())
-                return true;
-            else
-                return false;
+            return typeObj.ToString() == criteriaObj.ToString();
         }
 
 
@@ -65,7 +62,7 @@ namespace Snet.Iot.Daq.handler
             ConcurrentDictionary<(string path, string className), Type> copy = new ConcurrentDictionary<(string path, string className), Type>();
 
             //库
-            List<string> libs = Directory.GetFiles(path, DllWatcherFormat, SearchOption.AllDirectories).ToList();
+            string[] libs = Directory.GetFiles(path, DllWatcherFormat, SearchOption.AllDirectories);
             //循环文件，添加程序集
             foreach (var lib in libs)
             {
@@ -82,7 +79,7 @@ namespace Snet.Iot.Daq.handler
                     //检索类是否继承接口
                     foreach (Type type in types)
                     {
-                        if (type.FindInterfaces(typeFilter, iName).Count() > 0)
+                        if (type.FindInterfaces(typeFilter, iName).Length > 0)
                         {
                             typesArray.Add(type);
                         }
@@ -215,7 +212,7 @@ namespace Snet.Iot.Daq.handler
                 JObject? jsonObject = Newtonsoft.Json.JsonConvert.DeserializeObject<JObject>(content);
                 object[]? objs = [jsonObject];
                 //获取构造函数信息
-                ConstructorInfo? constructorInfo = type?.GetConstructors().Where(c => c.GetParameters().Count() > 0).FirstOrDefault();
+                ConstructorInfo? constructorInfo = type?.GetConstructors().Where(c => c.GetParameters().Length > 0).FirstOrDefault();
                 //返回数据
                 return ParamTypeConvert(objs, constructorInfo).FirstOrDefault();
             }
@@ -300,8 +297,8 @@ namespace Snet.Iot.Daq.handler
         {
             try
             {
-                var jObj = JsonConvert.DeserializeObject<JObject>(
-                    JsonConvert.SerializeObject(value));
+                var jObj = value as JObject
+                    ?? JsonConvert.DeserializeObject<JObject>(JsonConvert.SerializeObject(value));
 
                 if (jObj == null)
                     return GetDefault(type);
@@ -524,10 +521,8 @@ namespace Snet.Iot.Daq.handler
             if (operateResult.Status)
             {
                 //组织写入数据
-                ConcurrentDictionary<string, WriteModel> keys = new()
-                {
-                    [model.Address] = write
-                };
+                ConcurrentDictionary<string, WriteModel> keys = new();
+                keys[model.Address] = write;
                 //写入数据
                 operateResult = await daqNew.WriteAsync(keys);
                 //释放掉这个连接
@@ -616,7 +611,7 @@ namespace Snet.Iot.Daq.handler
         public static Address AddressConvert(this List<AddressModel> models)
         {
             Address address = new();
-            address.AddressArray = new();
+            address.AddressArray = new(models.Count);
             foreach (var item in models)
             {
                 address.AddressArray.Add(item.Convert());

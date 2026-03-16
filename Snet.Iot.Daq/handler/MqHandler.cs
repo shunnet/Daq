@@ -164,29 +164,7 @@ namespace Snet.Iot.Daq.handler
                 var key = item.Key;
                 var value = item.Value;
 
-                tasks.Add(Task.Run(async () =>
-                {
-                    try
-                    {
-                        string content = key.SimplifyValue
-                            ? value.GetSimplify().ToJson(true)
-                            : value.ToJson(true);
-
-                        var result = await mq.ProduceAsync(
-                            key.Topic,
-                            content,
-                            key.EncodingType.GetEncoding());
-
-                        if (!result.GetDetails(out string? msg))
-                        {
-                            errors.Add($"{key.Address} {msg}");
-                        }
-                    }
-                    catch (Exception ex)
-                    {
-                        errors.Add($"{key.Address} {ex.Message}");
-                    }
-                }));
+                tasks.Add(ProduceSingleAsync(mq, key, value, errors));
             }
             await Task.WhenAll(tasks);
             if (!errors.IsEmpty)
@@ -194,6 +172,33 @@ namespace Snet.Iot.Daq.handler
                 return OperateResult.CreateFailureResult(string.Join(Environment.NewLine, errors));
             }
             return OperateResult.CreateSuccessResult("Produce success");
+        }
+
+        /// <summary>
+        /// 单条生产（提取自批量循环，避免 Task.Run 包装 IO 密集型操作）
+        /// </summary>
+        private static async Task ProduceSingleAsync(IMq mq, AddressModel key, AddressValue value, ConcurrentBag<string> errors)
+        {
+            try
+            {
+                string content = key.SimplifyValue
+                    ? value.GetSimplify().ToJson(true)
+                    : value.ToJson(true);
+
+                var result = await mq.ProduceAsync(
+                    key.Topic,
+                    content,
+                    key.EncodingType.GetEncoding());
+
+                if (!result.GetDetails(out string? msg))
+                {
+                    errors.Add($"{key.Address} {msg}");
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"{key.Address} {ex.Message}");
+            }
         }
 
         /// <summary>

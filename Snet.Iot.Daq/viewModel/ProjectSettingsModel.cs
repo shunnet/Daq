@@ -448,7 +448,7 @@ namespace Snet.Iot.Daq.viewModel
             if (tab != null)
             {
                 DetailsNode.Remove(tab);
-                if (DetailsNode.Count() == 0)
+                if (DetailsNode.Count == 0)
                 {
                     TabControlVisibility = Visibility.Collapsed;
                 }
@@ -495,7 +495,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <param name="model">模型</param>
         private async Task RemoveSelectDeviceNodeAsync(ProjectTreeViewModel model)
         {
-            IEnumerable<ProjectDetailsTabControlModel> device;
+            List<ProjectDetailsTabControlModel> device;
             if (model.DaqDetails != null)
             {
                 device = DetailsNode.Where(c => c.DaqDetails.Guid == model.DaqDetails.Guid).ToList();
@@ -505,9 +505,9 @@ namespace Snet.Iot.Daq.viewModel
                 device = DetailsNode.Where(c => c.Header == model.Name).ToList();
             }
 
-            if (device.Count() > 0)
+            if (device.Count > 0)
             {
-                DetailsNode.Remove(device.First());
+                DetailsNode.Remove(device[0]);
             }
             if (model.Children.Count > 0)
             {
@@ -530,10 +530,10 @@ namespace Snet.Iot.Daq.viewModel
         {
             (ProjectDetails view, ProjectDetailsModel model) details = ProjectNode.CreateDetails(project);
             ProjectDetailsTabControlModel tabModel = new ProjectDetailsTabControlModel(project.DaqDetails.Guid.GetPlugin(), details.view);
-            IEnumerable<ProjectDetailsTabControlModel> device = DetailsNode.Where(c => c.DaqDetails.Guid == tabModel.DaqDetails.Guid).ToList();
-            if (device.Count() > 0)
+            var existing = DetailsNode.FirstOrDefault(c => c.DaqDetails.Guid == tabModel.DaqDetails.Guid);
+            if (existing != null)
             {
-                DetailsNodeSelectedItem = device.First();
+                DetailsNodeSelectedItem = existing;
             }
             else
             {

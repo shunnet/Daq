@@ -144,16 +144,16 @@ namespace Snet.Iot.Daq.utility
             HardwareData hardwareData = new HardwareData();
             if (baseInfo)
             {
-                Task.WaitAll(
-                    Task.Run(() => hardwareData.SystemName = GetSystemName()),
-                        Task.Run(() => hardwareData.SystemVer = GetSystemVer()),
-                        Task.Run(() => hardwareData.SystemRunTime = GetSystemRunTime()),
-                        Task.Run(() => hardwareData.CpuInfo = GetCpuInfo()),
-                        Task.Run(() => hardwareData.MemoryInfo = GetMemoryInfo()),
-                        Task.Run(() => hardwareData.DiskInfo = GetDiskInfo()),
-                        Task.Run(() => hardwareData.GpuInfo = GetGpuInfo()),
-                        Task.Run(() => hardwareData.BiosInfo = GetBiosInfo()),
-                        Task.Run(() => hardwareData.NetworkInfo = GetNetworkInfo()));
+                Parallel.Invoke(
+                    () => hardwareData.SystemName = GetSystemName(),
+                    () => hardwareData.SystemVer = GetSystemVer(),
+                    () => hardwareData.SystemRunTime = GetSystemRunTime(),
+                    () => hardwareData.CpuInfo = GetCpuInfo(),
+                    () => hardwareData.MemoryInfo = GetMemoryInfo(),
+                    () => hardwareData.DiskInfo = GetDiskInfo(),
+                    () => hardwareData.GpuInfo = GetGpuInfo(),
+                    () => hardwareData.BiosInfo = GetBiosInfo(),
+                    () => hardwareData.NetworkInfo = GetNetworkInfo());
             }
             foreach (IHardware hardware in computer.Hardware)  //硬件
             {

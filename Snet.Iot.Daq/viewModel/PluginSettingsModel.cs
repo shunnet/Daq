@@ -256,12 +256,11 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 FileHandler.StringToFile(Path.Combine(GlobalConfigModel.TaskPath, $"Remove{name}Plugin.bat"), stringBuilder.ToString());
                 //查询插件路径是否还有一致的，有的话一并删除
-                for (int i = 0; i < PluginList.Count; i++)
+                for (int i = PluginList.Count - 1; i >= 0; i--)
                 {
-                    var item = PluginList[i];
-                    if (item.PluginDetails.PluginPath == details.PluginPath)
+                    if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
                     {
-                        PluginList.Remove(item);
+                        PluginList.RemoveAt(i);
                     }
                 }
                 PluginListSelectedItem = null;  //置空

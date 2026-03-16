@@ -1,4 +1,4 @@
-ï»¿using CommunityToolkit.Mvvm.Input;
+using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
 using Snet.Iot.Daq.data;
@@ -16,13 +16,13 @@ using static Snet.Iot.Daq.handler.AddressHandler;
 namespace Snet.Iot.Daq.viewModel
 {
     /// <summary>
-    /// åœ°å€è®¾ç½®è§†å›¾æ¨¡å‹
+    /// µØÖ·ÉèÖÃÊÓÍ¼Ä£ĞÍ
     /// </summary>
     public class AddressSettingsModel : BindNotify
     {
-        #region å±æ€§
+        #region ÊôĞÔ
         /// <summary>
-        /// åœ°å€é…ç½®é›†åˆ
+        /// µØÖ·ÅäÖÃ¼¯ºÏ
         /// </summary>
         public ObservableCollection<Snet.Iot.Daq.data.AddressModel> AddressConfig
         {
@@ -32,7 +32,7 @@ namespace Snet.Iot.Daq.viewModel
         private ObservableCollection<Snet.Iot.Daq.data.AddressModel> addressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>();
 
         /// <summary>
-        /// åœ°å€é…ç½®è¢«é€‰ä¸­çš„é¡¹
+        /// µØÖ·ÅäÖÃ±»Ñ¡ÖĞµÄÏî
         /// </summary>
         public Snet.Iot.Daq.data.AddressModel AddressConfigSelectedItem
         {
@@ -41,7 +41,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// æŸ¥è¯¢çš„å†…å®¹
+        /// ²éÑ¯µÄÄÚÈİ
         /// </summary>
         /// <returns></returns>
         public string QueryCntent
@@ -51,7 +51,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// æ˜¯å¦è¡¨æ ¼ä¸­æ˜¾ç¤ºçš„å…¨éƒ¨é¡¹é€‰ä¸­
+        /// ÊÇ·ñ±í¸ñÖĞÏÔÊ¾µÄÈ«²¿ÏîÑ¡ÖĞ
         /// </summary>
         public bool IsAllItems1Selected
         {
@@ -60,7 +60,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// æ€»æ•°é‡
+        /// ×ÜÊıÁ¿
         /// </summary>
         public int Total
         {
@@ -69,7 +69,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// æ¯é¡µçš„é¡µæ•°
+        /// Ã¿Ò³µÄÒ³Êı
         /// </summary>
         public int PageSize
         {
@@ -79,7 +79,7 @@ namespace Snet.Iot.Daq.viewModel
         private int pageSize = 50;
 
         /// <summary>
-        /// é¡µç´¢å¼•
+        /// Ò³Ë÷Òı
         /// </summary>
         public int PageIndex
         {
@@ -88,9 +88,9 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        #region å‘½ä»¤
+        #region ÃüÁî
         /// <summary>
-        /// å¤„ç†
+        /// ´¦Àí
         /// </summary>
         public IAsyncRelayCommand Handler => p_handler ??= new AsyncRelayCommand(HandlerAsync);
         private IAsyncRelayCommand? p_handler;
@@ -103,7 +103,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// æŸ¥è¯¢åœ°å€
+        /// ²éÑ¯µØÖ·
         /// </summary>
         public IAsyncRelayCommand QueryAddress => queryAddress ??= new AsyncRelayCommand(QueryAddressAsync);
         private IAsyncRelayCommand? queryAddress;
@@ -111,29 +111,29 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (QueryCntent.IsNullOrWhiteSpace())
             {
-                //æŸ¥è¯¢æ‰€æœ‰
+                //²éÑ¯ËùÓĞ
                 await PageIndexChangedExecuteAsync(1);
             }
             else
             {
-                //æ¨¡ç³ŠæŸ¥è¯¢
+                //Ä£ºı²éÑ¯
                 List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().Where(p =>
                 p.AnotherName.Contains(QueryCntent) || p.AnotherName.Equals(QueryCntent) ||
                 p.Address.Contains(QueryCntent) || p.Address.Equals(QueryCntent) ||
                 p.Describe.Contains(QueryCntent) || p.Describe.Equals(QueryCntent)).ToList();
                 if (models.Count > 0)
                 {
-                    await ResetUiAsync(models.Count(), 1, models);
+                    await ResetUiAsync(models.Count, 1, models);
                 }
                 else
                 {
-                    await MessageBox.Show("æœªæŸ¥è¯¢åˆ°å¯¹åº”å†…å®¹".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Asterisk);
+                    await MessageBox.Show("Î´²éÑ¯µ½¶ÔÓ¦ÄÚÈİ".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Asterisk);
                 }
             }
         }
 
         /// <summary>
-        /// æ·»åŠ åœ°å€
+        /// Ìí¼ÓµØÖ·
         /// </summary>
         public IAsyncRelayCommand AddAddress => addAddress ??= new AsyncRelayCommand(AddAddressAsync);
         private IAsyncRelayCommand? addAddress;
@@ -147,13 +147,13 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     if (param.Address.IsNullOrWhiteSpace())
                     {
-                        await MessageBox.Show("åœ°å€ä¸èƒ½ä¸ºç©º".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        await MessageBox.Show("µØÖ·²»ÄÜÎª¿Õ".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                         return;
                     }
 
                     if (param.AnotherName.IsNullOrWhiteSpace())
                     {
-                        await MessageBox.Show("åœ°å€åˆ«åä¸èƒ½ä¸ºç©º".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        await MessageBox.Show("µØÖ·±ğÃû²»ÄÜÎª¿Õ".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                         return;
                     }
 
@@ -161,23 +161,23 @@ namespace Snet.Iot.Daq.viewModel
                     if (result.Duplicate == 0)
                     {
                         await PageIndexChangedExecuteAsync(PageIndex);
-                        //å¾€å…¨å±€é›†åˆä¸­æ·»åŠ 
+                        //ÍùÈ«¾Ö¼¯ºÏÖĞÌí¼Ó
                         param.SetAddress();
                     }
                     else
                     {
-                        await MessageBox.Show("æ·»åŠ å¤±è´¥ï¼Œåœ°å€æˆ–åˆ«åé‡å¤ï¼".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        await MessageBox.Show("Ìí¼ÓÊ§°Ü£¬µØÖ·»ò±ğÃûÖØ¸´£¡".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                     }
                 }
                 catch (Exception ex)
                 {
-                    await MessageBox.Show(ex.Message, "å¼‚å¸¸".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                    await MessageBox.Show(ex.Message, "Òì³£".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                 }
             }
         }
 
         /// <summary>
-        /// å¯¼å…¥åœ°å€
+        /// µ¼ÈëµØÖ·
         /// </summary>
         public IAsyncRelayCommand ImportAddress => importAddress ??= new AsyncRelayCommand(ImportAddressAsync);
         private IAsyncRelayCommand? importAddress;
@@ -189,7 +189,7 @@ namespace Snet.Iot.Daq.viewModel
                 List<Snet.Iot.Daq.data.AddressModel>? models = FileHandler.FileToString(file).ToJsonEntity<List<Snet.Iot.Daq.data.AddressModel>>();
                 if (models == null)
                 {
-                    await MessageBox.Show("å¯¼å…¥å¤±è´¥".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                    await MessageBox.Show("µ¼ÈëÊ§°Ü".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                 }
                 else
                 {
@@ -197,11 +197,11 @@ namespace Snet.Iot.Daq.viewModel
                     await PageIndexChangedExecuteAsync(1);
                     if (result.Failed > 0)
                     {
-                        await MessageBox.Show($"{"å­˜åœ¨".GetLanguageValue(App.LanguageOperate)}â€œ{result.Failed}â€{"ä¸ªç‚¹ä½å¯¼å…¥å¤±è´¥".GetLanguageValue(App.LanguageOperate)}", "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        await MessageBox.Show($"{"´æÔÚ".GetLanguageValue(App.LanguageOperate)}¡°{result.Failed}¡±{"¸öµãÎ»µ¼ÈëÊ§°Ü".GetLanguageValue(App.LanguageOperate)}", "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                     }
                     else
                     {
-                        await MessageBox.Show($"å¯¼å…¥æˆåŠŸ".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        await MessageBox.Show($"µ¼Èë³É¹¦".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                     }
                 }
             }
@@ -209,7 +209,7 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
-        /// å¯¼å‡ºåœ°å€
+        /// µ¼³öµØÖ·
         /// </summary>
         public IAsyncRelayCommand ExportAddress => exportAddress ??= new AsyncRelayCommand(ExportAddressAsync);
         private IAsyncRelayCommand? exportAddress;
@@ -220,17 +220,17 @@ namespace Snet.Iot.Daq.viewModel
                 string path = GlobalConfigModel.SelectFolder();
                 if (!string.IsNullOrEmpty(path))
                 {
-                    //æŸ¥è¯¢æ‰€æœ‰ç‚¹ä½
+                    //²éÑ¯ËùÓĞµãÎ»
                     List<AddressModel> models = GlobalConfigModel.sqliteOperate.Table<AddressModel>().ToList();
                     FileHandler.StringToFile(Path.Combine(path, $"Address[{DateTime.Now.ToString("yyyyMMddHHmmss")}].json"), models.ToJson());
-                    await MessageBox.Show(App.LanguageOperate.GetLanguageValue("å¯¼å‡ºæˆåŠŸ"), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    await MessageBox.Show(App.LanguageOperate.GetLanguageValue("µ¼³ö³É¹¦"), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
         }
 
 
         /// <summary>
-        /// å…¨é€‰åœ°å€
+        /// È«Ñ¡µØÖ·
         /// </summary>
         public IAsyncRelayCommand AllSelectAddress => allSelectAddress ??= new AsyncRelayCommand(AllSelectAddressAsync);
         private IAsyncRelayCommand? allSelectAddress;
@@ -243,7 +243,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// åé€‰åœ°å€
+        /// ·´Ñ¡µØÖ·
         /// </summary>
         public IAsyncRelayCommand InverseAddress => inverseAddress ??= new AsyncRelayCommand(InverseAddressAsync);
         private IAsyncRelayCommand? inverseAddress;
@@ -256,50 +256,50 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// åˆ é™¤åœ°å€
+        /// É¾³ıµØÖ·
         /// </summary>
         public IAsyncRelayCommand DeleteAddress => deleteAddress ??= new AsyncRelayCommand(DeleteAddressAsync);
         private IAsyncRelayCommand? deleteAddress;
         private async Task DeleteAddressAsync()
         {
-            IEnumerable<Snet.Iot.Daq.data.AddressModel> models = AddressConfig.Where(x => x.IsSelected);
-            if (models.Count() > 0)
+            List<Snet.Iot.Daq.data.AddressModel> models = AddressConfig.Where(x => x.IsSelected).ToList();
+            if (models.Count > 0)
             {
                 StringBuilder builder = new StringBuilder();
                 foreach (var model in models)
                 {
                     if (UseCheck(model))
                     {
-                        builder.AppendLine($"{model.Address} - {"åœ°å€é…ç½®åœ¨é¡¹ç›®è®¾ç½®ä¸­æœ‰ä½¿ç”¨".GetLanguageValue(App.LanguageOperate)}");
+                        builder.AppendLine($"{model.Address} - {"µØÖ·ÅäÖÃÔÚÏîÄ¿ÉèÖÃÖĞÓĞÊ¹ÓÃ".GetLanguageValue(App.LanguageOperate)}");
                     }
                 }
                 if (builder.Length > 0)
                 {
-                    await MessageBox.Show(builder.ToString(), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Warning);
+                    await MessageBox.Show(builder.ToString(), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Warning);
                     return;
                 }
 
 
-                if ((await MessageBox.Show("ç¡®è®¤åˆ é™¤é€‰ä¸­çš„åœ°å€é¡¹å—ï¼Ÿ".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Question)).ToBool())
+                if ((await MessageBox.Show("È·ÈÏÉ¾³ıÑ¡ÖĞµÄµØÖ·ÏîÂğ£¿".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Question)).ToBool())
                 {
-                    List<bool> status = new List<bool>();
+                    int failCount = 0;
                     GlobalConfigModel.sqliteOperate.RunInTransaction(() =>
                     {
                         foreach (var item in models)
                         {
-                            status.Add(GlobalConfigModel.sqliteOperate.Execute("DELETE FROM AddressModel WHERE [Index] = ?", item.Index) > 0 ? true : false);
+                            if (GlobalConfigModel.sqliteOperate.Execute("DELETE FROM AddressModel WHERE [Index] = ?", item.Index) <= 0)
+                                failCount++;
                             GlobalConfigModel.AddressDict.Remove(item.Guid, out _);
                         }
                     });
                     await PageIndexChangedExecuteAsync(1);
-                    int failStatus = status.Where(c => !c).Count();
-                    if (failStatus > 0)
+                    if (failCount > 0)
                     {
-                        await MessageBox.Show($"{"å­˜åœ¨".GetLanguageValue(App.LanguageOperate)}â€œ{failStatus}â€{"ä¸ªç‚¹ä½åˆ é™¤å¤±è´¥".GetLanguageValue(App.LanguageOperate)}", "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        await MessageBox.Show($"{"´æÔÚ".GetLanguageValue(App.LanguageOperate)}¡°{failCount}¡±{"¸öµãÎ»É¾³ıÊ§°Ü".GetLanguageValue(App.LanguageOperate)}", "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                     }
                     else
                     {
-                        await MessageBox.Show($"åˆ é™¤æˆåŠŸ".GetLanguageValue(App.LanguageOperate), "æ¸©é¦¨æç¤º".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        await MessageBox.Show($"É¾³ı³É¹¦".GetLanguageValue(App.LanguageOperate), "ÎÂÜ°ÌáÊ¾".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                     }
 
                 }
@@ -307,9 +307,9 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        #region ç•Œé¢äº‹ä»¶
+        #region ½çÃæÊÂ¼ş
         /// <summary>
-        /// å†…å®¹èœå•æ‰“å¼€è§¦å‘
+        /// ÄÚÈİ²Ëµ¥´ò¿ª´¥·¢
         /// </summary>
         public IAsyncRelayCommand DataGrid_ContextMenuOpening => dataGrid_ContextMenuOpening ??= new AsyncRelayCommand<ContextMenuEventArgs>(DataGrid_ContextMenuOpeningAsync);
         private IAsyncRelayCommand? dataGrid_ContextMenuOpening;
@@ -318,8 +318,8 @@ namespace Snet.Iot.Daq.viewModel
             if (e?.Source is not DataGrid dataGrid)
                 return;
 
-            // æœ€ç»ˆè£å†³ï¼š
-            // åªè¦å½“å‰ä¸æ˜¯â€œè¡Œå³é”®â€ï¼Œå°±ç¦æ­¢å¼¹å‡º
+            // ×îÖÕ²Ã¾ö£º
+            // Ö»Òªµ±Ç°²»ÊÇ¡°ĞĞÓÒ¼ü¡±£¬¾Í½ûÖ¹µ¯³ö
             if (dataGrid.SelectedItem == null)
             {
                 e.Handled = true;
@@ -327,7 +327,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// é¼ æ ‡å³é”®ç‚¹å‡»è§¦å‘
+        /// Êó±êÓÒ¼üµã»÷´¥·¢
         /// </summary>
         public IAsyncRelayCommand DataGrid_PreviewMouseRightButtonDown => dataGrid_PreviewMouseRightButtonDown ??= new AsyncRelayCommand<MouseButtonEventArgs>(DataGrid_PreviewMouseRightButtonDownAsync);
         private IAsyncRelayCommand? dataGrid_PreviewMouseRightButtonDown;
@@ -343,41 +343,41 @@ namespace Snet.Iot.Daq.viewModel
 
             if (dep is DataGridRow row)
             {
-                // å³é”®åœ¨è¡Œä¸Š
+                // ÓÒ¼üÔÚĞĞÉÏ
                 dataGrid.SelectedItem = row.Item;
                 row.IsSelected = true;
                 row.Focus();
             }
             else
             {
-                // å³é”®ç©ºç™½ï¼šæ¸…ç©ºé€‰æ‹©
+                // ÓÒ¼ü¿Õ°×£ºÇå¿ÕÑ¡Ôñ
                 dataGrid.SelectedItem = null;
-                e.Handled = true; // é˜»æ­¢é»˜è®¤å³é”®
+                e.Handled = true; // ×èÖ¹Ä¬ÈÏÓÒ¼ü
             }
         }
 
 
 
         /// <summary>
-        /// å½“å‰é¡µ
+        /// µ±Ç°Ò³
         /// </summary>
         public IAsyncRelayCommand PageIndexChanged => pageIndexChanged ??= new AsyncRelayCommand<int>(PageIndexChangedExecuteAsync);
         private IAsyncRelayCommand? pageIndexChanged;
         private async Task PageIndexChangedExecuteAsync(int index)
         {
             List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().ToList();
-            await ResetUiAsync(models.Count(), index, models);
+            await ResetUiAsync(models.Count, index, models);
         }
         #endregion
 
-        #region æ–¹æ³•
+        #region ·½·¨
         /// <summary>
-        /// ä½¿ç”¨æ£€æŸ¥
+        /// Ê¹ÓÃ¼ì²é
         /// </summary>
-        /// <returns>false:æ²¡æœ‰è¢«ä½¿ç”¨  true:è¢«ä½¿ç”¨äº†</returns>
+        /// <returns>false:Ã»ÓĞ±»Ê¹ÓÃ  true:±»Ê¹ÓÃÁË</returns>
         private bool UseCheck(AddressModel model)
         {
-            //æ£€æŸ¥æ˜¯å¦æœ‰è¢«ä½¿ç”¨
+            //¼ì²éÊÇ·ñÓĞ±»Ê¹ÓÃ
             string checkFile = GlobalConfigModel.UI_ProjectConfigPath;
             if (File.Exists(checkFile))
             {
@@ -391,18 +391,18 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// é‡ç½®ç•Œé¢
+        /// ÖØÖÃ½çÃæ
         /// </summary>
-        /// <param name="total">æ€»æ•°</param>
-        /// <param name="pageIndex">é¡µç </param>
-        /// <param name="models">æ•°æ®</param>
+        /// <param name="total">×ÜÊı</param>
+        /// <param name="pageIndex">Ò³Âë</param>
+        /// <param name="models">Êı¾İ</param>
         /// <returns></returns>
         private Task ResetUiAsync(int total, int pageIndex, List<Snet.Iot.Daq.data.AddressModel> models)
         {
             PageIndex = pageIndex;
             Total = total;
             AddressConfig.Clear();
-            foreach (var item in models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize).ToList())
+            foreach (var item in models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize))
             {
                 AddressConfig.Add(item);
             }

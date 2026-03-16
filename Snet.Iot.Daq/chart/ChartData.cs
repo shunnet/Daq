@@ -161,47 +161,17 @@ namespace Snet.Iot.Daq.chart
             /// <param name="v">值</param>
             public void Update(double v)
             {
-                if (!double.IsNaN(model.MaxValue) && !double.IsNaN(model.MinValue))
+                bool hasMax = !double.IsNaN(model.MaxValue);
+                bool hasMin = !double.IsNaN(model.MinValue);
+
+                if ((hasMin && v < model.MinValue) || (hasMax && v > model.MaxValue))
                 {
-                    if (v >= model.MinValue && v <= model.MaxValue)
-                    {
-                        logger.Add(v);
-                        data.Add(v);
-                    }
-                    else
-                    {
-                        LogHelper.Verbose(message: $"{model.SN} {v} exceed limit value", foldername: "Chart\\Source");
-                    }
+                    LogHelper.Verbose(message: $"{model.SN} {v} exceed limit value", foldername: "Chart\\Source");
+                    return;
                 }
-                else if (!double.IsNaN(model.MaxValue) && double.IsNaN(model.MinValue))
-                {
-                    if (v <= model.MaxValue)
-                    {
-                        logger.Add(v);
-                        data.Add(v);
-                    }
-                    else
-                    {
-                        LogHelper.Verbose(message: $"{model.SN} {v} exceed max value", foldername: "Chart\\Source");
-                    }
-                }
-                else if (double.IsNaN(model.MaxValue) && !double.IsNaN(model.MinValue))
-                {
-                    if (v >= model.MinValue)
-                    {
-                        logger.Add(v);
-                        data.Add(v);
-                    }
-                    else
-                    {
-                        LogHelper.Verbose(message: $"{model.SN} {v} exceed min value", foldername: "Chart\\Source");
-                    }
-                }
-                else
-                {
-                    logger.Add(v);
-                    data.Add(v);
-                }
+
+                logger.Add(v);
+                data.Add(v);
             }
 
             /// <summary>
@@ -222,7 +192,11 @@ namespace Snet.Iot.Daq.chart
             {
                 if (data != null && data.Count > 0)
                 {
-                    return (data.ToArray(), Enumerable.Range(0, data.Count()).Select(i => (double)i).ToArray());
+                    int count = data.Count;
+                    double[] xs = new double[count];
+                    for (int i = 0; i < count; i++)
+                        xs[i] = i;
+                    return (data.ToArray(), xs);
                 }
                 return ([], []);
             }

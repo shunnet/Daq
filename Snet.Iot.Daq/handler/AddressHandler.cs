@@ -93,11 +93,9 @@ namespace Snet.Iot.Daq.handler
                 .Select(_ => new HashSet<TKey>())
                 .ToArray();
 
-            var table = db.Table<T>().ToList();
-
-            for (int i = 0; i < keySelectors.Length; i++)
+            foreach (var item in db.Table<T>())
             {
-                foreach (var item in table)
+                for (int i = 0; i < keySelectors.Length; i++)
                 {
                     var key = keySelectors[i](item);
                     if (key != null)

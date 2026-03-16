@@ -104,7 +104,7 @@ namespace Snet.Iot.Daq.viewModel
                 p.Describe.Contains(QueryCntent) || p.Describe.Equals(QueryCntent)).ToList();
                 if (models.Count > 0)
                 {
-                    await ResetUiAsync(models.Count(), 1, models);
+                    await ResetUiAsync(models.Count, 1, models);
                 }
                 else
                 {
@@ -200,7 +200,7 @@ namespace Snet.Iot.Daq.viewModel
         private async Task PageIndexChangedExecuteAsync(int index)
         {
             List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().ToList();
-            await ResetUiAsync(models.Count(), index, models);
+            await ResetUiAsync(models.Count, index, models);
         }
         #endregion
 
@@ -255,7 +255,7 @@ namespace Snet.Iot.Daq.viewModel
             PageIndex = pageIndex;
             Total = total;
             AddressConfig.Clear();
-            foreach (var item in models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize).ToList())
+            foreach (var item in models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize))
             {
                 AddressConfig.Add(item);
             }

@@ -71,6 +71,11 @@ namespace Snet.Iot.Daq.viewModel
         private readonly ConcurrentDictionary<string, string> _addressMap = new();
 
         /// <summary>
+        /// UA写入复用字典（避免热路径反复分配）
+        /// </summary>
+        private readonly ConcurrentDictionary<string, WriteModel> _singleWriteDict = new();
+
+        /// <summary>
         /// 服务空间名称
         /// </summary>
         private string uaServerAddressSpaceName;
@@ -84,6 +89,16 @@ namespace Snet.Iot.Daq.viewModel
         /// 层级集合
         /// </summary>
         private List<FolderState> folderStates = new();
+
+        /// <summary>
+        /// 地址索引缓存（避免热路径每次重建）
+        /// </summary>
+        private Dictionary<string, AddressModel> _addressIndex = new();
+
+        /// <summary>
+        /// MQ插件映射缓存（避免热路径每次重建）
+        /// </summary>
+        private Dictionary<string, List<PluginConfigModel>> _mqPluginMap = new();
 
         /// <summary>
         /// DataType 与 BuiltInType 映射缓存
@@ -114,27 +129,12 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 通道配置（延迟创建）
         /// </summary>
-        private BoundedChannelOptions channel
+        private BoundedChannelOptions channel => p_Channel ??= new BoundedChannelOptions(int.MaxValue)
         {
-            get
-            {
-                BoundedChannelOptions boundedChannelOptions = p_Channel;
-                if (boundedChannelOptions == null)
-                {
-                    BoundedChannelOptions obj = new BoundedChannelOptions(int.MaxValue)
-                    {
-                        FullMode = BoundedChannelFullMode.Wait,
-                        SingleReader = false,
-                        SingleWriter = false
-                    };
-                    BoundedChannelOptions boundedChannelOptions2 = obj;
-                    p_Channel = obj;
-                    boundedChannelOptions = boundedChannelOptions2;
-                }
-
-                return boundedChannelOptions;
-            }
-        }
+            FullMode = BoundedChannelFullMode.Wait,
+            SingleReader = false,
+            SingleWriter = false
+        };
         private BoundedChannelOptions? p_Channel;
 
         /// <summary>
@@ -618,12 +618,11 @@ namespace Snet.Iot.Daq.viewModel
                         if (!_addressMap.TryGetValue(addressName, out var realAddress))
                             continue;
 
-                        var dict = new ConcurrentDictionary<string, WriteModel>()
-                        {
-                            [realAddress] = new WriteModel(value, dataType)
-                        };
+                        _singleWriteDict[realAddress] = new WriteModel(value, dataType);
 
-                        var writeResult = await service.WriteAsync(dict);
+                        var writeResult = await service.WriteAsync(_singleWriteDict);
+
+                        _singleWriteDict.Clear();
 
                         if (!writeResult.Status && ShowAsync != null)
                             await ShowAsync.Invoke(writeResult.Message);
@@ -713,13 +712,9 @@ namespace Snet.Iot.Daq.viewModel
                         if (keys == null || keys.Count == 0)
                             continue;
 
-                        Dictionary<string, AddressModel> addressIndex = AddressDatas.Keys.Where(a => !string.IsNullOrEmpty(a.Address)).ToDictionary(a => a.Address!);
-
-                        Dictionary<string, List<PluginConfigModel>> mqPluginMap = AddressDatas.Where(kv => !string.IsNullOrEmpty(kv.Key.Address)).GroupBy(kv => kv.Key.Address!).ToDictionary(g => g.Key, g => g.SelectMany(x => x.Value).ToList());
-
                         foreach (var kv in keys)
                         {
-                            if (addressIndex.TryGetValue(kv.Key, out var addressModel) && mqPluginMap.TryGetValue(kv.Key, out var pluginConfigs))
+                            if (_addressIndex.TryGetValue(kv.Key, out var addressModel) && _mqPluginMap.TryGetValue(kv.Key, out var pluginConfigs))
                             {
                                 if (addressModel.ExpandParam != null)
                                 {
@@ -812,6 +807,21 @@ namespace Snet.Iot.Daq.viewModel
         private int AddressCount = 0;
 
         /// <summary>
+        /// 重建地址查找缓存
+        /// </summary>
+        private void RebuildAddressCache()
+        {
+            _addressIndex = AddressDatas.Keys
+                .Where(a => !string.IsNullOrEmpty(a.Address))
+                .ToDictionary(a => a.Address!);
+
+            _mqPluginMap = AddressDatas
+                .Where(kv => !string.IsNullOrEmpty(kv.Key.Address))
+                .GroupBy(kv => kv.Key.Address!)
+                .ToDictionary(g => g.Key, g => g.SelectMany(x => x.Value).ToList());
+        }
+
+        /// <summary>
         /// 设置
         /// </summary>
         /// <param name="model">项目信息</param>
@@ -826,7 +836,8 @@ namespace Snet.Iot.Daq.viewModel
             DeviceHierarchyToolTip = model.GetHierarchyPath();
             DeviceHierarchy = DeviceHierarchyToolTip.TruncateByBytes(36);
             AddressDatas = model.Details.ToAddressMqDictionary();
-            AddressCount = AddressDatas.Count();
+            AddressCount = AddressDatas.Count;
+            RebuildAddressCache();
             DaqData = model.DaqDetails;
             if (DeviceStatusFlashing)
             {
@@ -863,15 +874,20 @@ namespace Snet.Iot.Daq.viewModel
         {
             _cts = new CancellationTokenSource();
 
-            Task.Run(async () =>
+            _ = PollAsync(recorder, _cts.Token);
+        }
+
+        private async Task PollAsync(RuntimeSecondsRecorderHandler recorder, CancellationToken token)
+        {
+            using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+            try
             {
-                while (!_cts.IsCancellationRequested)
+                while (await timer.WaitForNextTickAsync(token))
                 {
-                    double seconds = recorder.TotalSeconds;
-                    CollectTime = (int)seconds;
-                    await Task.Delay(1000, _cts.Token);
+                    CollectTime = (int)recorder.TotalSeconds;
                 }
-            }, _cts.Token);
+            }
+            catch (OperationCanceledException) { }
         }
         private CancellationTokenSource _cts;
         /// <summary>
@@ -889,7 +905,7 @@ namespace Snet.Iot.Daq.viewModel
 
         public void Dispose()
         {
-            daqHandler.Dispose();
+            daqHandler?.Dispose();
             daqHandler = null;
             foreach (var item in mqHandlers)
             {
@@ -905,7 +921,8 @@ namespace Snet.Iot.Daq.viewModel
 
         public async ValueTask DisposeAsync()
         {
-            await daqHandler.DisposeAsync();
+            if (daqHandler != null)
+                await daqHandler.DisposeAsync();
             daqHandler = null;
             foreach (var item in mqHandlers)
             {

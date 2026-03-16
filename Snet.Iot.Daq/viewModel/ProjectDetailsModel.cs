@@ -90,7 +90,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 foreach (var item in GlobalConfigModel.addressModel.GetSelectItem())
                 {
-                    if (DetailsNode.Where(c => c.AddressDetails.Address == item.Address || c.AddressDetails.AnotherName == item.AnotherName).Count() == 0)
+                    if (!DetailsNode.Any(c => c.AddressDetails.Address == item.Address || c.AddressDetails.AnotherName == item.AnotherName))
                     {
                         DetailsNode.Add(new ProjectDetailsTreeViewModel(item.Guid.GetAddress()));
                     }
@@ -114,7 +114,7 @@ namespace Snet.Iot.Daq.viewModel
                 foreach (var items in DetailsNode)
                 {
                     ProjectDetailsTreeViewModel item = new ProjectDetailsTreeViewModel(plugin);
-                    if (items?.Children.Where(c => c.MqDetails.SN == item.MqDetails.SN).Count() == 0)
+                    if (!items?.Children.Any(c => c.MqDetails.SN == item.MqDetails.SN) ?? true)
                     {
                         items?.Children.Add(item);
                     }
@@ -143,7 +143,7 @@ namespace Snet.Iot.Daq.viewModel
                 PluginConfigModel plugin = GlobalConfigModel.deviceModel.GetValue().Guid.GetPlugin();
                 ProjectDetailsTreeViewModel item = new ProjectDetailsTreeViewModel(plugin);
 
-                if (DetailsNodeSelectedItem?.Children.Where(c => c.MqDetails.SN == item.MqDetails.SN).Count() == 0)
+                if (DetailsNodeSelectedItem?.Children.Any(c => c.MqDetails.SN == item.MqDetails.SN) == false)
                 {
                     DetailsNodeSelectedItem?.Children.Add(item);  //选中的节点添加子集
                     DetailsNodeSelectedItem = item; //在把子集设置为选中的节点
