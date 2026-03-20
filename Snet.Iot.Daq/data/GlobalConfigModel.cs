@@ -1,4 +1,5 @@
 ﻿using Snet.Core.handler;
+using Snet.Iot.Daq.mqtt.service;
 using Snet.Iot.Daq.opc.ua.service;
 using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
@@ -57,6 +58,11 @@ namespace Snet.Iot.Daq.data
         /// Opcua服务端
         /// </summary>
         public static OpcUaServiceOperate uaService;
+
+        /// <summary>
+        /// Mqtt服务端
+        /// </summary>
+        public static MqttServiceOperate mqttService;
 
         /// <summary>
         /// 刷新插件信息方法
@@ -151,6 +157,11 @@ namespace Snet.Iot.Daq.data
         /// ua服务端配置
         /// </summary>
         public static readonly string UaServerConfigPath = Path.Combine(ServerConfigPath, "UaServerConfig.json");
+
+        /// <summary>
+        /// Mqtt服务端配置
+        /// </summary>
+        public static readonly string MqttServerConfigPath = Path.Combine(ServerConfigPath, "MqttServerConfig.json");
 
         /// <summary>
         /// 界面插件集合配置路径

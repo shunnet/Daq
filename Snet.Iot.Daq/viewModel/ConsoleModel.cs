@@ -5,6 +5,7 @@ using Snet.Core.handler;
 using Snet.Iot.Daq.chart;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
+using Snet.Iot.Daq.mqtt.service;
 using Snet.Iot.Daq.opc.ua.service;
 using Snet.Iot.Daq.utility;
 using Snet.Iot.Daq.view;
@@ -14,7 +15,6 @@ using Snet.Utility;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.message;
 using Snet.Windows.Core.mvvm;
-using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
 using static Snet.Iot.Daq.utility.SystemMonitoring;
@@ -239,6 +239,121 @@ namespace Snet.Iot.Daq.viewModel
             await uiMessage.ClearAsync();
         }
 
+        /// <summary>
+        /// Mqtt服务数据修改
+        /// </summary>
+        public IAsyncRelayCommand MqttServerUpdate => p_MqttServerUpdate ??= new AsyncRelayCommand(MqttServerUpdateAsync);
+        IAsyncRelayCommand p_MqttServerUpdate;
+        public async Task MqttServerUpdateAsync()
+        {
+            if (File.Exists(GlobalConfigModel.MqttServerConfigPath))
+            {
+                MqttServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.MqttServerConfigPath).ToJsonEntity<MqttServiceData.Basics>();
+                GlobalConfigModel.param.SetBasics(basics);
+                if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                {
+                    basics = GlobalConfigModel.param.GetBasics().GetSource<MqttServiceData.Basics>();
+                    //写入配置
+                    FileHandler.StringToFile(GlobalConfigModel.MqttServerConfigPath, basics.ToJson(true));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 启动Mqtt服务
+        /// </summary>
+        public IAsyncRelayCommand MqttServerStart => p_MqttServerStart ??= new AsyncRelayCommand(MqttServerStartAsync);
+        IAsyncRelayCommand p_MqttServerStart;
+        public async Task MqttServerStartAsync()
+        {
+            if (GlobalConfigModel.mqttService is null)
+            {
+                GlobalConfigModel.param.SetBasics(new MqttServiceData.Basics());
+                if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                {
+                    MqttServiceData.Basics basics = GlobalConfigModel.param.GetBasics().GetSource<MqttServiceData.Basics>();
+                    GlobalConfigModel.mqttService = await MqttServiceOperate.InstanceAsync(basics);
+                    //创建本地配置
+                    if (!Directory.Exists(GlobalConfigModel.ServerConfigPath))
+                    {
+                        Directory.CreateDirectory(GlobalConfigModel.ServerConfigPath);
+                    }
+                    FileHandler.StringToFile(GlobalConfigModel.MqttServerConfigPath, basics.ToJson(true));
+
+                    await MqttServerInitAsync();
+                    await RefreshAsync();
+                }
+            }
+            else
+            {
+                await MessageBox.Show("已启动".GetLanguageValue(App.LanguageOperate), "Mqtt");
+            }
+        }
+
+        /// <summary>
+        /// Mqtt服务端初始化
+        /// </summary>
+        /// <returns></returns>
+        private async Task MqttServerInitAsync()
+        {
+            if (File.Exists(GlobalConfigModel.MqttServerConfigPath))
+            {
+                //实例化参数
+                MqttServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.MqttServerConfigPath).ToJsonEntity<MqttServiceData.Basics>();
+                //实例化
+                GlobalConfigModel.mqttService = MqttServiceOperate.Instance(basics ??= new());
+            }
+
+            if (GlobalConfigModel.mqttService is not null)
+            {
+                GlobalConfigModel.mqttService.OnInfoEventAsync += MqttService_OnInfoEventAsync;
+                OperateResult result = await GlobalConfigModel.mqttService.OnAsync();
+                await ShowAsync(result.ToJson(true));
+                if (!result.Status)
+                {
+                    GlobalConfigModel.mqttService.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
+                    await GlobalConfigModel.mqttService.DisposeAsync();
+                    GlobalConfigModel.mqttService = null;
+                }
+            }
+        }
+
+        private async Task MqttService_OnInfoEventAsync(object? sender, EventInfoResult e)
+        {
+            await ShowAsync($"[ MqttService ] {e.Status.ToString().ToUpperInvariant()}\r\n{e.ToJson(true)}");
+        }
+
+        /// <summary>
+        /// 停止Mqtt服务
+        /// </summary>
+        public IAsyncRelayCommand MqttServerStop => p_MqttServerStop ??= new AsyncRelayCommand(MqttServerStopAsync);
+        IAsyncRelayCommand p_MqttServerStop;
+        public async Task MqttServerStopAsync()
+        {
+            if (GlobalConfigModel.mqttService is not null)
+            {
+                OperateResult result = await GlobalConfigModel.mqttService.OffAsync();
+                await ShowAsync(result.ToJson(true));
+                GlobalConfigModel.mqttService.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
+                await GlobalConfigModel.mqttService.DisposeAsync();
+                GlobalConfigModel.mqttService = null;
+                await RefreshAsync();
+            }
+            else
+            {
+                await MessageBox.Show("未启动".GetLanguageValue(App.LanguageOperate), "Mqtt");
+            }
+        }
+
+
+
+
+
+
+
+
+
+
 
         /// <summary>
         /// OPCUA服务数据修改
@@ -321,7 +436,7 @@ namespace Snet.Iot.Daq.viewModel
 
         private async Task UaService_OnInfoEventAsync(object? sender, EventInfoResult e)
         {
-            await ShowAsync(e.ToJson(true));
+            await ShowAsync($"[ OpcUaService ] {e.Status.ToString().ToUpperInvariant()}\r\n{e.ToJson(true)}");
         }
 
         /// <summary>
@@ -428,7 +543,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (!result.Status)
             {
-                string msg = $"[ Error ] {result.Time} : [ {model.Type} ] : {result.Message}";
+                string msg = $"[ Error ] {result.Time} : [ {model.Type} ] {result.Message}";
                 await uiMessage.ShowAsync(msg, withTime: false);
                 LogHelper.Error(msg, foldername: "msg");
             }
@@ -477,6 +592,9 @@ namespace Snet.Iot.Daq.viewModel
 
             //OPCUA服务端启动
             await OpcUaServerInitAsync();
+
+            //Mqtt服务端启动
+            await MqttServerInitAsync();
 
             //赋值插件信息
             GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;

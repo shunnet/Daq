@@ -622,11 +622,11 @@
   <data name="布尔位索引" xml:space="preserve">
     <value>布尔位索引</value>
   </data>
-  <data name="OpcUa服务启动" xml:space="preserve">
-    <value>OpcUa服务启动</value>
+  <data name="服务启动" xml:space="preserve">
+    <value>服务启动</value>
   </data>
-  <data name="OpcUa服务停止" xml:space="preserve">
-    <value>OpcUa服务停止</value>
+  <data name="服务停止" xml:space="preserve">
+    <value>服务停止</value>
   </data>
   <data name="未启动" xml:space="preserve">
     <value>未启动</value>
@@ -634,8 +634,8 @@
   <data name="已启动" xml:space="preserve">
     <value>已启动</value>
   </data>
-  <data name="OpcUa服务数据修改" xml:space="preserve">
-    <value>OpcUa服务数据修改</value>
+  <data name="服务数据修改" xml:space="preserve">
+    <value>服务数据修改</value>
   </data>
   <data name="Exception" xml:space="preserve">
     <value>异常</value>

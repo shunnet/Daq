@@ -79,33 +79,6 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
-        ///   查找类似 OpcUa服务停止 的本地化字符串。
-        /// </summary>
-        public static string OpcUa服务停止 {
-            get {
-                return ResourceManager.GetString("OpcUa服务停止", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   查找类似 OpcUa服务启动 的本地化字符串。
-        /// </summary>
-        public static string OpcUa服务启动 {
-            get {
-                return ResourceManager.GetString("OpcUa服务启动", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   查找类似 OpcUa服务数据修改 的本地化字符串。
-        /// </summary>
-        public static string OpcUa服务数据修改 {
-            get {
-                return ResourceManager.GetString("OpcUa服务数据修改", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   查找类似 启动 的本地化字符串。
         /// </summary>
         public static string Start {
@@ -912,6 +885,33 @@ namespace Snet.Iot.Daq {
         public static string 最后更新时间 {
             get {
                 return ResourceManager.GetString("最后更新时间", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 服务停止 的本地化字符串。
+        /// </summary>
+        public static string 服务停止 {
+            get {
+                return ResourceManager.GetString("服务停止", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 服务启动 的本地化字符串。
+        /// </summary>
+        public static string 服务启动 {
+            get {
+                return ResourceManager.GetString("服务启动", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 服务数据修改 的本地化字符串。
+        /// </summary>
+        public static string 服务数据修改 {
+            get {
+                return ResourceManager.GetString("服务数据修改", resourceCulture);
             }
         }
         

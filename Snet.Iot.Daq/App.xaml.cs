@@ -51,6 +51,16 @@ namespace Snet.Iot.Daq
 
             models.Add(new EditModel
             {
+                Name = "异常",
+                Color = "#F44336"
+            });
+            models.Add(new EditModel
+            {
+                Name = "Exception",
+                Color = "#F44336"
+            });
+            models.Add(new EditModel
+            {
                 Name = "[ Mq ]",
                 Color = "#2196F3"
             });
@@ -63,9 +73,53 @@ namespace Snet.Iot.Daq
 
             models.Add(new EditModel
             {
+                Name = "[ MqttService ]",
+                Color = "#2196F3"
+            });
+
+            models.Add(new EditModel
+            {
+                Name = "[ OpcUaService ]",
+                Color = "#2196F3"
+            });
+
+            models.Add(new EditModel
+            {
+                Name = "[ MqttServiceOperate ]",
+                Color = "#2196F3"
+            });
+
+            models.Add(new EditModel
+            {
+                Name = "[ OpcUaServiceOperate ]",
+                Color = "#2196F3"
+            });
+
+            models.Add(new EditModel
+            {
+                Name = "TRUE",
+                Color = "#4CAF50"
+            });
+
+            models.Add(new EditModel
+            {
+                Name = "FALSE",
+                Color = "#F44336"
+            });
+
+            models.Add(new EditModel
+            {
                 Name = ">",
                 Color = "#FBC31D"
             });
+
+            models.Add(new EditModel
+            {
+                Name = "<",
+                Color = "#FBC31D"
+            });
+
+
 
             return models;
         }

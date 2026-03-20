@@ -154,9 +154,8 @@
                         Margin="10,0,0,0"
                         HorizontalAlignment="Left"
                         IsFlashing="{Binding DeviceStatusFlashing}"
-                        IsOn="{Binding DeviceStatus}"
-                        OffLightness="0.1"
-                        ToolTip="{snet:Loc 设备状态（常亮通信正常）（闪烁采集正常）}"
+                        IsOn="{Binding DeviceStatusChangLiang}"
+                        OffLightness="0.2"
                         Color="{Binding LedColor}" />
                     <Menu HorizontalAlignment="Right">
                         <uis:MenuItem Header="{x:Null}" Icon="{uis:SymbolIcon Symbol=ReOrderDotsVertical24, Filled=True}">

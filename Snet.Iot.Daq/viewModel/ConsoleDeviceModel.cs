@@ -153,6 +153,11 @@ namespace Snet.Iot.Daq.viewModel
         private CancellationTokenSource TokenSource;
 
         /// <summary>
+        /// 是否在运行采集
+        /// </summary>
+        private bool IsRun = false;
+
+        /// <summary>
         /// 采集数据
         /// </summary>
         private PluginConfigModel DaqData
@@ -186,6 +191,15 @@ namespace Snet.Iot.Daq.viewModel
         {
             get => GetProperty(() => DeviceStatusFlashing);
             set => SetProperty(() => DeviceStatusFlashing, value);
+        }
+
+        /// <summary>
+        /// 设备状态常亮 亮还是暗
+        /// </summary>
+        public bool DeviceStatusChangLiang
+        {
+            get => GetProperty(() => DeviceStatusChangLiang);
+            set => SetProperty(() => DeviceStatusChangLiang, value);
         }
 
         /// <summary>
@@ -242,15 +256,6 @@ namespace Snet.Iot.Daq.viewModel
             set => SetProperty(ref collectStatus, value);
         }
         private string collectStatus = LanguageHandler.GetLanguageValue("未知", App.LanguageOperate);
-
-        /// <summary>
-        /// 设备状态
-        /// </summary>
-        public bool DeviceStatus
-        {
-            get => GetProperty(() => DeviceStatus);
-            set => SetProperty(() => DeviceStatus, value);
-        }
 
         /// <summary>
         /// 创建时间
@@ -381,7 +386,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? collect;
         private async Task CollectAsync()
         {
-            if (!DeviceStatusFlashing)
+            if (!IsRun)
             {
                 if (daqHandler == null)
                 {
@@ -409,7 +414,7 @@ namespace Snet.Iot.Daq.viewModel
 
                     CollectStatus = LanguageHandler.GetLanguageValue("启动", App.LanguageOperate);
                     DeviceStatusFlashing = true;
-                    DeviceStatus = true;
+                    DeviceStatusChangLiang = true;
                     runtime.Start();
 
                     if (DaqData.WebApi != null)
@@ -433,10 +438,13 @@ namespace Snet.Iot.Daq.viewModel
                         DataSyncChannel = Channel.CreateBounded<EventDataResult>(channel);
                         _ = DataSyncChannelDataEventAsync(TokenSource.Token);
                     }
+
+                    IsRun = true;
                 }
                 else
                 {
-                    DeviceStatus = false;
+                    DeviceStatusFlashing = false;
+                    DeviceStatusChangLiang = false;
                 }
                 //回写结果数据
                 await ResultMsgAsync(DaqData, result);
@@ -476,7 +484,8 @@ namespace Snet.Iot.Daq.viewModel
 
             CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
             DeviceStatusFlashing = false;
-            DeviceStatus = false;
+            DeviceStatusChangLiang = false;
+            IsRun = false;
             runtime.Stop();
 
             if (UaSyncChannel != null)
@@ -650,43 +659,53 @@ namespace Snet.Iot.Daq.viewModel
         /// 创建UA层级
         /// </summary>
         /// <returns></returns>
-        private async Task<FolderState> UaCreateFolder()
+        private async Task<FolderState?> UaCreateFolder()
         {
-            if (folderState != null)
+            try
             {
+                if (GlobalConfigModel.uaService is null)
+                    return null;
+
+                if (folderState != null)
+                {
+                    return folderState;
+                }
+
+                //比对层级
+                if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
+                {
+                    uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsData().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
+                }
+
+                if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)
+                {
+                    FolderState folder = null;
+                    //创建层级
+                    foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
+                    {
+                        OperateResult operateResult = GlobalConfigModel.uaService.CreateFolder(item, folder);
+                        if (operateResult.GetDetails(out string? msg))
+                        {
+                            folder = operateResult.GetSource<FolderState>();
+                            folderStates.Add(folder);
+                        }
+                        else
+                        {
+                            await ShowAsync.Invoke(msg);
+                        }
+                    }
+                    folderState = folder;
+                }
+                else
+                {
+                    return null;
+                }
                 return folderState;
             }
-
-            //比对层级
-            if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
-            {
-                uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsData().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
-            }
-
-            if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)
-            {
-                FolderState folder = null;
-                //创建层级
-                foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
-                {
-                    OperateResult operateResult = GlobalConfigModel.uaService.CreateFolder(item, folder);
-                    if (operateResult.GetDetails(out string? msg))
-                    {
-                        folder = operateResult.GetSource<FolderState>();
-                        folderStates.Add(folder);
-                    }
-                    else
-                    {
-                        await ShowAsync.Invoke(msg);
-                    }
-                }
-                folderState = folder;
-            }
-            else
+            catch (Exception)
             {
                 return null;
             }
-            return folderState;
         }
 
         /// <summary>
@@ -840,7 +859,7 @@ namespace Snet.Iot.Daq.viewModel
             AddressCount = AddressDatas.Count;
             RebuildAddressCache();
             DaqData = model.DaqDetails;
-            if (DeviceStatusFlashing)
+            if (IsRun)
             {
                 await RetryAsync();
             }
@@ -864,6 +883,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 LedColor = System.Windows.Media.Colors.Red;
                 CollectStatus = LanguageHandler.GetLanguageValue("异常", App.LanguageOperate);
+                DeviceStatusChangLiang = true;
             }
             await ResultAsync.Invoke(pcm, bm);
         }

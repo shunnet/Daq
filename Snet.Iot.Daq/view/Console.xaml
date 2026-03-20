@@ -59,10 +59,72 @@
 
                     <ui:PopupBox Padding="0" PlacementMode="BottomAndAlignCentres">
                         <StackPanel>
-                            <Button
-                                Command="{Binding OpcUaServerStart}"
-                                Style="{StaticResource MaterialDesignFlatSecondaryButton}"
-                                ToolTip="{snet:Loc OpcUa服务启动}">
+                            <Button Command="{Binding MqttServerStart}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Button.ToolTip>
+                                    <ToolTip Content="{Binding Source={snet:Loc 服务启动}, StringFormat=Mqtt:{0}}" />
+                                </Button.ToolTip>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image
+                                        Height="15"
+                                        Margin="0,0,5,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource Mqtt}"
+                                        Stretch="Fill" />
+                                    <Image
+                                        Height="15"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource 启动}"
+                                        Stretch="Fill" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding MqttServerStop}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Button.ToolTip>
+                                    <ToolTip Content="{Binding Source={snet:Loc 服务停止}, StringFormat=Mqtt{0}}" />
+                                </Button.ToolTip>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image
+                                        Height="15"
+                                        Margin="0,0,5,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource Mqtt}"
+                                        Stretch="Fill" />
+                                    <Image
+                                        Height="15"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource 停止}"
+                                        Stretch="Fill" />
+                                </StackPanel>
+                            </Button>
+                            <Button Command="{Binding MqttServerUpdate}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Button.ToolTip>
+                                    <ToolTip Content="{Binding Source={snet:Loc 服务数据修改}, StringFormat=Mqtt{0}}" />
+                                </Button.ToolTip>
+                                <StackPanel Orientation="Horizontal">
+                                    <Image
+                                        Height="15"
+                                        Margin="0,0,5,0"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource Mqtt}"
+                                        Stretch="Fill" />
+                                    <Image
+                                        Height="15"
+                                        HorizontalAlignment="Center"
+                                        VerticalAlignment="Center"
+                                        Source="{DynamicResource 修改}"
+                                        Stretch="Fill" />
+                                </StackPanel>
+                            </Button>
+
+
+                            <Button Command="{Binding OpcUaServerStart}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Button.ToolTip>
+                                    <ToolTip Content="{Binding Source={snet:Loc 服务启动}, StringFormat=OpcUa{0}}" />
+                                </Button.ToolTip>
                                 <StackPanel Orientation="Horizontal">
                                     <Image
                                         Height="15"
@@ -79,10 +141,10 @@
                                         Stretch="Fill" />
                                 </StackPanel>
                             </Button>
-                            <Button
-                                Command="{Binding OpcUaServerStop}"
-                                Style="{StaticResource MaterialDesignFlatSecondaryButton}"
-                                ToolTip="{snet:Loc OpcUa服务停止}">
+                            <Button Command="{Binding OpcUaServerStop}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Button.ToolTip>
+                                    <ToolTip Content="{Binding Source={snet:Loc 服务停止}, StringFormat=OpcUa{0}}" />
+                                </Button.ToolTip>
                                 <StackPanel Orientation="Horizontal">
                                     <Image
                                         Height="15"
@@ -99,10 +161,10 @@
                                         Stretch="Fill" />
                                 </StackPanel>
                             </Button>
-                            <Button
-                                Command="{Binding OpcUaServerUpdate}"
-                                Style="{StaticResource MaterialDesignFlatSecondaryButton}"
-                                ToolTip="{snet:Loc OpcUa服务数据修改}">
+                            <Button Command="{Binding OpcUaServerUpdate}" Style="{StaticResource MaterialDesignFlatSecondaryButton}">
+                                <Button.ToolTip>
+                                    <ToolTip Content="{Binding Source={snet:Loc 服务数据修改}, StringFormat=OpcUa{0}}" />
+                                </Button.ToolTip>
                                 <StackPanel Orientation="Horizontal">
                                     <Image
                                         Height="15"
