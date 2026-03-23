@@ -13,6 +13,7 @@
     Height="900"
     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
     snet:ResxLocalizationProvider.DefaultDictionary="Language"
+    AnimationTime="5000"
     Icon="/icon.ico"
     LoadAnimationEnabled="True"
     VerEnabled="True"
