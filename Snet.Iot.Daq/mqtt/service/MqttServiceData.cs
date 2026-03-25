@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 namespace Snet.Iot.Daq.mqtt.service
 {
     /// <summary>
-    /// mqtt 服务 数据
+    /// MQTT 服务端数据配置类，封装 MQTT Broker 的连接参数（端口、认证信息、最大连接数等）和步骤枚举。
     /// </summary>
     public class MqttServiceData
     {

@@ -14,6 +14,9 @@ using System.Threading.Channels;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 控制台设备视图模型，负责单个采集设备的运行控制、数据读写、订阅管理、OPC UA 地址空间同步以及 MQ 数据转发。
+    /// </summary>
     public class ConsoleDeviceModel : BindNotify, IDisposable, IAsyncDisposable
     {
         #region 构造函数

@@ -10,6 +10,9 @@ using System.Windows.Media;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 处理器视图模型，提供字节数据处理配置的导入/导出、DataGrid 右键菜单交互等功能。
+    /// </summary>
     public class HandlerModel : BindNotify
     {
         #region 界面事件

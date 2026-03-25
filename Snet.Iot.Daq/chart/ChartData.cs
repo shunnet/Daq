@@ -7,7 +7,7 @@ using System.Text.Json.Serialization;
 namespace Snet.Iot.Daq.chart
 {
     /// <summary>
-    /// 图标数据
+    /// 图表数据定义类，包含图表基础配置和线条模型基类。
     /// </summary>
     public class ChartData
     {

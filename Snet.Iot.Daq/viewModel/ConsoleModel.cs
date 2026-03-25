@@ -21,6 +21,9 @@ using static Snet.Iot.Daq.utility.SystemMonitoring;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 控制台视图模型，负责系统监控信息显示、OPC UA/MQTT 服务端管理、日志输出以及采集设备运行状态的综合管理。
+    /// </summary>
     public class ConsoleModel : BindNotify
     {
         #region 构造函数

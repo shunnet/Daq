@@ -9,7 +9,8 @@ using static Snet.Iot.Daq.mqtt.service.MqttServiceData;
 namespace Snet.Iot.Daq.mqtt.service
 {
     /// <summary>
-    /// mqtt 服务端
+    /// MQTT 服务端操作类，基于 MQTTnet 实现 MQTT Broker 服务。
+    /// <para>支持客户端连接/断开监听、主题订阅/取消订阅、消息接收等功能。</para>
     /// </summary>
     public class MqttServiceOperate : CoreUnify<MqttServiceOperate, Basics>, IOn, IOff, IGetStatus, IDisposable, IAsyncDisposable
     {

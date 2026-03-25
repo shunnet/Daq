@@ -105,7 +105,7 @@ namespace Snet.Iot.Daq.data
             get => _statusMessage;
             set => SetProperty(ref _statusMessage, value);
         }
-        private string _statusMessage;
+        private string _statusMessage = string.Empty;
 
         /// <summary>
         /// 唯一标识符
@@ -160,7 +160,7 @@ namespace Snet.Iot.Daq.data
         public WAModel? WebApi { get; set; }
 
         /// <summary>
-        /// 修改本地参数
+        /// 修改本地参数配置：将当前参数写入到本地配置文件。
         /// </summary>
         /// <returns>是否修改成功</returns>
         public bool UpdateLocalConfig()
@@ -170,7 +170,7 @@ namespace Snet.Iot.Daq.data
                 FileHandler.StringToFile(Path.Combine(ConfigPath, SN), Param);
                 return true;
             }
-            catch (Exception ex)
+            catch
             {
                 return false;
             }

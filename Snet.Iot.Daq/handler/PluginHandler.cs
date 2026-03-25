@@ -367,7 +367,7 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 保存插件界面你配置
+        /// 保存插件界面配置
         /// </summary>
         /// <param name="data">json 数据</param>
         /// <param name="path">保存的路径</param>
@@ -377,7 +377,7 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 保存插件界面你配置
+        /// 保存插件界面配置
         /// </summary>
         /// <param name="data">json 数据</param>
         /// <param name="path">保存的路径</param>

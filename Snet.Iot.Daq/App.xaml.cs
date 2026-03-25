@@ -229,19 +229,21 @@ namespace Snet.Iot.Daq
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
         }
 
-        //Task线程报错
+        /// <summary>
+        /// Task 线程内未捕获异常处理事件，先进行空判断再访问 HResult 属性以避免空引用异常。
+        /// </summary>
         private void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
             try
             {
                 var exception = e.Exception as Exception;
+                if (exception == null)
+                    return;
+
                 if (exception.HResult == -2146233088)
                     return;
 
-                if (exception != null)
-                {
-                    HandleException(exception);
-                }
+                HandleException(exception);
             }
             catch (Exception ex)
             {

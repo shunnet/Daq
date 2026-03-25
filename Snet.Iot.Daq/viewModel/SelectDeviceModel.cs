@@ -10,6 +10,9 @@ using System.Windows.Media;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 选择设备视图模型，提供插件配置列表展示、状态验证、DataGrid 右键菜单交互等功能。
+    /// </summary>
     public class SelectDeviceModel : BindNotify
     {
         #region 属性

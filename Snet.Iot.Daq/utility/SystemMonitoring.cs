@@ -21,55 +21,72 @@ namespace Snet.Iot.Daq.utility
         private UpdateVisitor updateVisitor = new UpdateVisitor();
 
         /// <summary>
-        /// 传感器信息类型
+        /// 传感器信息类型，包含键值对数据
         /// </summary>
         public class SensorDataType
         {
-            public string Key { get; set; }
-            public string Value { get; set; }
+            /// <summary>
+            /// 传感器键名
+            /// </summary>
+            public string Key { get; set; } = string.Empty;
+
+            /// <summary>
+            /// 传感器值
+            /// </summary>
+            public string Value { get; set; } = string.Empty;
         }
 
         /// <summary>
-        /// 硬件信息类型
+        /// 硬件信息类型，继承传感器信息并包含子传感器列表
         /// </summary>
         public class HardwareDataType : SensorDataType
         {
+            /// <summary>
+            /// 构造函数，初始化子传感器列表
+            /// </summary>
             public HardwareDataType()
             {
                 Values = new List<SensorDataType>();
             }
+
+            /// <summary>
+            /// 子传感器信息列表
+            /// </summary>
             public List<SensorDataType> Values { get; set; }
         }
 
         /// <summary>
-        /// 硬件信息
+        /// 硬件信息数据模型，包含系统信息和各硬件组件详情
         /// </summary>
         public class HardwareData
         {
+            /// <summary>
+            /// 构造函数，初始化硬件信息列表
+            /// </summary>
             public HardwareData()
             {
                 Info = new List<HardwareDataType>();
             }
 
             /// <summary>
-            /// 信息
+            /// 硬件信息列表
             /// </summary>
             public List<HardwareDataType> Info { get; set; }
 
             /// <summary>
             /// 系统名称
             /// </summary>
-            public string SystemName { get; set; }
+            public string SystemName { get; set; } = string.Empty;
 
             /// <summary>
             /// 系统版本
             /// </summary>
-            public string SystemVer { get; set; }
+            public string SystemVer { get; set; } = string.Empty;
 
             /// <summary>
             /// 系统运行时间
             /// </summary>
-            public string SystemRunTime { get; set; }
+            public string SystemRunTime { get; set; } = string.Empty;
 
             /// <summary>
             /// 处理器信息

@@ -11,6 +11,9 @@ using System.Windows.Media;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 选择地址视图模型，提供地址列表的查询、全选/取消、单项选中等交互功能。
+    /// </summary>
     public class SelectAddressModel : BindNotify
     {
         #region 属性

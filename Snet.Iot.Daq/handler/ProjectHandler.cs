@@ -13,6 +13,9 @@ using System.Text;
 namespace Snet.Iot.Daq.handler
 {
 
+    /// <summary>
+    /// 项目树形结构处理器，提供树节点的选中、展开、查找、移除、配置保存与加载等操作。
+    /// </summary>
     public static class ProjectHandler
     {
         /// <summary>
@@ -229,6 +232,12 @@ namespace Snet.Iot.Daq.handler
 
             return true;
         }
+        /// <summary>
+        /// 检查当前节点及子节点中是否存在与目标设备 GUID 相同的节点。
+        /// </summary>
+        /// <param name="current">当前遍历的节点</param>
+        /// <param name="target">目标设备节点</param>
+        /// <returns>true 表示唯一，false 表示存在重复</returns>
         private static bool CheckNodeUnique(ProjectTreeViewModel current, ProjectTreeViewModel target)
         {
             // 跳过自己（编辑场景）
@@ -407,6 +416,10 @@ namespace Snet.Iot.Daq.handler
             }
         }
 
+        /// <summary>
+        /// 回灌单个项目节点的全局数据（采集设备、地址、MQ 等），并递归处理子节点。
+        /// </summary>
+        /// <param name="node">待回灌的项目树节点</param>
         public static void RebindProjectNode(this ProjectTreeViewModel node)
         {
             // 🔥 回灌采集设备 / 插件（PluginConfigModel）
@@ -441,6 +454,10 @@ namespace Snet.Iot.Daq.handler
                 }
             }
         }
+        /// <summary>
+        /// 回灌单个详情树节点的全局数据（地址、MQ 插件等），并递归处理子节点。
+        /// </summary>
+        /// <param name="node">待回灌的详情树节点</param>
         public static void RebindDetailNode(this ProjectDetailsTreeViewModel node)
         {
             // 🔥 AddressModel 回灌

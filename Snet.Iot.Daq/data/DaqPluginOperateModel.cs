@@ -63,7 +63,7 @@ namespace Snet.Iot.Daq.data
         }
 
         /// <summary>
-        /// 写入模型
+        /// 写入模型，封装写入操作的地址和数据类型信息
         /// </summary>
         public class WriteModel : Snet.Model.data.WriteModel
         {
@@ -71,7 +71,7 @@ namespace Snet.Iot.Daq.data
             /// 地址
             /// </summary>
             [Description("地址")]
-            public string Address { get; set; }
+            public string Address { get; set; } = string.Empty;
         }
 
     }

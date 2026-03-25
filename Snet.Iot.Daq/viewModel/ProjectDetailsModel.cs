@@ -17,6 +17,9 @@ using System.Windows.Media;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 项目详情视图模型，管理单个项目节点的地址和传输设备树形结构，支持添加/删除地址、添加/移除 MQ 设备等操作。
+    /// </summary>
     public partial class ProjectDetailsModel : BindNotify
     {
         #region 属性

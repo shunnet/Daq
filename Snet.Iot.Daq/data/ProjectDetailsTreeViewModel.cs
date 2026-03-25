@@ -8,6 +8,9 @@ using System.ComponentModel;
 
 namespace Snet.Iot.Daq.data
 {
+    /// <summary>
+    /// 项目详情树控件视图模型，表示项目中地址和传输设备的树形节点，支持展开/折叠、选中、父子关系等功能。
+    /// </summary>
     public class ProjectDetailsTreeViewModel : BindNotify, ITreeViewModel<ProjectDetailsTreeViewModel>
     {
         public ProjectDetailsTreeViewModel()

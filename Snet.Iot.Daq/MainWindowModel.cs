@@ -9,6 +9,9 @@ using Wpf.Ui.Controls;
 
 namespace Snet.Iot.Daq
 {
+    /// <summary>
+    /// 主窗口视图模型，负责初始化导航菜单项和托盘操作命令。
+    /// </summary>
     public class MainWindowModel : BindNotify
     {
         public MainWindowModel()

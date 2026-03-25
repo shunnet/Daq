@@ -16,6 +16,9 @@ using System.Windows.Media;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 项目设置视图模型，提供项目树形节点的增删改、展开/折叠、启停标记以及配置保存等功能。
+    /// </summary>
     public class ProjectSettingsModel : BindNotify
     {
         #region 构造函数

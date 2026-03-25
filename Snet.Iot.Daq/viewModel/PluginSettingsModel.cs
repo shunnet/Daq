@@ -23,6 +23,9 @@ using System.Windows.Media;
 
 namespace Snet.Iot.Daq.viewModel
 {
+    /// <summary>
+    /// 插件设置视图模型，提供插件上传/移除、配置新建/修改/删除、WebAPI 设置以及插件状态验证等功能。
+    /// </summary>
     public class PluginSettingsModel : BindNotify
     {
         #region 构造函数
