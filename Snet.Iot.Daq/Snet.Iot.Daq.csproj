@@ -8,7 +8,7 @@
 		<UseWPF>true</UseWPF>
 		<SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
 		<ApplicationIcon>Icon.ico</ApplicationIcon>
-		<Version>1.0.0.1</Version>
+		<Version>1.0.0.2</Version>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>

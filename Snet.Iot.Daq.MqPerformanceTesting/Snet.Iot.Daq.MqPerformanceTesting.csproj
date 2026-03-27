@@ -8,7 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Snet.Mqtt" Version="26.59.1" />
+    <PackageReference Include="Snet.Mqtt" Version="26.83.1" />
   </ItemGroup>
 
 </Project>
