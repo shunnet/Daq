@@ -643,4 +643,16 @@
   <data name="Normal" xml:space="preserve">
     <value>Normal</value>
   </data>
+  <data name="地址数量" xml:space="preserve">
+    <value>AddressCount</value>
+  </data>
+  <data name="你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置" xml:space="preserve">
+    <value>You have imported the underlying source data format, and it is necessary to set the necessary parameters for the plugin. Confirm and proceed with the settings</value>
+  </data>
+  <data name="采集失败" xml:space="preserve">
+    <value>CollectFailed</value>
+  </data>
+  <data name="设置自动组包" xml:space="preserve">
+    <value>SettingsAutoPack</value>
+  </data>
 </root>

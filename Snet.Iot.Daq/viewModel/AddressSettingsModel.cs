@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
 using Snet.Iot.Daq.data;
+using Snet.Model.data;
 using Snet.Utility;
 using Snet.Windows.Controls.message;
 using Snet.Windows.Core.mvvm;
@@ -76,7 +77,7 @@ namespace Snet.Iot.Daq.viewModel
             get => pageSize;
             set => SetProperty(ref pageSize, value);
         }
-        private int pageSize = 50;
+        private int pageSize = 200;
 
         /// <summary>
         /// 页索引
@@ -118,9 +119,9 @@ namespace Snet.Iot.Daq.viewModel
             {
                 //模糊查询
                 List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().Where(p =>
-                p.AnotherName.Contains(QueryCntent) || p.AnotherName.Equals(QueryCntent) ||
-                p.Address.Contains(QueryCntent) || p.Address.Equals(QueryCntent) ||
-                p.Describe.Contains(QueryCntent) || p.Describe.Equals(QueryCntent)).ToList();
+                p.AnotherName.Contains(QueryCntent) ||
+                p.Address.Contains(QueryCntent) ||
+                p.Describe.Contains(QueryCntent)).ToList();
                 if (models.Count > 0)
                 {
                     await ResetUiAsync(models.Count, 1, models);
@@ -186,7 +187,56 @@ namespace Snet.Iot.Daq.viewModel
             string file = GlobalConfigModel.SelectFiles("json");
             if (!string.IsNullOrEmpty(file))
             {
-                List<Snet.Iot.Daq.data.AddressModel>? models = FileHandler.FileToString(file).ToJsonEntity<List<Snet.Iot.Daq.data.AddressModel>>();
+                //添加兼容流程，兼容源地址模型
+                string addressInfoStr = FileHandler.FileToString(file);
+                List<Snet.Iot.Daq.data.AddressModel>? models = null;
+                if (addressInfoStr.Contains("SN") && addressInfoStr.Contains("AddressName") && addressInfoStr.Contains("AddressDataType") && addressInfoStr.Contains("AddressType"))
+                {
+                    bool status = await MessageBox.Show("你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    if (status)
+                    {
+                        AddressSourceModel sourceModel = new AddressSourceModel();
+                        GlobalConfigModel.param.SetBasics(sourceModel);
+                        if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                        {
+                            sourceModel = GlobalConfigModel.param.GetBasics().GetSource<AddressSourceModel>();
+                        }
+                        else
+                        {
+                            await MessageBox.Show("导入取消".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                            return;
+                        }
+                        //这是源数据
+                        List<AddressDetails>? addresses = null;
+                        if (addressInfoStr.Contains("AddressArray"))
+                        {
+                            Address? address = addressInfoStr.ToJsonEntity<Address>();
+                            addresses = address?.AddressArray;
+                        }
+                        else
+                        {
+                            addresses = addressInfoStr.ToJsonEntity<List<AddressDetails>>();
+                        }
+
+                        models = addresses?.Select(a => new AddressModel
+                        {
+                            Guid = a.SN,
+                            Address = a.AddressName,
+                            Type = a.AddressDataType,
+                            Length = a.Length,
+                            EncodingType = a.EncodingType,
+                            Describe = a.AddressDescribe,
+                            AnotherName = a.AddressAnotherName ?? a.AddressName,
+                            ExpandParam = a.AddressExtendParam?.ToString(),
+                            Topic = sourceModel.Topic,
+                            SimplifyValue = sourceModel.SimplifyValue,
+                        }).ToList();
+                    }
+                }
+                else
+                {
+                    models = addressInfoStr.ToJsonEntity<List<Snet.Iot.Daq.data.AddressModel>>();
+                }
                 if (models == null)
                 {
                     await MessageBox.Show("导入失败".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
@@ -365,8 +415,15 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? pageIndexChanged;
         private async Task PageIndexChangedExecuteAsync(int index)
         {
-            List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().ToList();
-            await ResetUiAsync(models.Count, index, models);
+            var table = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>();
+            int total = table.Count();
+            var page = table.OrderByDescending(x => x.Time)
+                            .Skip((index - 1) * PageSize)
+                            .Take(PageSize)
+                            .ToList();
+            PageIndex = index;
+            Total = total;
+            AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(page);
         }
         #endregion
 
@@ -401,11 +458,8 @@ namespace Snet.Iot.Daq.viewModel
         {
             PageIndex = pageIndex;
             Total = total;
-            AddressConfig.Clear();
-            foreach (var item in models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize))
-            {
-                AddressConfig.Add(item);
-            }
+            AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(
+                models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize));
             return Task.CompletedTask;
         }
         #endregion

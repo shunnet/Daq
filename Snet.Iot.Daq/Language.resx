@@ -643,4 +643,16 @@
   <data name="Normal" xml:space="preserve">
     <value>正常</value>
   </data>
+  <data name="地址数量" xml:space="preserve">
+    <value>地址数量</value>
+  </data>
+  <data name="你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置" xml:space="preserve">
+    <value>你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置</value>
+  </data>
+  <data name="采集失败" xml:space="preserve">
+    <value>采集失败</value>
+  </data>
+  <data name="设置自动组包" xml:space="preserve">
+    <value>设置自动组包</value>
+  </data>
 </root>

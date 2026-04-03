@@ -91,11 +91,15 @@ namespace Snet.Iot.Daq.viewModel
             GlobalConfigModel.addressModel.SetSelectItem();
             if ((await DialogHost.Show(GlobalConfigModel.address, GlobalConfigModel.DialogHostTag_ClickClose)).ToBool())
             {
+                var existingAddresses = new HashSet<string>(DetailsNode.Select(c => c.AddressDetails.Address));
+                var existingNames = new HashSet<string>(DetailsNode.Select(c => c.AddressDetails.AnotherName));
                 foreach (var item in GlobalConfigModel.addressModel.GetSelectItem())
                 {
-                    if (!DetailsNode.Any(c => c.AddressDetails.Address == item.Address || c.AddressDetails.AnotherName == item.AnotherName))
+                    if (!existingAddresses.Contains(item.Address) && !existingNames.Contains(item.AnotherName))
                     {
                         DetailsNode.Add(new ProjectDetailsTreeViewModel(item.Guid.GetAddress()));
+                        existingAddresses.Add(item.Address);
+                        existingNames.Add(item.AnotherName);
                     }
                 }
                 ProjectTree.Details = DetailsNode;  //给父级赋值
@@ -360,7 +364,11 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     ProjectDetailsTreeViewModel? model = treeItem?.DataContext.GetSource<ProjectDetailsTreeViewModel>();
                     DetailsNodeSelectedItem = model;
-                    _ = DetailsNodeSelectedItem?.SetAsync(DetailsNode).ConfigureAwait(false);
+                    if (DetailsNodeSelectedItem != null)
+                    {
+                        DetailsNode.EnsureSingleSelection(DetailsNodeSelectedItem);
+                        DetailsNodeSelectedItem.ExpandParents();
+                    }
                 }
                 treeItem?.Focus();
                 e.Handled = true;
@@ -382,7 +390,8 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (e?.NewValue is not ProjectDetailsTreeViewModel model)
                 return;
-            _ = model?.SetAsync(DetailsNode).ConfigureAwait(false);
+            DetailsNode.EnsureSingleSelection(model);
+            model.ExpandParents();
         }
 
         /// <summary>
@@ -454,6 +463,7 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     DetailsNode = new ObservableCollection<ProjectDetailsTreeViewModel>(project.Details);
                     DetailsNode.RebindGlobals();
+                    DetailsNode.InitChildrenParent();
                 }
             }
         }

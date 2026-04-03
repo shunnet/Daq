@@ -139,6 +139,7 @@
                 Background="Transparent"
                 BorderThickness="0"
                 ColumnHeaderHeight="45"
+                EnableColumnVirtualization="True"
                 GridLinesVisibility="None"
                 IsReadOnly="True"
                 ItemsSource="{Binding AddressConfig}"
@@ -146,7 +147,9 @@
                 SelectedItem="{Binding AddressConfigSelectedItem}"
                 SelectionMode="Single"
                 SnapsToDevicePixels="True"
-                UseLayoutRounding="True">
+                UseLayoutRounding="True"
+                VirtualizingPanel.IsVirtualizing="True"
+                VirtualizingPanel.VirtualizationMode="Recycling">
                 <i:Interaction.Triggers>
                     <!--  内容菜单打开  -->
                     <i:EventTrigger EventName="ContextMenuOpening">

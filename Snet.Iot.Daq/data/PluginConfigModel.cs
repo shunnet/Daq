@@ -160,6 +160,11 @@ namespace Snet.Iot.Daq.data
         public WAModel? WebApi { get; set; }
 
         /// <summary>
+        /// 自动组包数据
+        /// </summary>
+        public AddressAutoPackModel? AutoPack { get; set; }
+
+        /// <summary>
         /// 修改本地参数配置：将当前参数写入到本地配置文件。
         /// </summary>
         /// <returns>是否修改成功</returns>

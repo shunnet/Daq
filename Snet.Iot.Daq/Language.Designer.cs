@@ -520,6 +520,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 地址数量 的本地化字符串。
+        /// </summary>
+        public static string 地址数量 {
+            get {
+                return ResourceManager.GetString("地址数量", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 地址文件转换 的本地化字符串。
         /// </summary>
         public static string 地址文件转换 {
@@ -1258,6 +1267,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 设置自动组包 的本地化字符串。
+        /// </summary>
+        public static string 设置自动组包 {
+            get {
+                return ResourceManager.GetString("设置自动组包", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 该插件配置文件在项目设置中有使用 的本地化字符串。
         /// </summary>
         public static string 该插件配置文件在项目设置中有使用 {
@@ -1416,6 +1434,15 @@ namespace Snet.Iot.Daq {
         public static string 采集 {
             get {
                 return ResourceManager.GetString("采集", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 采集失败 的本地化字符串。
+        /// </summary>
+        public static string 采集失败 {
+            get {
+                return ResourceManager.GetString("采集失败", resourceCulture);
             }
         }
         

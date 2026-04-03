@@ -96,6 +96,24 @@ namespace Snet.Iot.Daq.viewModel
 
         #region 命令
         /// <summary>
+        /// 设置自动组包
+        /// </summary>
+        public IAsyncRelayCommand SettingsAutoPack => p_SettingsAutoPack ??= new AsyncRelayCommand(SettingsAutoPackAsync);
+        private IAsyncRelayCommand p_SettingsAutoPack;
+        private async Task SettingsAutoPackAsync()
+        {
+            GlobalConfigModel.param.SetBasics(new AddressAutoPackModel());
+            if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+            {
+                PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
+                PluginConfigSelectedItem?.SetPlugin();
+                SavePluginConfig();
+                await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+            }
+        }
+
+
+        /// <summary>
         /// 设置WEBapi
         /// </summary>
         public IAsyncRelayCommand SettingsWebApi => p_SettingsWebApi ??= new AsyncRelayCommand(SettingsWebApiAsync);

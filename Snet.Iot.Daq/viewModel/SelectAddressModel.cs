@@ -73,7 +73,7 @@ namespace Snet.Iot.Daq.viewModel
             get => pageSize;
             set => SetProperty(ref pageSize, value);
         }
-        private int pageSize = 50;
+        private int pageSize = 200;
 
         /// <summary>
         /// 页索引
@@ -102,9 +102,9 @@ namespace Snet.Iot.Daq.viewModel
             {
                 //模糊查询
                 List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().Where(p =>
-                p.AnotherName.Contains(QueryCntent) || p.AnotherName.Equals(QueryCntent) ||
-                p.Address.Contains(QueryCntent) || p.Address.Equals(QueryCntent) ||
-                p.Describe.Contains(QueryCntent) || p.Describe.Equals(QueryCntent)).ToList();
+                p.AnotherName.Contains(QueryCntent) ||
+                p.Address.Contains(QueryCntent) ||
+                p.Describe.Contains(QueryCntent)).ToList();
                 if (models.Count > 0)
                 {
                     await ResetUiAsync(models.Count, 1, models);
@@ -202,8 +202,15 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? pageIndexChanged;
         private async Task PageIndexChangedExecuteAsync(int index)
         {
-            List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().ToList();
-            await ResetUiAsync(models.Count, index, models);
+            var table = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>();
+            int total = table.Count();
+            var page = table.OrderByDescending(x => x.Time)
+                            .Skip((index - 1) * PageSize)
+                            .Take(PageSize)
+                            .ToList();
+            PageIndex = index;
+            Total = total;
+            AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(page);
         }
         #endregion
 
@@ -257,11 +264,8 @@ namespace Snet.Iot.Daq.viewModel
         {
             PageIndex = pageIndex;
             Total = total;
-            AddressConfig.Clear();
-            foreach (var item in models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize))
-            {
-                AddressConfig.Add(item);
-            }
+            AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(
+                models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize));
             return Task.CompletedTask;
         }
         #endregion

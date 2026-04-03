@@ -202,6 +202,7 @@ namespace Snet.Iot.Daq.data
                 this.Type = model.Type;
                 this.EncodingType = model.EncodingType;
                 this.IsSelected = model.IsSelected;
+                this.ExpandParam = model.ExpandParam;
             }
             return Task.CompletedTask;
         }
@@ -214,6 +215,7 @@ namespace Snet.Iot.Daq.data
         {
             AddressDetails address = new AddressDetails(Address, Type, Length, EncodingType);
             address.AddressAnotherName = AnotherName;
+            address.AddressExtendParam = ExpandParam;
             return address;
         }
 

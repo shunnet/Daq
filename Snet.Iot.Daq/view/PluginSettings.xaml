@@ -511,6 +511,24 @@
                                 <uis:MenuItem
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                                    Command="{Binding SettingsAutoPack}"
+                                    Header="{snet:Loc 设置自动组包}"
+                                    Icon="{uis:SymbolIcon Symbol=Settings20,
+                                                          Filled=False}">
+                                    <uis:MenuItem.Style>
+                                        <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding PlacementTarget.DataContext.PluginConfigSelectedItem.Type, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Daq">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </uis:MenuItem.Style>
+                                </uis:MenuItem>
+                                <uis:MenuItem
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding SettingsWebApi}"
                                     Header="{snet:Loc 设置WebApi}"
                                     Icon="{uis:SymbolIcon Symbol=Settings20,

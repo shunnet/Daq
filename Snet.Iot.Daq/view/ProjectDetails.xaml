@@ -81,7 +81,10 @@
             Grid.Row="2"
             Margin="5"
             ItemsSource="{Binding DetailsNode}"
-            Style="{StaticResource DefaultTreeViewStyle}">
+            ScrollViewer.CanContentScroll="True"
+            Style="{StaticResource DefaultTreeViewStyle}"
+            VirtualizingPanel.IsVirtualizing="True"
+            VirtualizingPanel.VirtualizationMode="Recycling">
             <i:Interaction.Triggers>
                 <!--  内容菜单打开  -->
                 <i:EventTrigger EventName="ContextMenuOpening">
@@ -302,6 +305,8 @@
                 <Style BasedOn="{StaticResource DefaultTreeViewItemStyle}" TargetType="TreeViewItem">
                     <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
                     <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
+                    <Setter Property="VirtualizingPanel.IsVirtualizing" Value="True" />
+                    <Setter Property="VirtualizingPanel.VirtualizationMode" Value="Recycling" />
                 </Style>
             </TreeView.ItemContainerStyle>
             <TreeView.ItemTemplate>

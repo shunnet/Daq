@@ -564,10 +564,10 @@ namespace Snet.Iot.Daq.opc.ua.service
                 {
                     FolderInfo.Clear();
                     //停止节点管理服务
-                    service?.NodeManage.Dispose();
-                    service?.NodeManage.DeleteAddressSpace();
+                    service?.NodeManage?.Dispose();
+                    service?.NodeManage?.DeleteAddressSpace();
                     // 停止服务并处理
-                    service?.Stop();
+                    service?.StopAsync().ConfigureAwait(false).GetAwaiter().GetResult();
                     service?.Dispose();
                     // 停止状态线程
                     service = null;
