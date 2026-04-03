@@ -417,7 +417,7 @@ namespace Snet.Iot.Daq.viewModel
                 string[] keys = AutoPackHandler.GetSupportAutoPackDeviceTypes();
                 string? key = keys.FirstOrDefault(k => DaqData.Param.Contains(k));
                 OperateResult result = OperateResult.CreateFailureResult("采集失败".GetLanguageValue(App.LanguageOperate));
-                if (key != null)
+                if (key != null && DaqData.AutoPack != null)
                 {
                     autoPack ??= AutoPackHandler.Instance(key);
                     List<AddressModel>? models = autoPack.AddressAutoPack(AddressDatas.Keys.ToList(), key, DaqData.AutoPack.MaxByteLength, DaqData.AutoPack.Format);
@@ -430,6 +430,8 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     result = await daqHandler.SubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
                 }
+
+
                 if (result.Status)
                 {
                     if (folderStates.Count > 0)
@@ -771,8 +773,16 @@ namespace Snet.Iot.Daq.viewModel
                                 !_mqPluginMap.TryGetValue(kv.Key, out var pluginConfigs))
                                 continue;
 
-                            // 解析字节处理模型：优先从扩展参数获取，其次从文件获取
-                            List<BytesModel>? bm = kv.Value?.AddressExtendParam?.ToString()?.ToJsonEntity<List<BytesModel>>();
+                            // 解析字节处理模型：优先从JSON字符串获取，其次从文件获取
+                            List<BytesModel>? bm = null;
+                            try
+                            {
+                                bm = kv.Value?.AddressExtendParam?.ToString()?.ToJsonEntity<List<BytesModel>>();
+                            }
+                            catch (System.Text.Json.JsonException)
+                            {
+                                // AddressExtendParam 不是有效的 BytesModel JSON，回退到文件模式
+                            }
 
                             if (bm != null)
                             {
@@ -785,10 +795,13 @@ namespace Snet.Iot.Daq.viewModel
                                     ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展参数文件不存在".GetLanguageValue(App.LanguageOperate));
                                     continue;
                                 }
-                                if (!bytesModels.TryGetValue(addressModel.Address, out bm))
+                                if (!bytesModels.TryGetValue(addressModel.Address, out bm) || bm == null)
                                 {
                                     bm = FileHandler.FileToString(addressModel.ExpandParam).ToJsonEntity<List<BytesModel>>();
-                                    bytesModels[addressModel.Address] = bm;
+                                    if (bm != null)
+                                    {
+                                        bytesModels[addressModel.Address] = bm;
+                                    }
                                 }
                             }
 
