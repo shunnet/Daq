@@ -466,6 +466,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 启动自动组包 的本地化字符串。
+        /// </summary>
+        public static string 启动自动组包 {
+            get {
+                return ResourceManager.GetString("启动自动组包", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 启动采集 的本地化字符串。
         /// </summary>
         public static string 启动采集 {
@@ -1204,6 +1213,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 移除自动组包 的本地化字符串。
+        /// </summary>
+        public static string 移除自动组包 {
+            get {
+                return ResourceManager.GetString("移除自动组包", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 类型 的本地化字符串。
         /// </summary>
         public static string 类型 {
@@ -1263,15 +1281,6 @@ namespace Snet.Iot.Daq {
         public static string 设置成功 {
             get {
                 return ResourceManager.GetString("设置成功", resourceCulture);
-            }
-        }
-        
-        /// <summary>
-        ///   查找类似 设置自动组包 的本地化字符串。
-        /// </summary>
-        public static string 设置自动组包 {
-            get {
-                return ResourceManager.GetString("设置自动组包", resourceCulture);
             }
         }
         

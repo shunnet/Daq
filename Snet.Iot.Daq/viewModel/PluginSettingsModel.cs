@@ -96,11 +96,11 @@ namespace Snet.Iot.Daq.viewModel
 
         #region 命令
         /// <summary>
-        /// 设置自动组包
+        /// 启动自动组包
         /// </summary>
-        public IAsyncRelayCommand SettingsAutoPack => p_SettingsAutoPack ??= new AsyncRelayCommand(SettingsAutoPackAsync);
-        private IAsyncRelayCommand p_SettingsAutoPack;
-        private async Task SettingsAutoPackAsync()
+        public IAsyncRelayCommand StartAutoPack => p_StartAutoPack ??= new AsyncRelayCommand(StartAutoPackAsync);
+        private IAsyncRelayCommand p_StartAutoPack;
+        private async Task StartAutoPackAsync()
         {
             GlobalConfigModel.param.SetBasics(new AddressAutoPackModel());
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
@@ -110,6 +110,19 @@ namespace Snet.Iot.Daq.viewModel
                 SavePluginConfig();
                 await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
             }
+        }
+
+        /// <summary>
+        /// 移除自动组包
+        /// </summary>
+        public IAsyncRelayCommand RemoveAutoPack => p_RemoveAutoPack ??= new AsyncRelayCommand(RemoveAutoPackAsync);
+        private IAsyncRelayCommand p_RemoveAutoPack;
+        private async Task RemoveAutoPackAsync()
+        {
+            PluginConfigSelectedItem?.AutoPack = null;
+            PluginConfigSelectedItem?.SetPlugin();
+            SavePluginConfig();
+            await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
         }
 
 

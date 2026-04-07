@@ -511,9 +511,9 @@
                                 <uis:MenuItem
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
-                                    Command="{Binding SettingsAutoPack}"
-                                    Header="{snet:Loc 设置自动组包}"
-                                    Icon="{uis:SymbolIcon Symbol=Settings20,
+                                    Command="{Binding StartAutoPack}"
+                                    Header="{snet:Loc 启动自动组包}"
+                                    Icon="{uis:SymbolIcon Symbol=Star24,
                                                           Filled=False}">
                                     <uis:MenuItem.Style>
                                         <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
@@ -575,7 +575,24 @@
                                         </Style>
                                     </Separator.Style>
                                 </Separator>
-
+                                <uis:MenuItem
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultDictionary="Language"
+                                    Command="{Binding RemoveAutoPack}"
+                                    Header="{snet:Loc 移除自动组包}"
+                                    Icon="{uis:SymbolIcon Symbol=DeleteDismiss20,
+                                                          Filled=False}">
+                                    <uis:MenuItem.Style>
+                                        <Style BasedOn="{StaticResource UiMenuItem}" TargetType="uis:MenuItem">
+                                            <Setter Property="Visibility" Value="Collapsed" />
+                                            <Style.Triggers>
+                                                <DataTrigger Binding="{Binding PlacementTarget.DataContext.PluginConfigSelectedItem.Type, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Daq">
+                                                    <Setter Property="Visibility" Value="Visible" />
+                                                </DataTrigger>
+                                            </Style.Triggers>
+                                        </Style>
+                                    </uis:MenuItem.Style>
+                                </uis:MenuItem>
                                 <uis:MenuItem
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
