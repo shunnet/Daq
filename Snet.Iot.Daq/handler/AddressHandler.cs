@@ -5,6 +5,10 @@ using System.Collections.Concurrent;
 
 namespace Snet.Iot.Daq.handler
 {
+    /// <summary>
+    /// 地址处理静态类<br/>
+    /// 提供地址数据的 CRUD 操作，包括 SQLite 批量插入、全局字典管理等功能
+    /// </summary>
     public static class AddressHandler
     {
         /// <summary>
@@ -155,9 +159,10 @@ namespace Snet.Iot.Daq.handler
 
 
         /// <summary>
-        /// 获取所有已经存在的
+        /// 从 SQLite 数据库加载所有地址记录到全局字典<br/>
+        /// 并为每个地址触发信息事件，用于初始化界面绑定
         /// </summary>
-        /// <param name="obj"></param>
+        /// <returns>全局地址字典（Key = Guid，Value = AddressModel）</returns>
         public static ConcurrentDictionary<string, AddressModel> GetAllAddress()
         {
             foreach (var item in GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>())
@@ -169,9 +174,10 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 添加地址到统一集合
+        /// 添加或更新地址到全局统一集合<br/>
+        /// 同时触发信息事件通知并异步刷新界面
         /// </summary>
-        /// <param name="address">地址对象</param>
+        /// <param name="address">待注册的地址对象</param>
         public static void SetAddress(this AddressModel address)
         {
             GlobalConfigModel.AddressDict[address.Guid] = address;
@@ -180,10 +186,10 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 从统一集合中获取地址
+        /// 根据 GUID 从全局字典获取地址对象
         /// </summary>
-        /// <param name="guid">唯一标识</param>
-        /// <returns>插件对象</returns>
+        /// <param name="guid">地址的唯一标识</param>
+        /// <returns>对应的地址对象，未找到时返回 null</returns>
         public static AddressModel? GetAddress(this string guid)
         {
             if (GlobalConfigModel.AddressDict.TryGetValue(guid, out AddressModel? model))

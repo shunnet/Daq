@@ -14,7 +14,9 @@ using System.Reflection;
 namespace Snet.Iot.Daq.handler
 {
     /// <summary>
-    /// 插件参数处理类
+    /// 插件参数处理类<br/>
+    /// 负责插件的加载、实例化、参数转换、状态验证、配置读写等核心操作。
+    /// 内部使用 ConcurrentDictionary 缓存程序集类型和实例，支持线程安全的并发访问。
     /// </summary>
     public static class PluginHandler
     {
@@ -48,11 +50,13 @@ namespace Snet.Iot.Daq.handler
 
 
         /// <summary>
-        /// 第一次加载，初始化插件
+        /// 插件初始化加载<br/>
+        /// 扫描指定路径下的所有符合命名规则的 DLL，通过反射加载实现了指定接口的类型，<br/>
+        /// 创建基础实例并缓存到 IOC 容器中。
         /// </summary>
-        /// <param name="path">插件路径</param>
-        /// <param name="iName">接口名称</param>
-        /// <returns>插件信息集合</returns>
+        /// <param name="path">插件 DLL 所在目录路径</param>
+        /// <param name="iName">目标接口全名（如 Snet.Model.interface.IDaq）</param>
+        /// <returns>插件信息和参数的元组列表</returns>
         public static List<(PluginDetailsModel Model, object? Param)> InitPlugin(string path, string iName)
         {
             //结果
@@ -170,12 +174,12 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 获取插件参数对象
+        /// 获取插件的默认参数对象<br/>
+        /// 从 IOC 容器缓存的基础实例中获取该插件的参数模板
         /// </summary>
-        /// <param name="path">插件路径</param>
-        /// <param name="iName">接口名称</param>
-        /// <param name="className">类名</param>
-        /// <returns>返回对应采集的入参对象</returns>
+        /// <param name="iName">接口名称（用于区分 Daq/Mq 类型）</param>
+        /// <param name="className">插件类名（IOC 容器中的键）</param>
+        /// <returns>参数对象，未找到时返回 null</returns>
         public static object? GetPluginParamObject(string iName, string className)
         {
             //加载程序集
@@ -200,20 +204,23 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 通过从本地获取的参数转换成对应的参数对象
+        /// 将本地 JSON 格式的插件参数转换为对应的强类型参数对象<br/>
+        /// 1. 从 IOC 容器获取插件类型<br/>
+        /// 2. 反序列化 JSON 为 JObject<br/>
+        /// 3. 通过构造函数反射进行参数类型匹配和转换
         /// </summary>
-        /// <param name="className">类名</param>
-        /// <param name="content">参数</param>
-        /// <returns>对应的对象</returns>
+        /// <param name="className">插件类名（IOC 容器中的键）</param>
+        /// <param name="content">JSON 格式的参数字符串</param>
+        /// <returns>转换后的参数对象，失败返回 null</returns>
         public static object? ConvertPluginJsonParam(string className, string content)
         {
             if (iocType.TryGetValue(className, out Type? type))
             {
                 JObject? jsonObject = Newtonsoft.Json.JsonConvert.DeserializeObject<JObject>(content);
                 object[]? objs = [jsonObject];
-                //获取构造函数信息
-                ConstructorInfo? constructorInfo = type.GetConstructors().Where(c => c.GetParameters().Length > 0).FirstOrDefault();
-                //返回数据
+                // 获取第一个有参构造函数（优化：直接使用带谓词的 FirstOrDefault，避免多余的 Where 枚举）
+                ConstructorInfo? constructorInfo = type.GetConstructors().FirstOrDefault(c => c.GetParameters().Length > 0);
+                // 返回数据
                 return ParamTypeConvert(objs, constructorInfo).FirstOrDefault();
             }
 
@@ -334,12 +341,13 @@ namespace Snet.Iot.Daq.handler
         #endregion
 
         /// <summary>
-        /// 状态验证
+        /// 验证插件连接状态<br/>
+        /// 创建临时实例尝试打开连接，验证配置参数是否正确，完成后立即释放
         /// </summary>
-        /// <param name="iName">接口名称</param>
-        /// <param name="className">类名</param>
-        /// <param name="data">实例化的数据</param>
-        /// <returns>返回是否能正常打开</returns>
+        /// <param name="iName">接口名称（用于区分 Daq/Mq 类型）</param>
+        /// <param name="className">插件类名</param>
+        /// <param name="data">序列化的连接参数数据</param>
+        /// <returns>操作结果，包含连接测试成功/失败状态</returns>
         public static async Task<OperateResult> StatusVerifyAsync(string iName, string className, string data)
         {
             OperateResult result = OperateResult.CreateFailureResult("Verify Failure");
@@ -367,31 +375,32 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 保存插件界面配置
+        /// 保存插件配置列表到本地 JSON 文件
         /// </summary>
-        /// <param name="data">json 数据</param>
-        /// <param name="path">保存的路径</param>
+        /// <param name="data">插件配置集合</param>
+        /// <param name="path">保存路径</param>
         public static void SavePluginUIConfig(ObservableCollection<PluginConfigModel> data, string path)
         {
             FileHandler.StringToFile(path, data.ToJson(true));
         }
 
         /// <summary>
-        /// 保存插件界面配置
+        /// 保存插件列表配置到本地 JSON 文件
         /// </summary>
-        /// <param name="data">json 数据</param>
-        /// <param name="path">保存的路径</param>
+        /// <param name="data">插件列表集合</param>
+        /// <param name="path">保存路径</param>
         public static void SavePluginUIConfig(ObservableCollection<PluginListModel> data, string path)
         {
             FileHandler.StringToFile(path, data.ToJson(true));
         }
 
         /// <summary>
-        /// 获取插件界面配置
+        /// 从本地 JSON 文件加载插件界面配置<br/>
+        /// 文件不存在时返回默认值
         /// </summary>
-        /// <typeparam name="T">对象</typeparam>
-        /// <param name="path">文件路径</param>
-        /// <returns>返回指定对象</returns>
+        /// <typeparam name="T">反序列化目标类型</typeparam>
+        /// <param name="filePath">配置文件路径</param>
+        /// <returns>反序列化后的对象，文件不存在或反序列化失败时返回 default</returns>
         public static T? GetPluginUIConfig<T>(string filePath)
         {
             if (!File.Exists(filePath))
@@ -403,10 +412,12 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 从插件文件名称得到对象SN码
+        /// 从插件文件名提取设备 SN 码<br/>
+        /// 例如 "Namespace.ClassName.MySN.Daq.Config.json" → "MySN"
         /// </summary>
-        /// <param name="fileName">文件名称</param>
-        /// <returns></returns>
+        /// <param name="fileName">插件配置文件名</param>
+        /// <param name="type">插件类型（Daq/Mq）</param>
+        /// <returns>提取的 SN 码字符串</returns>
         public static string PluginFileNameToSN(string fileName, PluginType type)
         {
             string newData = fileName.Replace($".{type.ToString()}.Config.json", string.Empty);
@@ -414,10 +425,12 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 创建一个新的对象
+        /// 通过插件配置创建新的设备实例<br/>
+        /// 从 IOC 容器中获取缓存的基础实例，调用其 CreateInstanceAsync 方法创建新连接
         /// </summary>
-        /// <param name="plugin">插件配置</param>
-        /// <returns>对象</returns>
+        /// <typeparam name="T">目标接口类型（IDaq 或 IMq）</typeparam>
+        /// <param name="plugin">插件配置信息，包含类名和连接参数</param>
+        /// <returns>新创建的实例，失败时返回 default</returns>
         public static async Task<T?> CreateNewObjetcAsync<T>(this PluginConfigModel plugin)
         {
             switch (plugin.Type)
@@ -449,133 +462,168 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 生产
+        /// 测试生产消息<br/>
+        /// 创建临时 MQ 实例进行单次消息生产测试，完成后释放资源。
+        /// 使用 try/finally 确保资源可靠释放，即使发生异常也不会泄漏连接。
         /// </summary>
-        /// <param name="plugin">采集插件配置</param>
-        /// <param name="topic">主题</param>
-        /// <param name="content">内容</param>
-        /// <returns>生产结果</returns>
+        /// <param name="plugin">传输插件配置信息</param>
+        /// <param name="topic">消息主题</param>
+        /// <param name="content">消息内容</param>
+        /// <returns>操作结果，包含生产成功/失败状态</returns>
         public static async Task<OperateResult> TestProduceAsync(this PluginConfigModel plugin, string topic, string content)
         {
             IMq? mqNew = await plugin.CreateNewObjetcAsync<IMq>();
             if (mqNew is null)
                 return OperateResult.CreateFailureResult("Failed to create MQ instance");
-            OperateResult operateResult = await mqNew.GetStatusAsync();
-            if (!operateResult.Status)
+
+            try
             {
-                operateResult = await mqNew.OnAsync();
-            }
-            if (operateResult.Status)
-            {
-                //读取数据
-                operateResult = await mqNew.ProduceAsync(topic, content);
-                //释放掉这个连接
-                await mqNew.OffAsync();
-                await mqNew.DisposeAsync();
+                OperateResult operateResult = await mqNew.GetStatusAsync();
+                if (!operateResult.Status)
+                {
+                    operateResult = await mqNew.OnAsync();
+                }
+                if (operateResult.Status)
+                {
+                    // 生产消息
+                    operateResult = await mqNew.ProduceAsync(topic, content);
+                }
                 return operateResult;
             }
-            return operateResult;
+            finally
+            {
+                // 确保资源可靠释放
+                await mqNew.OffAsync();
+                await mqNew.DisposeAsync();
+            }
         }
 
 
         /// <summary>
-        /// 读取地址
+        /// 测试读取地址数据<br/>
+        /// 创建临时 DAQ 实例进行单次地址读取测试，完成后释放资源。
+        /// 使用 try/finally 确保资源可靠释放。
         /// </summary>
-        /// <param name="plugin">采集插件配置</param>
-        /// <param name="model">地址的模型</param>
-        /// <returns>读取结果</returns>
+        /// <param name="model">地址模型，包含地址信息和数据类型</param>
+        /// <param name="plugin">采集插件配置信息</param>
+        /// <returns>操作结果，成功时 ResultData 包含读取到的数据</returns>
         public static async Task<OperateResult> TestReadAddressAsync(this AddressModel model, PluginConfigModel plugin)
         {
             IDaq? daqNew = await plugin.CreateNewObjetcAsync<IDaq>();
             if (daqNew is null)
                 return OperateResult.CreateFailureResult("Failed to create DAQ instance");
-            OperateResult operateResult = await daqNew.GetStatusAsync();
-            if (!operateResult.Status)
+
+            try
             {
-                operateResult = await daqNew.OnAsync();
-            }
-            if (operateResult.Status)
-            {
-                AddressDetails? address = model.Convert();
-                if (address is not null)
+                OperateResult operateResult = await daqNew.GetStatusAsync();
+                if (!operateResult.Status)
                 {
-                    //读取数据
-                    operateResult = await daqNew.ReadAsync(new Address() { AddressArray = [address] });
-                    //释放掉这个连接
-                    await daqNew.OffAsync();
-                    await daqNew.DisposeAsync();
-                    return operateResult;
+                    operateResult = await daqNew.OnAsync();
                 }
-                operateResult = OperateResult.CreateFailureResult("地址转换失败");
+                if (operateResult.Status)
+                {
+                    AddressDetails? address = model.Convert();
+                    if (address is not null)
+                    {
+                        // 执行读取操作
+                        return await daqNew.ReadAsync(new Address() { AddressArray = [address] });
+                    }
+                    return OperateResult.CreateFailureResult("地址转换失败");
+                }
+                return operateResult;
             }
-            return operateResult;
+            finally
+            {
+                // 确保资源可靠释放
+                await daqNew.OffAsync();
+                await daqNew.DisposeAsync();
+            }
         }
 
         /// <summary>
-        /// 写入地址
+        /// 测试写入地址数据<br/>
+        /// 创建临时 DAQ 实例进行单次地址写入测试，完成后释放资源。
+        /// 使用 try/finally 确保资源可靠释放。
         /// </summary>
-        /// <param name="plugin">采集插件配置</param>
-        /// <param name="model">地址的模型</param>
-        /// <param name="write">写入的数据</param>
-        /// <returns></returns>
+        /// <param name="model">地址模型，包含目标地址信息</param>
+        /// <param name="plugin">采集插件配置信息</param>
+        /// <param name="write">待写入的数据模型</param>
+        /// <returns>操作结果，包含写入成功/失败状态</returns>
         public static async Task<OperateResult> TestWriteAddressAsync(this AddressModel model, PluginConfigModel plugin, WriteModel write)
         {
             IDaq? daqNew = await plugin.CreateNewObjetcAsync<IDaq>();
             if (daqNew is null)
                 return OperateResult.CreateFailureResult("Failed to create DAQ instance");
-            OperateResult operateResult = await daqNew.GetStatusAsync();
-            if (!operateResult.Status)
+
+            try
             {
-                operateResult = await daqNew.OnAsync();
+                OperateResult operateResult = await daqNew.GetStatusAsync();
+                if (!operateResult.Status)
+                {
+                    operateResult = await daqNew.OnAsync();
+                }
+                if (operateResult.Status)
+                {
+                    // 组织写入数据：以地址字符串为 Key
+                    var keys = new ConcurrentDictionary<string, WriteModel>();
+                    keys[model.Address] = write;
+                    // 执行写入操作
+                    operateResult = await daqNew.WriteAsync(keys);
+                }
+                return operateResult;
             }
-            if (operateResult.Status)
+            finally
             {
-                //组织写入数据
-                ConcurrentDictionary<string, WriteModel> keys = new();
-                keys[model.Address] = write;
-                //写入数据
-                operateResult = await daqNew.WriteAsync(keys);
-                //释放掉这个连接
+                // 确保资源可靠释放
                 await daqNew.OffAsync();
                 await daqNew.DisposeAsync();
             }
-            return operateResult;
         }
 
         /// <summary>
-        /// 传输数据
+        /// 测试数据传输<br/>
+        /// 创建临时 MQ 实例进行单次数据传输测试，完成后释放资源。
+        /// 使用 try/finally 确保资源可靠释放。
         /// </summary>
-        /// <param name="plugin">传输采集信息</param>
-        /// <param name="data">数据</param>
-        /// <returns>操作结果</returns>
+        /// <param name="address">地址模型，包含主题、精简值设置等</param>
+        /// <param name="plugin">传输插件配置信息</param>
+        /// <param name="data">待传输的地址值数据</param>
+        /// <returns>操作结果，包含传输成功/失败状态</returns>
         public static async Task<OperateResult> TestTransmitDataAsync(this AddressModel address, PluginConfigModel plugin, AddressValue data)
         {
             IMq? mqNew = await plugin.CreateNewObjetcAsync<IMq>();
             if (mqNew is null)
                 return OperateResult.CreateFailureResult("Failed to create MQ instance");
-            OperateResult operateResult = await mqNew.GetStatusAsync();
-            if (!operateResult.Status)
+
+            try
             {
-                operateResult = await mqNew.OnAsync();
-            }
-            if (operateResult.Status)
-            {
-                //转换数据
-                string content = address.SimplifyValue ? data.GetSimplify().ToJson(true) : data.ToJson(true);
-                //读取数据
-                operateResult = await mqNew.ProduceAsync(address.Topic, content);
-                //释放掉这个连接
-                await mqNew.OffAsync();
-                await mqNew.DisposeAsync();
+                OperateResult operateResult = await mqNew.GetStatusAsync();
+                if (!operateResult.Status)
+                {
+                    operateResult = await mqNew.OnAsync();
+                }
+                if (operateResult.Status)
+                {
+                    // 根据精简值设置决定序列化方式
+                    string content = address.SimplifyValue ? data.GetSimplify().ToJson(true) : data.ToJson(true);
+                    // 执行消息生产
+                    operateResult = await mqNew.ProduceAsync(address.Topic, content);
+                }
                 return operateResult;
             }
-            return operateResult;
+            finally
+            {
+                // 确保资源可靠释放
+                await mqNew.OffAsync();
+                await mqNew.DisposeAsync();
+            }
         }
 
         /// <summary>
-        /// 获取所有插件
+        /// 获取所有已保存的插件配置<br/>
+        /// 从本地 JSON 文件加载插件列表并注册到全局字典中，同时触发信息事件通知
         /// </summary>
-        /// <param name="obj">全局静态对象</param>
+        /// <returns>全局插件配置字典</returns>
         public static ConcurrentDictionary<string, PluginConfigModel> GetAllPlugin()
         {
             if (!File.Exists(GlobalConfigModel.UI_PluginConfigPath))
@@ -591,9 +639,10 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 添加插件到统一集合
+        /// 添加或更新插件到全局统一集合<br/>
+        /// 同时触发信息事件通知并异步刷新界面
         /// </summary>
-        /// <param name="plugin">插件对象</param>
+        /// <param name="plugin">待注册的插件配置对象</param>
         public static void SetPlugin(this PluginConfigModel plugin)
         {
             GlobalConfigModel.PluginDict[plugin.Guid] = plugin;
@@ -616,10 +665,11 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 地址集合转换
+        /// 将 AddressModel 列表批量转换为底层 Address 对象<br/>
+        /// 预分配 AddressArray 容量以减少扩容开销
         /// </summary>
-        /// <param name="models">集合</param>
-        /// <returns>转换后的数据</returns>
+        /// <param name="models">地址模型集合</param>
+        /// <returns>转换后的 Address 对象，包含所有地址详情</returns>
         public static Address AddressConvert(this List<AddressModel> models)
         {
             Address address = new();
@@ -632,10 +682,10 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 地址集合转换
+        /// 将单个 AddressModel 转换为底层 Address 对象
         /// </summary>
-        /// <param name="models">集合</param>
-        /// <returns>转换后的数据</returns>
+        /// <param name="models">地址模型</param>
+        /// <returns>转换后的 Address 对象，包含单个地址详情</returns>
         public static Address AddressConvert(this AddressModel models)
         {
             Address address = new();

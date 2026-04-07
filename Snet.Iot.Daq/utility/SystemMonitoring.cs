@@ -115,7 +115,8 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 构造函数
+        /// 构造函数：初始化硬件监控对象<br/>
+        /// 启用 CPU、GPU、内存、主板、控制器、网络、存储的监控
         /// </summary>
         public SystemMonitoring()
         {
@@ -136,16 +137,15 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 初始化
+        /// 初始化硬件监控引擎，开始采集硬件信息
         /// </summary>
-        /// <returns></returns>
         public void Init()
         {
             computer.Open();
         }
 
         /// <summary>
-        /// 结束
+        /// 关闭硬件监控引擎，释放相关资源
         /// </summary>
         public void End()
         {
@@ -153,8 +153,11 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 硬件数据获取
+        /// 获取硬件监控数据<br/>
+        /// 当 baseInfo 为 true 时，通过 Parallel.Invoke 并行获取系统基础信息（WMI 查询），提升性能
         /// </summary>
+        /// <param name="baseInfo">是否同时获取系统基础信息（CPU、内存、硬盘等）</param>
+        /// <returns>硬件数据对象，包含传感器读数和系统信息</returns>
         public HardwareData GetInfo(bool baseInfo = false)
         {
             computer.Accept(updateVisitor);
@@ -203,6 +206,10 @@ namespace Snet.Iot.Daq.utility
             catch { }
             return "未知系统";
         }
+        /// <summary>
+        /// 获取 CPU 信息（名称、核心数、线程数）
+        /// </summary>
+        /// <returns>CPU 信息字符串</returns>
         private string GetCpuInfo()
         {
             try
@@ -214,6 +221,10 @@ namespace Snet.Iot.Daq.utility
             catch { return "未知CPU"; }
         }
 
+        /// <summary>
+        /// 获取物理内存总容量
+        /// </summary>
+        /// <returns>内存容量字符串（单位 GB）</returns>
         private string GetMemoryInfo()
         {
             try
@@ -225,6 +236,10 @@ namespace Snet.Iot.Daq.utility
             catch { return "未知内存"; }
         }
 
+        /// <summary>
+        /// 获取硬盘信息（型号和容量）
+        /// </summary>
+        /// <returns>硬盘信息字符串，多个硬盘用分号分隔</returns>
         private string GetDiskInfo()
         {
             try
@@ -239,6 +254,10 @@ namespace Snet.Iot.Daq.utility
             catch { return "未知硬盘"; }
         }
 
+        /// <summary>
+        /// 获取显卡信息（名称和驱动版本）
+        /// </summary>
+        /// <returns>显卡信息字符串，多个显卡用分号分隔</returns>
         private string GetGpuInfo()
         {
             try
@@ -249,6 +268,10 @@ namespace Snet.Iot.Daq.utility
             catch { return "未知显卡"; }
         }
 
+        /// <summary>
+        /// 获取 BIOS 信息（制造商、版本、日期）
+        /// </summary>
+        /// <returns>BIOS 信息字符串</returns>
         private string GetBiosInfo()
         {
             try
@@ -261,6 +284,10 @@ namespace Snet.Iot.Daq.utility
             catch { return "未知BIOS"; }
         }
 
+        /// <summary>
+        /// 获取网络适配器信息（名称和 MAC 地址）
+        /// </summary>
+        /// <returns>网络适配器信息字符串，多个适配器用分号分隔</returns>
         private string GetNetworkInfo()
         {
             try

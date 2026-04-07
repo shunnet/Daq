@@ -312,15 +312,16 @@ namespace Snet.Iot.Daq.handler
 
 
         /// <summary>
-        /// 保存配置
+        /// 异步保存项目配置到 JSON 文件<br/>
+        /// 包含重试机制（最多5次，间隔500ms），用于处理文件被占用的情况
         /// </summary>
-        /// <param name="data">json 数据</param>
-        /// <param name="path">保存的路径</param>
+        /// <param name="data">待保存的项目树数据</param>
+        /// <param name="path">配置文件保存路径</param>
         public static async Task SaveConfigAsync(ObservableCollection<ProjectTreeViewModel> data, string path)
         {
-            // 最大重试次数和等待时间
-            int maxRetries = 5;
-            int delayMilliseconds = 500; // 等待半秒
+            // 重试策略参数
+            const int maxRetries = 5;
+            const int delayMilliseconds = 500;
             int retries = 0;
             bool fileWritten = false;
 
@@ -328,37 +329,38 @@ namespace Snet.Iot.Daq.handler
             {
                 try
                 {
-                    // 尝试打开文件并进行写入
+                    // 序列化并写入文件
                     await WriteToFileAsync(path, data.ToJson(true));
-                    fileWritten = true;  // 文件成功写入
+                    fileWritten = true;
                     _ = GlobalConfigModel.RefreshAsync().ConfigureAwait(false);
                 }
                 catch (IOException ex)
                 {
-                    // 文件正在被占用，增加重试次数
-                    LogHelper.Error($"文件被占用，重试 {retries + 1}/{maxRetries}...");
+                    // 文件被占用时记录详细异常信息并重试
                     retries++;
-
-                    // 等待一段时间后再次尝试
+                    LogHelper.Error($"文件被占用，重试 {retries}/{maxRetries}：{ex.Message}");
                     await Task.Delay(delayMilliseconds);
                 }
                 catch (Exception ex)
                 {
-                    // 处理其他异常
-                    LogHelper.Error($"发生错误: {ex.Message}");
+                    // 其他异常直接记录并中止重试
+                    LogHelper.Error($"配置保存失败: {ex.Message}", exception: ex);
                     break;
                 }
             }
 
             if (!fileWritten)
             {
-                LogHelper.Error("文件写入失败，文件可能被长时间占用。");
+                LogHelper.Error("配置文件写入失败，文件可能被长时间占用。");
             }
         }
 
         /// <summary>
-        /// 异步写入文件
+        /// 异步写入字符串内容到文件<br/>
+        /// 使用 UTF-8 编码，覆盖写入模式
         /// </summary>
+        /// <param name="path">文件路径</param>
+        /// <param name="data">待写入的字符串内容</param>
         private static async Task WriteToFileAsync(string path, string data)
         {
             await using var writer = new StreamWriter(path, false, Encoding.UTF8);
@@ -366,11 +368,12 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 获取配置
+        /// 从 JSON 文件加载配置对象<br/>
+        /// 文件不存在时返回默认值
         /// </summary>
-        /// <typeparam name="T">对象</typeparam>
-        /// <param name="path">文件路径</param>
-        /// <returns>返回指定对象</returns>
+        /// <typeparam name="T">反序列化目标类型</typeparam>
+        /// <param name="filePath">配置文件路径</param>
+        /// <returns>反序列化后的对象，文件不存在或反序列化失败时返回 default</returns>
         public static T? GetConfig<T>(string filePath)
         {
             if (!File.Exists(filePath))
@@ -385,8 +388,12 @@ namespace Snet.Iot.Daq.handler
 
 
         /// <summary>
-        /// 创建一个详情界面
+        /// 创建项目详情界面实例及其 ViewModel<br/>
+        /// 用于双击树节点时动态创建设备详情页
         /// </summary>
+        /// <param name="bossProject">项目树根集合</param>
+        /// <param name="project">当前选中的项目节点</param>
+        /// <returns>界面实例和 ViewModel 的元组</returns>
         public static (ProjectDetails view, ProjectDetailsModel model) CreateDetails(this ObservableCollection<ProjectTreeViewModel> bossProject, ProjectTreeViewModel project)
         {
             ProjectDetails p = new ProjectDetails();
@@ -396,8 +403,9 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
-        /// 回灌全局数据
+        /// 回灌项目详情树节点的全局数据（地址、MQ插件等）
         /// </summary>
+        /// <param name="nodes">详情树节点集合</param>
         public static void RebindGlobals(this IEnumerable<ProjectDetailsTreeViewModel> nodes)
         {
             foreach (var node in nodes)
@@ -405,9 +413,11 @@ namespace Snet.Iot.Daq.handler
                 RebindDetailNode(node);
             }
         }
+
         /// <summary>
-        /// 回灌全局数据
+        /// 回灌项目树节点的全局数据（采集设备、地址、MQ 等）
         /// </summary>
+        /// <param name="trees">项目树根节点集合</param>
         public static void RebindGlobals(this ObservableCollection<ProjectTreeViewModel> trees)
         {
             foreach (var node in trees)

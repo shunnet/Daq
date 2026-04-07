@@ -1,7 +1,7 @@
-<h1 align="center">Snet.Iot.Daq</h1>
+<h1 align="center">Daq</h1>
 
 <p align="center">
-  <img width="120" height="120" src="https://api.shunnet.top/pic/nuget.png" alt="Snet.Iot.Daq Logo"/>
+  <img width="120" height="120" src="https://api.shunnet.top/pic/nuget.png" alt="Snet Logo"/>
 </p>
 
 <p align="center">

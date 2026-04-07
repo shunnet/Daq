@@ -15,13 +15,18 @@ using System.IO;
 namespace Snet.Iot.Daq.data
 {
     /// <summary>
-    /// 全局配置
+    /// 全局配置模型<br/>
+    /// 存储应用程序全局共享的配置、缓存、数据库连接、服务实例等资源
     /// </summary>
     public static class GlobalConfigModel
     {
+        /// <summary>
+        /// 静态构造函数：初始化 SQLite 数据库连接<br/>
+        /// 自动创建数据库目录（若不存在）
+        /// </summary>
         static GlobalConfigModel()
         {
-            string directory = Path.GetDirectoryName(dbPath);
+            string directory = Path.GetDirectoryName(dbPath)!;
             if (!Directory.Exists(directory))
             {
                 Directory.CreateDirectory(directory);
@@ -179,10 +184,10 @@ namespace Snet.Iot.Daq.data
         public static readonly string UI_ProjectConfigPath = Path.Combine(UiConfigPath, "ProjectConfig.json");
 
         /// <summary>
-        /// 选中文件
+        /// 打开文件选择对话框，根据指定扩展名过滤文件
         /// </summary>
-        /// <param name="fileExt">文件格式</param>
-        /// <returns></returns>
+        /// <param name="fileExt">文件扩展名（不含点号，如 "json"、"csv"）</param>
+        /// <returns>选中的文件路径，未选择时返回空字符串</returns>
         public static string SelectFiles(string fileExt)
         {
             var filters = new Dictionary<string, string>
@@ -193,9 +198,9 @@ namespace Snet.Iot.Daq.data
         }
 
         /// <summary>
-        /// 选中文件夹
+        /// 打开文件夹选择对话框
         /// </summary>
-        /// <returns></returns>
+        /// <returns>选中的文件夹路径，未选择时返回空字符串</returns>
         public static string SelectFolder()
         {
             return Win32Handler.Select(App.LanguageOperate.GetLanguageValue("请选择文件夹"), true);
