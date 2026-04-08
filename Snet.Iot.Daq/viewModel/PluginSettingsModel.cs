@@ -16,7 +16,6 @@ using System.Collections.ObjectModel;
 using System.IO;
 using System.IO.Compression;
 using System.Reflection;
-using System.Text;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -283,25 +282,27 @@ namespace Snet.Iot.Daq.viewModel
             //创建移除的任务
             if (await MessageBox.Show($"确定移除此插件吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
-                //创建命令
-                StringBuilder stringBuilder = new StringBuilder();
-                stringBuilder.AppendLine($"rmdir /s /q {details.PluginPath}"); //删除插件
-                stringBuilder.AppendLine("del /f /q \"%~f0\"");//删除自身
-                if (!Directory.Exists(GlobalConfigModel.TaskPath))
+                if (await PluginHandler.RemovePluginAsync(details.Name))
                 {
-                    Directory.CreateDirectory(GlobalConfigModel.TaskPath);
-                }
-                FileHandler.StringToFile(Path.Combine(GlobalConfigModel.TaskPath, $"Remove{name}Plugin.bat"), stringBuilder.ToString());
-                //查询插件路径是否还有一致的，有的话一并删除
-                for (int i = PluginList.Count - 1; i >= 0; i--)
-                {
-                    if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
+                    //强制 GC 回收已卸载的程序集上下文，确保释放所有残留引用
+                    GC.Collect();
+                    GC.WaitForPendingFinalizers();
+                    Directory.Delete(details.PluginPath, true);  //删除插件文件夹
+                    //查询插件路径是否还有一致的，有的话一并删除
+                    for (int i = PluginList.Count - 1; i >= 0; i--)
                     {
-                        PluginList.RemoveAt(i);
+                        if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
+                        {
+                            PluginList.RemoveAt(i);
+                        }
                     }
+                    PluginListSelectedItem = null;  //置空
+                    await MessageBox.Show($"插件移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                PluginListSelectedItem = null;  //置空
-                await MessageBox.Show($"插件移除任务创建成功，重启后生效！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                else
+                {
+
+                }
             }
             SavePluginListConfig();
         }

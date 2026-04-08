@@ -817,6 +817,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 插件移除成功 的本地化字符串。
+        /// </summary>
+        public static string 插件移除成功 {
+            get {
+                return ResourceManager.GetString("插件移除成功", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 插件类型 的本地化字符串。
         /// </summary>
         public static string 插件类型 {

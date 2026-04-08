@@ -15,7 +15,7 @@ namespace Snet.Iot.Daq.handler
 {
     /// <summary>
     /// 插件参数处理类<br/>
-    /// 负责插件的加载、实例化、参数转换、状态验证、配置读写等核心操作。
+    /// 负责插件的加载、移除、实例化、参数转换、状态验证、配置读写等核心操作。
     /// 内部使用 ConcurrentDictionary 缓存程序集类型和实例，支持线程安全的并发访问。
     /// </summary>
     public static class PluginHandler
@@ -34,6 +34,11 @@ namespace Snet.Iot.Daq.handler
         /// MQ实例对象
         /// </summary>
         private static readonly ConcurrentDictionary<string, IMq> icoMq = new();
+
+        /// <summary>
+        /// 插件加载上下文：以插件类名为键，支持通过 Unload() 实现程序集热卸载
+        /// </summary>
+        private static readonly ConcurrentDictionary<string, PluginLoadContext> pluginContexts = new();
 
         /// <summary>
         /// 动态库监控格式
@@ -62,8 +67,8 @@ namespace Snet.Iot.Daq.handler
             //结果
             List<(PluginDetailsModel Model, object? Param)> result = new();
 
-            //数据
-            ConcurrentDictionary<(string path, string className), Type> copy = new ConcurrentDictionary<(string path, string className), Type>();
+            //数据（同时跟踪类型和其所属的加载上下文）
+            ConcurrentDictionary<(string path, string className), (Type type, PluginLoadContext context)> copy = new();
 
             //库
             string[] libs = Directory.GetFiles(path, DllWatcherFormat, SearchOption.AllDirectories);
@@ -72,8 +77,10 @@ namespace Snet.Iot.Daq.handler
             {
                 try
                 {
-                    //加载程序集
-                    Assembly assembly = Assembly.LoadFrom(lib);
+                    //使用可回收的 AssemblyLoadContext 加载程序集，支持热卸载
+                    string fullPath = Path.GetFullPath(lib);
+                    var context = new PluginLoadContext(fullPath);
+                    Assembly assembly = context.LoadFromFileStream(fullPath);
                     //获取所有类
                     Type[] types = assembly.GetExportedTypes();
                     //过滤器
@@ -95,7 +102,7 @@ namespace Snet.Iot.Daq.handler
                         {
                             continue;
                         }
-                        copy.AddOrUpdate((path, type.Name), type, (k, v) => type);
+                        copy.AddOrUpdate((path, type.Name), (type, context), (k, v) => (type, context));
                     }
                 }
                 catch (Exception ex)
@@ -110,21 +117,24 @@ namespace Snet.Iot.Daq.handler
             {
                 try
                 {
+                    //解构类型和加载上下文
+                    (Type pluginType, PluginLoadContext pluginContext) = item.Value;
+
                     //类名
-                    string className = item.Value.Name;
+                    string className = pluginType.Name;
                     //命名空间
-                    string @namespace = $"{item.Value.Namespace}.{item.Value.Name}";
+                    string @namespace = $"{pluginType.Namespace}.{pluginType.Name}";
                     //名称
-                    string name = item.Value.Name;
+                    string name = pluginType.Name;
                     //版本号
-                    AssemblyName assemblyName = item.Value.Assembly.GetName();
+                    AssemblyName assemblyName = pluginType.Assembly.GetName();
                     string version = assemblyName.Version.ToString().Replace(".0", string.Empty);
 
                     if (iName.Contains(PluginType.Mq.ToString()))
                     {
                         if (!icoMq.TryGetValue(className, out IMq? mq))
                         {
-                            mq = Activator.CreateInstance(item.Value) as IMq;
+                            mq = Activator.CreateInstance(pluginType) as IMq;
                             if (mq != null)
                             {
                                 icoMq.TryAdd(className, mq);
@@ -132,7 +142,7 @@ namespace Snet.Iot.Daq.handler
                         }
 
                         //格式
-                        string configFormat = $"{item.Value.Namespace}.{item.Value.Name}" + ".{0}." + PluginType.Mq.ToString() + ".Config.json";
+                        string configFormat = $"{pluginType.Namespace}.{pluginType.Name}" + ".{0}." + PluginType.Mq.ToString() + ".Config.json";
 
                         //参数
                         object? param = mq.GetParam(true).ResultData;
@@ -144,7 +154,7 @@ namespace Snet.Iot.Daq.handler
                     {
                         if (!icoDaq.TryGetValue(className, out IDaq? daq))
                         {
-                            daq = Activator.CreateInstance(item.Value) as IDaq;
+                            daq = Activator.CreateInstance(pluginType) as IDaq;
                             if (daq != null)
                             {
                                 icoDaq.TryAdd(className, daq);
@@ -152,7 +162,7 @@ namespace Snet.Iot.Daq.handler
                         }
 
                         //格式
-                        string configFormat = $"{item.Value.Namespace}.{item.Value.Name}" + ".{0}." + PluginType.Daq.ToString() + ".Config.json";
+                        string configFormat = $"{pluginType.Namespace}.{pluginType.Name}" + ".{0}." + PluginType.Daq.ToString() + ".Config.json";
 
                         //参数
                         object? param = daq.GetParam(true).ResultData;
@@ -161,8 +171,15 @@ namespace Snet.Iot.Daq.handler
                         result.Add((new(name, @namespace, configFormat, version), param));
                     }
 
-                    //更新容器
-                    iocType.AddOrUpdate(className, item.Value, (k, v) => item.Value);
+                    //更新类型容器
+                    iocType.AddOrUpdate(className, pluginType, (k, v) => pluginType);
+
+                    //记录加载上下文（热重载时卸载旧上下文）
+                    if (pluginContexts.TryGetValue(className, out var oldContext) && !ReferenceEquals(oldContext, pluginContext))
+                    {
+                        try { oldContext.Unload(); } catch { }
+                    }
+                    pluginContexts[className] = pluginContext;
                 }
                 catch (Exception ex)
                 {
@@ -171,6 +188,78 @@ namespace Snet.Iot.Daq.handler
                 }
             }
             return result;
+        }
+
+        /// <summary>
+        /// 热卸载指定插件<br/>
+        /// 释放插件的缓存实例（IDaq/IMq），移除类型注册，并卸载对应的程序集加载上下文。<br/>
+        /// 同一 DLL 中的所有插件类型将一并卸载，卸载后 GC 将在下一次回收时释放程序集内存。
+        /// </summary>
+        /// <param name="className">插件类名（IOC 容器中的键）</param>
+        /// <returns>是否成功卸载</returns>
+        public static async Task<bool> RemovePluginAsync(string className)
+        {
+            if (!pluginContexts.TryGetValue(className, out PluginLoadContext? context))
+                return false;
+
+            //查找同一加载上下文下的所有插件类（同一 DLL 可能包含多个插件类型）
+            var relatedClassNames = pluginContexts
+                .Where(kvp => ReferenceEquals(kvp.Value, context))
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            //依次清理所有相关插件的缓存实例和类型注册
+            foreach (var name in relatedClassNames)
+            {
+                if (icoDaq.TryRemove(name, out IDaq? daq))
+                {
+                    try { await daq.DisposeAsync(); } catch { }
+                }
+                if (icoMq.TryRemove(name, out IMq? mq))
+                {
+                    try { await mq.DisposeAsync(); } catch { }
+                }
+                iocType.TryRemove(name, out _);
+                pluginContexts.TryRemove(name, out _);
+            }
+
+            //卸载程序集加载上下文
+            context.Unload();
+            return true;
+        }
+
+        /// <summary>
+        /// 热卸载所有已加载的插件<br/>
+        /// 依次释放所有缓存实例并卸载全部程序集加载上下文
+        /// </summary>
+        public static async Task RemoveAllPluginsAsync()
+        {
+            //收集所有需要卸载的上下文（去重）
+            var contexts = pluginContexts.Values.Distinct().ToList();
+
+            //释放所有 DAQ 实例
+            foreach (var kvp in icoDaq)
+            {
+                try { await kvp.Value.DisposeAsync(); } catch { }
+            }
+            icoDaq.Clear();
+
+            //释放所有 MQ 实例
+            foreach (var kvp in icoMq)
+            {
+                try { await kvp.Value.DisposeAsync(); } catch { }
+            }
+            icoMq.Clear();
+
+            //清除类型注册
+            iocType.Clear();
+            pluginContexts.Clear();
+
+            //卸载所有程序集上下文
+            foreach (var ctx in contexts)
+            {
+                try { ctx.Unload(); } catch { }
+            }
         }
 
         /// <summary>

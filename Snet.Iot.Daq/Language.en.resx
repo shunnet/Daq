@@ -292,8 +292,8 @@
   <data name="确定移除此插件吗？" xml:space="preserve">
     <value>Are you sure to remove this plugin?</value>
   </data>
-  <data name="插件移除任务创建成功，重启后生效！" xml:space="preserve">
-    <value>The plugin removal task has been successfully created and will take effect after restarting!</value>
+  <data name="插件移除成功" xml:space="preserve">
+    <value>Plugin removal successful</value>
   </data>
   <data name="确定移除此配置吗？" xml:space="preserve">
     <value>Are you sure to remove this configuration?</value>

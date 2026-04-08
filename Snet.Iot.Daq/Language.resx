@@ -292,8 +292,8 @@
   <data name="确定移除此插件吗？" xml:space="preserve">
     <value>确定移除此插件吗？</value>
   </data>
-  <data name="插件移除任务创建成功，重启后生效！" xml:space="preserve">
-    <value>插件移除任务创建成功，重启后生效！</value>
+  <data name="插件移除成功" xml:space="preserve">
+    <value>插件移除成功</value>
   </data>
   <data name="确定移除此配置吗？" xml:space="preserve">
     <value>确定移除此配置吗？</value>
