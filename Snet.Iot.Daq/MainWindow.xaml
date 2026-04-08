@@ -45,12 +45,19 @@
 
         <!--  托盘  -->
         <snet:NotifyIcon
+            x:Name="TrayIcon"
             FocusOnLeftClick="True"
             Icon="/icon.ico"
             MenuOnRightClick="True"
             TooltipText="{snet:Loc SystemTitle}">
             <snet:NotifyIcon.Menu>
-                <ContextMenu Style="{StaticResource UiContextMenu}">
+                <ContextMenu x:Name="TrayContextMenu" Style="{StaticResource UiContextMenu}">
+                    <!--  设备状态项将在代码中动态添加到此分隔符之前  -->
+                    <Separator x:Name="TrayDeviceSeparator" />
+                    <uis:MenuItem
+                        Command="{Binding ShowWindow}"
+                        Header="{snet:Loc 显示窗口}"
+                        Icon="{uis:SymbolIcon Symbol=Window20}" />
                     <uis:MenuItem
                         Command="{Binding Close}"
                         Header="{snet:Loc 关闭}"

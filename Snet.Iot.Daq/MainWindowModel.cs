@@ -1,5 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.view;
+using Snet.Iot.Daq.viewModel;
 using Snet.Model.data;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Core.mvvm;
@@ -10,16 +12,20 @@ using Wpf.Ui.Controls;
 namespace Snet.Iot.Daq
 {
     /// <summary>
-    /// 主窗口视图模型，负责初始化导航菜单项和托盘操作命令。
+    /// 主窗口视图模型，负责初始化导航菜单项、托盘操作命令以及设备状态托盘绑定。
     /// </summary>
     public class MainWindowModel : BindNotify
     {
+        /// <summary>
+        /// 构造函数，初始化菜单项数据源
+        /// </summary>
         public MainWindowModel()
         {
             // 初始化菜单项数据源
-            MenuItemsSource = MenuItemsOperate(App.LanguageOperate);   //给菜单项赋值
-            FooterMenuItemsSource = FooterMenuItemsOperate(App.LanguageOperate);  //给底部菜单项赋值
+            MenuItemsSource = MenuItemsOperate(App.LanguageOperate);
+            FooterMenuItemsSource = FooterMenuItemsOperate(App.LanguageOperate);
         }
+
         /// <summary>
         /// 菜单项数据源
         /// </summary>
@@ -28,6 +34,7 @@ namespace Snet.Iot.Daq
             get => GetProperty(() => MenuItemsSource);
             set => SetProperty(() => MenuItemsSource, value);
         }
+
         /// <summary>
         /// 底部菜单项数据源
         /// </summary>
@@ -38,9 +45,15 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// 菜单项操作
+        /// 托盘设备状态集合，供系统托盘右键菜单绑定使用
         /// </summary>
-        /// <returns>返回新的菜单项</returns>
+        public ObservableCollection<ConsoleDeviceModel> TrayDevices => GlobalConfigModel.TrayDevices;
+
+        /// <summary>
+        /// 创建主菜单项集合
+        /// </summary>
+        /// <param name="model">语言模型，用于多语言支持</param>
+        /// <returns>返回主菜单项集合</returns>
         public ObservableCollection<object> MenuItemsOperate(LanguageModel model) => new(){
             WpfUiHandler.CreationControl("主页", SymbolRegular.Home24, typeof(Home),true,model),
             WpfUiHandler.CreationControl("插件设置", SymbolRegular.DocumentQueue20, typeof(PluginSettings),true,model),
@@ -50,65 +63,59 @@ namespace Snet.Iot.Daq
          };
 
         /// <summary>
-        /// 底部菜单项操作
+        /// 创建底部菜单项集合
         /// </summary>
-        /// <returns>返回新的菜单项</returns>
+        /// <param name="model">语言模型，用于多语言支持</param>
+        /// <returns>返回底部菜单项集合</returns>
         public ObservableCollection<object> FooterMenuItemsOperate(LanguageModel model) => new(){
             WpfUiHandler.CreationControl("关于", SymbolRegular.Info28, typeof(About), true, model)
         };
 
+        /// <summary>
+        /// 显示主窗口命令，从系统托盘恢复窗口显示
+        /// </summary>
+        public IAsyncRelayCommand ShowWindow => p_ShowWindow ??= new AsyncRelayCommand(ShowWindowAsync);
+        private IAsyncRelayCommand p_ShowWindow;
 
         /// <summary>
-        /// 关闭
+        /// 显示主窗口，恢复任务栏显示并激活窗口
         /// </summary>
-        public IAsyncRelayCommand Close => p_Close ??= new AsyncRelayCommand(CloseAsync);
-        private IAsyncRelayCommand p_Close;
-        private Task CloseAsync()
+        /// <returns>已完成的任务</returns>
+        private Task ShowWindowAsync()
         {
-            Application.Current.Shutdown();
+            var window = Application.Current.MainWindow;
+            if (window != null)
+            {
+                window.Show();
+                window.ShowInTaskbar = true;
+                if (window.WindowState == WindowState.Minimized)
+                {
+                    window.WindowState = WindowState.Normal;
+                }
+                window.Activate();
+            }
             return Task.CompletedTask;
         }
 
-        #region 右键托盘 Item MVVM 
-        /*
+        /// <summary>
+        /// 关闭应用程序命令（从托盘菜单调用，真正退出程序）
+        /// </summary>
+        public IAsyncRelayCommand Close => p_Close ??= new AsyncRelayCommand(CloseAsync);
+        private IAsyncRelayCommand p_Close;
 
-        ////注册托盘点击事件
-           //foreach (var menuItem in TrayMenuItems)
-           //{
-           //    if (menuItem is MenuItem item)
-           //    {
-           //        item.Click += OnTrayMenuItemClick;
-           //    }
-           //}
-
-        */
-        ///// <summary>
-        ///// 托盘右键菜单
-        ///// </summary>
-        //public ObservableCollection<System.Windows.Controls.Control> TrayMenuItems => _trayMenuItems ??= [
-        //        new Wpf.Ui.Controls.MenuItem()
-        //        {
-        //            Header = "关闭",
-        //            Tag = "tray_close",
-        //            Icon = new SymbolIcon { Symbol = SymbolRegular.Dismiss24 },
-        //        },
-        //    ];
-        //private ObservableCollection<System.Windows.Controls.Control> _trayMenuItems;
-        ///// <summary>
-        ///// 托盘点击
-        ///// </summary>
-        //private void OnTrayMenuItemClick(object sender, RoutedEventArgs e)
-        //{
-        //    if (sender is not Wpf.Ui.Controls.MenuItem menuItem)
-        //        return;
-        //    var tag = menuItem.Tag?.ToString() ?? string.Empty;
-        //    switch (tag)
-        //    {
-        //        case "tray_close":
-        //            Application.Current.Shutdown();
-        //            break;
-        //    }
-        //} 
-        #endregion
+        /// <summary>
+        /// 关闭应用程序，设置强制关闭标志后执行退出
+        /// </summary>
+        /// <returns>已完成的任务</returns>
+        private Task CloseAsync()
+        {
+            // 设置强制关闭标志，避免 OnClosing 拦截
+            if (Application.Current.MainWindow is MainWindow mainWindow)
+            {
+                mainWindow.IsForceClose = true;
+            }
+            Application.Current.Shutdown();
+            return Task.CompletedTask;
+        }
     }
 }

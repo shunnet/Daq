@@ -22,6 +22,9 @@ namespace Snet.Iot.Daq.viewModel
     public class ProjectSettingsModel : BindNotify
     {
         #region 构造函数
+        /// <summary>
+        /// 构造函数，初始化项目树节点配置数据
+        /// </summary>
         public ProjectSettingsModel()
         {
             _ = InitAsync();

@@ -31,133 +31,59 @@ namespace Snet.Iot.Daq
         public readonly static List<EditModel> EditModels = GetEditModels();
 
         /// <summary>
-        /// 获取信息框模型集合
+        /// 获取信息框模型集合，定义日志输出文本的颜色高亮规则
         /// </summary>
-        /// <returns></returns>
-        private static List<EditModel> GetEditModels()
-        {
-            List<EditModel> models = new List<EditModel>();
-
-            models.Add(new EditModel
-            {
-                Name = "[ Info ]",
-                Color = "#4CAF50"
-            });
-            models.Add(new EditModel
-            {
-                Name = "[ Error ]",
-                Color = "#F44336"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "异常",
-                Color = "#F44336"
-            });
-            models.Add(new EditModel
-            {
-                Name = "Exception",
-                Color = "#F44336"
-            });
-            models.Add(new EditModel
-            {
-                Name = "[ Mq ]",
-                Color = "#2196F3"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "[ Daq ]",
-                Color = "#2196F3"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "[ MqttService ]",
-                Color = "#2196F3"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "[ OpcUaService ]",
-                Color = "#2196F3"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "[ MqttServiceOperate ]",
-                Color = "#2196F3"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "[ OpcUaServiceOperate ]",
-                Color = "#2196F3"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "TRUE",
-                Color = "#4CAF50"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "FALSE",
-                Color = "#F44336"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = ">",
-                Color = "#FBC31D"
-            });
-
-            models.Add(new EditModel
-            {
-                Name = "<",
-                Color = "#FBC31D"
-            });
-
-
-
-            return models;
-        }
+        /// <returns>编辑模型集合，包含各类日志标签对应的高亮颜色</returns>
+        private static List<EditModel> GetEditModels() =>
+        [
+            new() { Name = "[ Info ]",                Color = "#4CAF50" },
+            new() { Name = "[ Error ]",               Color = "#F44336" },
+            new() { Name = "异常",                     Color = "#F44336" },
+            new() { Name = "Exception",               Color = "#F44336" },
+            new() { Name = "[ Mq ]",                  Color = "#2196F3" },
+            new() { Name = "[ Daq ]",                 Color = "#2196F3" },
+            new() { Name = "[ MqttService ]",         Color = "#2196F3" },
+            new() { Name = "[ OpcUaService ]",        Color = "#2196F3" },
+            new() { Name = "[ MqttServiceOperate ]",  Color = "#2196F3" },
+            new() { Name = "[ OpcUaServiceOperate ]", Color = "#2196F3" },
+            new() { Name = "TRUE",                    Color = "#4CAF50" },
+            new() { Name = "FALSE",                   Color = "#F44336" },
+            new() { Name = ">",                       Color = "#FBC31D" },
+            new() { Name = "<",                       Color = "#FBC31D" },
+        ];
 
         /// <summary>
-        /// 在应用程序关闭时发生
+        /// 在应用程序关闭时发生，释放全局注入的服务资源
         /// </summary>
         private void OnExit(object sender, ExitEventArgs e)
         {
             InjectionWpf.ClearService();
-            GC.SuppressFinalize(this);
-            GC.Collect();
         }
 
         /// <summary>
-        /// 在加载应用程序时发生
+        /// 在加载应用程序时发生，执行初始化和全局异常注册后打开主窗口
         /// </summary>
         private void OnStartup(object sender, StartupEventArgs e)
         {
-            //初始化
+            // 初始化依赖注入、数据库、插件等
             Init();
 
-            //启动全局异常捕捉
+            // 启动全局异常捕捉
             RegisterEvents();
 
-            //加载本地自定义图标
+            // 加载本地自定义图标资源
             IconsHandler.Loading("pack://application:,,,/Snet.Iot.Daq;component/resources/icons.xaml");
 
-            //打开主窗口
+            // 打开主窗口
             InjectionWpf.Window<MainWindow, MainWindowModel>(true).Show();
         }
 
         /// <summary>
-        /// 初始化
+        /// 初始化应用程序核心资源：依赖注入、用户控件注册、任务执行、数据库建表、插件加载
         /// </summary>
         private void Init()
         {
-            //注入参数设置
+            // 注入参数设置控件
             PropertyControl control = new PropertyControl();
             control.ButtonVisibility = Visibility.Visible;
             InjectionWpf.AddService(s =>
@@ -165,16 +91,16 @@ namespace Snet.Iot.Daq
                 s.AddSingleton(control);
             });
 
-            //注入设备选择
+            // 注入设备选择控件
             InjectionWpf.UserControl<SelectDevice, Snet.Iot.Daq.viewModel.SelectDeviceModel>(true);
 
-            //注入地址选择
+            // 注入地址选择控件
             InjectionWpf.UserControl<SelectAddress, Snet.Iot.Daq.viewModel.SelectAddressModel>(true);
 
-            //注入处理
+            // 注入处理器控件
             InjectionWpf.UserControl<Handler, Snet.Iot.Daq.viewModel.HandlerModel>(true);
 
-            // 处理任务 -------------------------
+            // 执行任务目录中的所有 .bat 脚本（隐藏窗口运行）
             string batDirectory = GlobalConfigModel.TaskPath;
             if (Directory.Exists(batDirectory))
             {
@@ -190,10 +116,10 @@ namespace Snet.Iot.Daq
                 }
             }
 
-            //初始化数据库 -------------------------
+            // 初始化 SQLite 数据库表
             GlobalConfigModel.sqliteOperate.CreateTable<AddressModel>();
 
-            //初始化插件 -------------------------
+            // 加载并初始化所有已配置的插件
             ObservableCollection<PluginListModel> plugins = PluginHandler.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
             //初始化插件
             foreach (var item in plugins)
@@ -215,7 +141,7 @@ namespace Snet.Iot.Daq
         #region 全局异常捕捉
 
         /// <summary>
-        /// 全局异常捕捉
+        /// 注册全局异常捕获事件，覆盖 Task 线程、UI 线程和非 UI 线程的未处理异常
         /// </summary>
         private void RegisterEvents()
         {
@@ -255,7 +181,9 @@ namespace Snet.Iot.Daq
             }
         }
 
-        //非UI线程未捕获异常处理事件(例如自己创建的一个子线程)
+        /// <summary>
+        /// 非UI线程未捕获异常处理事件（例如自己创建的子线程）
+        /// </summary>
         private void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
             try
@@ -276,7 +204,9 @@ namespace Snet.Iot.Daq
             }
         }
 
-        //UI线程未捕获异常处理事件（UI主线程）
+        /// <summary>
+        /// UI线程未捕获异常处理事件（UI主线程）
+        /// </summary>
         private void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
             try

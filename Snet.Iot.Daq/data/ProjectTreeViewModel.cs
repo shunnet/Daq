@@ -9,12 +9,21 @@ using System.Collections.ObjectModel;
 namespace Snet.Iot.Daq.data
 {
     /// <summary>
-    /// 项目的树控件
+    /// 项目树控件视图模型，表示项目树中的描述节点或设备节点，支持展开/折叠、选中、父子关系、随软启动等功能。
     /// </summary>
     public class ProjectTreeViewModel : BindNotify, ITreeViewModel<ProjectTreeViewModel>
     {
+        /// <summary>
+        /// 无参构造函数
+        /// </summary>
         public ProjectTreeViewModel() { }
 
+        /// <summary>
+        /// 创建描述类型的树节点
+        /// </summary>
+        /// <param name="name">节点名称</param>
+        /// <param name="children">子节点集合，默认为 null 则使用空集合</param>
+        /// <param name="isExpanded">是否展开</param>
         public ProjectTreeViewModel(string name, ObservableCollection<ProjectTreeViewModel>? children = null, bool isExpanded = false)
         {
             Name = name;
@@ -25,6 +34,10 @@ namespace Snet.Iot.Daq.data
             UpdateSpecialData();
         }
 
+        /// <summary>
+        /// 创建设备类型的树节点
+        /// </summary>
+        /// <param name="deviceDetails">采集设备插件配置</param>
         public ProjectTreeViewModel(PluginConfigModel deviceDetails)
         {
             Name = deviceDetails.GetObjSn();

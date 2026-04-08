@@ -889,6 +889,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 显示窗口 的本地化字符串。
+        /// </summary>
+        public static string 显示窗口 {
+            get {
+                return ResourceManager.GetString("显示窗口", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 更新时间 的本地化字符串。
         /// </summary>
         public static string 更新时间 {

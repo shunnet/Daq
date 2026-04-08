@@ -13,13 +13,18 @@ namespace Snet.Iot.Daq.data
     /// </summary>
     public class ProjectDetailsTreeViewModel : BindNotify, ITreeViewModel<ProjectDetailsTreeViewModel>
     {
+        /// <summary>
+        /// 无参构造函数
+        /// </summary>
         public ProjectDetailsTreeViewModel()
         { }
 
         /// <summary>
-        /// 添加地址
+        /// 创建地址类型的详情树节点
         /// </summary>
-        /// <param name="address">地址</param>
+        /// <param name="address">地址模型</param>
+        /// <param name="children">子节点集合，默认为 null 则使用空集合</param>
+        /// <param name="isExpanded">是否展开</param>
         public ProjectDetailsTreeViewModel(AddressModel address, ObservableCollection<ProjectDetailsTreeViewModel>? children = null, bool isExpanded = false)
         {
             Name = $"[ {address.AnotherName} ] {address.Address}";

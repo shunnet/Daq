@@ -8,6 +8,11 @@ namespace Snet.Iot.Daq.data
     /// </summary>
     public class ProjectDetailsTabControlModel : BindNotify
     {
+        /// <summary>
+        /// 构造函数，初始化设备详情和内容并刷新显示数据
+        /// </summary>
+        /// <param name="daqDetails">采集设备配置模型</param>
+        /// <param name="content">选项卡页内容</param>
         public ProjectDetailsTabControlModel(PluginConfigModel daqDetails, object content)
         {
             DaqDetails = daqDetails;
@@ -34,6 +39,10 @@ namespace Snet.Iot.Daq.data
             }
         }
         private PluginConfigModel _daqDetails;
+
+        /// <summary>
+        /// 设备信息事件回调，收到设备信息变更时刷新显示数据
+        /// </summary>
         private Task DaqDetails_OnInfoEventAsync(object? sender, Model.data.EventInfoResult e)
         {
             UpdateData();

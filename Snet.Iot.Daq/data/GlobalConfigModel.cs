@@ -205,5 +205,11 @@ namespace Snet.Iot.Daq.data
         {
             return Win32Handler.Select(App.LanguageOperate.GetLanguageValue("请选择文件夹"), true);
         }
+
+        /// <summary>
+        /// 托盘设备状态集合，供系统托盘右键菜单绑定使用。<br/>
+        /// 由 ConsoleModel 在刷新设备时同步维护。
+        /// </summary>
+        public static ObservableCollection<Snet.Iot.Daq.viewModel.ConsoleDeviceModel> TrayDevices { get; } = new();
     }
 }

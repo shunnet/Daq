@@ -658,4 +658,7 @@
   <data name="移除自动组包" xml:space="preserve">
     <value>移除自动组包</value>
   </data>
+  <data name="显示窗口" xml:space="preserve">
+    <value>显示窗口</value>
+  </data>
 </root>

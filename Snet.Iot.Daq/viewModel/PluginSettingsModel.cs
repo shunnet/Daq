@@ -29,6 +29,9 @@ namespace Snet.Iot.Daq.viewModel
     public class PluginSettingsModel : BindNotify
     {
         #region 构造函数
+        /// <summary>
+        /// 构造函数，初始化插件配置数据
+        /// </summary>
         public PluginSettingsModel()
         {
             _ = InitAsync();

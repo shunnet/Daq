@@ -542,6 +542,13 @@ namespace Snet.Iot.Daq.viewModel
                 await device.DataContext.GetSource<ConsoleDeviceModel>().DisposeAsync();
                 uiDevices.Remove(device);
             }
+
+            // 同步托盘设备状态集合，供系统托盘右键菜单使用
+            GlobalConfigModel.TrayDevices.Clear();
+            foreach (var device in uiDevices)
+            {
+                GlobalConfigModel.TrayDevices.Add(device.DataContext.GetSource<ConsoleDeviceModel>());
+            }
         }
 
 
