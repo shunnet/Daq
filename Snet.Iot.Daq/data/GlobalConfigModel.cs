@@ -85,11 +85,6 @@ namespace Snet.Iot.Daq.data
         public static readonly string InterfaceFullName = "Snet.Model.interface.I{0}";
 
         /// <summary>
-        /// 默认要执行的任务文件夹路径
-        /// </summary>
-        public static readonly string TaskPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "task");
-
-        /// <summary>
         /// 库配置唯一标识符键
         /// </summary>
         public static readonly string LibConfigSNKey = "SN";

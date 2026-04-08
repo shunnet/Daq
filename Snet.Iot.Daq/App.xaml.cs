@@ -9,8 +9,6 @@ using Snet.Windows.Controls.data;
 using Snet.Windows.Controls.property;
 using Snet.Windows.Core.handler;
 using System.Collections.ObjectModel;
-using System.Diagnostics;
-using System.IO;
 using System.Windows;
 
 namespace Snet.Iot.Daq
@@ -99,22 +97,6 @@ namespace Snet.Iot.Daq
 
             // 注入处理器控件
             InjectionWpf.UserControl<Handler, Snet.Iot.Daq.viewModel.HandlerModel>(true);
-
-            // 执行任务目录中的所有 .bat 脚本（隐藏窗口运行）
-            string batDirectory = GlobalConfigModel.TaskPath;
-            if (Directory.Exists(batDirectory))
-            {
-                foreach (var batFile in Directory.GetFiles(batDirectory, "*.bat"))
-                {
-                    Process.Start(new ProcessStartInfo
-                    {
-                        FileName = batFile,
-                        WindowStyle = ProcessWindowStyle.Hidden,
-                        CreateNoWindow = true,
-                        UseShellExecute = false
-                    });
-                }
-            }
 
             // 初始化 SQLite 数据库表
             GlobalConfigModel.sqliteOperate.CreateTable<AddressModel>();
