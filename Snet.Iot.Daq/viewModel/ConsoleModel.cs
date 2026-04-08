@@ -15,6 +15,7 @@ using Snet.Utility;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.message;
 using Snet.Windows.Core.mvvm;
+using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
 using static Snet.Iot.Daq.utility.SystemMonitoring;
@@ -37,16 +38,7 @@ namespace Snet.Iot.Daq.viewModel
         #endregion
 
         #region 监控信息
-        public double Cpu
-        {
-            get => GetProperty(() => Cpu);
-            set => SetProperty(() => Cpu, value);
-        }
-        public System.Windows.Media.Brush Cpu_Foreground
-        {
-            get => cpu_Foreground;
-            set => SetProperty(ref cpu_Foreground, value);
-        }
+
         private static readonly System.Windows.Media.SolidColorBrush s_cpuBrush = CreateFrozenBrush("#4CAF50");
         private static readonly System.Windows.Media.SolidColorBrush s_gpuBrush = CreateFrozenBrush("#F44336");
         private static readonly System.Windows.Media.SolidColorBrush s_ramBrush = CreateFrozenBrush("#2196F3");
@@ -57,7 +49,16 @@ namespace Snet.Iot.Daq.viewModel
             brush.Freeze();
             return brush;
         }
-
+        public double Cpu
+        {
+            get => GetProperty(() => Cpu);
+            set => SetProperty(() => Cpu, value);
+        }
+        public System.Windows.Media.Brush Cpu_Foreground
+        {
+            get => cpu_Foreground;
+            set => SetProperty(ref cpu_Foreground, value);
+        }
         private System.Windows.Media.Brush cpu_Foreground = s_cpuBrush;
 
         public double Gpu
@@ -93,9 +94,10 @@ namespace Snet.Iot.Daq.viewModel
             {
                 await Task.Run(async () =>
                 {
-                    Dictionary<string, double> values = new(3);
-                    using var timer = new System.Threading.PeriodicTimer(TimeSpan.FromMilliseconds(_interval));
+                    // 在循环外分配字典，避免每次迭代产生 GC 压力
+                    ConcurrentDictionary<string, double> values = new ConcurrentDictionary<string, double>();
 
+                    using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_interval));
                     while (await timer.WaitForNextTickAsync(token))
                     {
                         HardwareData hardwareData = systemMonitoring.GetInfo();
@@ -106,27 +108,30 @@ namespace Snet.Iot.Daq.viewModel
                             {
                                 foreach (var item in iteminfolist.Values)
                                 {
-                                    if (item.Key.Equals("负载,Memory") && double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value) && value > 0)
+                                    if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
+                                        && item.Key.Equals("负载,Memory") && value > 0)
                                     {
                                         values["RAM"] = value;
                                     }
                                 }
                             }
-                            else if (iteminfolist.Key.Equals("英伟达显卡") || iteminfolist.Key.Equals("因特尔显卡") || iteminfolist.Key.Equals("AMD显卡"))
+                            if (iteminfolist.Key.Equals("英伟达显卡") || iteminfolist.Key.Equals("英特尔显卡") || iteminfolist.Key.Equals("AMD显卡"))
                             {
                                 foreach (var item in iteminfolist.Values)
                                 {
-                                    if (item.Key.Equals("负载,GPU Core") && double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value) && value > 0)
+                                    if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
+                                        && item.Key.Equals("负载,GPU Core") && value > 0)
                                     {
                                         values["Gpu"] = value;
                                     }
                                 }
                             }
-                            else if (iteminfolist.Key.Equals("处理器"))
+                            if (iteminfolist.Key.Equals("处理器"))
                             {
                                 foreach (var item in iteminfolist.Values)
                                 {
-                                    if (item.Key.Equals("负载,CPU Total") && double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value) && value > 0)
+                                    if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
+                                        && item.Key.Equals("负载,CPU Total") && value > 0)
                                     {
                                         values["Cpu"] = value;
                                     }
@@ -137,7 +142,7 @@ namespace Snet.Iot.Daq.viewModel
                         {
                             foreach (var item in values)
                             {
-                                double value = Math.Round(item.Value, 2, MidpointRounding.AwayFromZero);
+                                double value = Math.Round(item.Value, 2);
                                 UpdateLineSeriesData(item.Key, value);
 
                                 switch (item.Key)
@@ -163,8 +168,10 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// 更新线条数据
+        /// 更新指定名称的图表线条数据，将最新数值推送到图表组件进行实时绘制。
         /// </summary>
+        /// <param name="name">线条名称（如 "Cpu"、"Gpu"、"RAM"）</param>
+        /// <param name="value">最新数值</param>
         private void UpdateLineSeriesData(string name, double value)
         {
             chartOperate.Update(name, value);

@@ -6,9 +6,10 @@ using System.Security.Principal;
 namespace Snet.Iot.Daq.utility
 {
     /// <summary>
-    /// 系统监控器
+    /// 系统监控器（单例），基于 LibreHardwareMonitor 和 WMI 获取 CPU、GPU、内存、硬盘、BIOS、网络等硬件信息。
+    /// 实现 IDisposable 以确保底层 Computer 资源被正确释放。
     /// </summary>
-    public class SystemMonitoring
+    public class SystemMonitoring : IDisposable
     {
 
         private static readonly Lazy<SystemMonitoring> _instance = new(() => new SystemMonitoring(), true);
@@ -21,70 +22,55 @@ namespace Snet.Iot.Daq.utility
         private UpdateVisitor updateVisitor = new UpdateVisitor();
 
         /// <summary>
-        /// 传感器信息类型，包含键值对数据
+        /// 传感器信息类型，表示单个传感器的键值对数据。
         /// </summary>
         public class SensorDataType
         {
-            /// <summary>
-            /// 传感器键名
-            /// </summary>
+            /// <summary>传感器类型与名称组合键，例如 "负载,CPU Total"</summary>
             public string Key { get; set; } = string.Empty;
-
-            /// <summary>
-            /// 传感器值
-            /// </summary>
+            /// <summary>传感器当前数值（字符串形式）</summary>
             public string Value { get; set; } = string.Empty;
         }
 
         /// <summary>
-        /// 硬件信息类型，继承传感器信息并包含子传感器列表
+        /// 硬件信息类型
         /// </summary>
         public class HardwareDataType : SensorDataType
         {
-            /// <summary>
-            /// 构造函数，初始化子传感器列表
-            /// </summary>
             public HardwareDataType()
             {
                 Values = new List<SensorDataType>();
             }
-
-            /// <summary>
-            /// 子传感器信息列表
-            /// </summary>
             public List<SensorDataType> Values { get; set; }
         }
 
         /// <summary>
-        /// 硬件信息数据模型，包含系统信息和各硬件组件详情
+        /// 硬件信息
         /// </summary>
         public class HardwareData
         {
-            /// <summary>
-            /// 构造函数，初始化硬件信息列表
-            /// </summary>
             public HardwareData()
             {
                 Info = new List<HardwareDataType>();
             }
 
             /// <summary>
-            /// 硬件信息列表
+            /// 信息
             /// </summary>
             public List<HardwareDataType> Info { get; set; }
 
             /// <summary>
-            /// 系统名称
+            /// 系统名称（计算机名）
             /// </summary>
             public string SystemName { get; set; } = string.Empty;
 
             /// <summary>
-            /// 系统版本
+            /// 系统版本（操作系统名称）
             /// </summary>
             public string SystemVer { get; set; } = string.Empty;
 
             /// <summary>
-            /// 系统运行时间
+            /// 系统运行时间（格式：X天X小时X分钟）
             /// </summary>
             public string SystemRunTime { get; set; } = string.Empty;
 
@@ -115,29 +101,25 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 构造函数：初始化硬件监控对象<br/>
-        /// 启用 CPU、GPU、内存、主板、控制器、网络、存储的监控
+        /// 构造函数，初始化 LibreHardwareMonitor 的 Computer 实例并启用所有硬件监控。
         /// </summary>
         public SystemMonitoring()
         {
-            if (computer == null)
+            computer = new Computer
             {
-                computer = new Computer
-                {
-                    IsCpuEnabled = true,
-                    IsGpuEnabled = true,
-                    IsMemoryEnabled = true,
-                    IsMotherboardEnabled = true,
-                    IsControllerEnabled = true,
-                    IsNetworkEnabled = true,
-                    IsStorageEnabled = true
-                };
-                Init();
-            }
+                IsCpuEnabled = true,
+                IsGpuEnabled = true,
+                IsMemoryEnabled = true,
+                IsMotherboardEnabled = true,
+                IsControllerEnabled = true,
+                IsNetworkEnabled = true,
+                IsStorageEnabled = true
+            };
+            Init();
         }
 
         /// <summary>
-        /// 初始化硬件监控引擎，开始采集硬件信息
+        /// 初始化硬件监控，打开底层驱动连接。
         /// </summary>
         public void Init()
         {
@@ -145,7 +127,7 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 关闭硬件监控引擎，释放相关资源
+        /// 结束硬件监控，关闭底层驱动连接。
         /// </summary>
         public void End()
         {
@@ -153,37 +135,45 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 获取硬件监控数据<br/>
-        /// 当 baseInfo 为 true 时，通过 Parallel.Invoke 并行获取系统基础信息（WMI 查询），提升性能
+        /// 释放资源，关闭 Computer 连接。
         /// </summary>
-        /// <param name="baseInfo">是否同时获取系统基础信息（CPU、内存、硬盘等）</param>
-        /// <returns>硬件数据对象，包含传感器读数和系统信息</returns>
+        public void Dispose()
+        {
+            computer?.Close();
+            GC.SuppressFinalize(this);
+        }
+
+        /// <summary>
+        /// 获取当前硬件传感器数据。当 baseInfo 为 true 时，同时并行获取系统基本信息（系统名、版本、运行时间、CPU、内存、硬盘、GPU、BIOS、网络）。
+        /// </summary>
+        /// <param name="baseInfo">是否同时获取系统基本信息</param>
+        /// <returns>包含所有硬件传感器数据和可选基本信息的 HardwareData 对象</returns>
         public HardwareData GetInfo(bool baseInfo = false)
         {
             computer.Accept(updateVisitor);
             HardwareData hardwareData = new HardwareData();
             if (baseInfo)
             {
-                Parallel.Invoke(
-                    () => hardwareData.SystemName = GetSystemName(),
-                    () => hardwareData.SystemVer = GetSystemVer(),
-                    () => hardwareData.SystemRunTime = GetSystemRunTime(),
-                    () => hardwareData.CpuInfo = GetCpuInfo(),
-                    () => hardwareData.MemoryInfo = GetMemoryInfo(),
-                    () => hardwareData.DiskInfo = GetDiskInfo(),
-                    () => hardwareData.GpuInfo = GetGpuInfo(),
-                    () => hardwareData.BiosInfo = GetBiosInfo(),
-                    () => hardwareData.NetworkInfo = GetNetworkInfo());
+                Task.WaitAll(
+                    Task.Run(() => hardwareData.SystemName = GetSystemName()),
+                        Task.Run(() => hardwareData.SystemVer = GetSystemVer()),
+                        Task.Run(() => hardwareData.SystemRunTime = GetSystemRunTime()),
+                        Task.Run(() => hardwareData.CpuInfo = GetCpuInfo()),
+                        Task.Run(() => hardwareData.MemoryInfo = GetMemoryInfo()),
+                        Task.Run(() => hardwareData.DiskInfo = GetDiskInfo()),
+                        Task.Run(() => hardwareData.GpuInfo = GetGpuInfo()),
+                        Task.Run(() => hardwareData.BiosInfo = GetBiosInfo()),
+                        Task.Run(() => hardwareData.NetworkInfo = GetNetworkInfo()));
             }
             foreach (IHardware hardware in computer.Hardware)  //硬件
             {
                 HardwareDataType hardwareDataType = new HardwareDataType() { Key = GetHardwareNameCn(hardware), Value = hardware.Name };
                 for (int i = 0; i < hardware.Sensors.Length; i++)
                 {
-                    string SensorsNameCn = GetSensorsNameCn(hardware.Sensors[i].SensorType);
-                    if (!string.IsNullOrEmpty(hardware.Sensors[i].Value.ToString()))
+                    string sensorsNameCn = GetSensorsNameCn(hardware.Sensors[i].SensorType);
+                    if (hardware.Sensors[i].Value.HasValue)
                     {
-                        hardwareDataType.Values.Add(new SensorDataType() { Key = $"{SensorsNameCn},{hardware.Sensors[i].Name}", Value = hardware.Sensors[i].Value.ToString() });
+                        hardwareDataType.Values.Add(new SensorDataType() { Key = $"{sensorsNameCn},{hardware.Sensors[i].Name}", Value = hardware.Sensors[i].Value.ToString()! });
                     }
                 }
                 hardwareData.Info.Add(hardwareDataType);
@@ -207,9 +197,9 @@ namespace Snet.Iot.Daq.utility
             return "未知系统";
         }
         /// <summary>
-        /// 获取 CPU 信息（名称、核心数、线程数）
+        /// 通过 WMI 获取处理器信息（名称、核心数、线程数）。
         /// </summary>
-        /// <returns>CPU 信息字符串</returns>
+        /// <returns>处理器描述字符串</returns>
         private string GetCpuInfo()
         {
             try
@@ -222,9 +212,9 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 获取物理内存总容量
+        /// 通过 WMI 获取物理内存总容量（单位 GB）。
         /// </summary>
-        /// <returns>内存容量字符串（单位 GB）</returns>
+        /// <returns>内存容量描述字符串</returns>
         private string GetMemoryInfo()
         {
             try
@@ -237,9 +227,9 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 获取硬盘信息（型号和容量）
+        /// 通过 WMI 获取所有物理硬盘的型号与容量。
         /// </summary>
-        /// <returns>硬盘信息字符串，多个硬盘用分号分隔</returns>
+        /// <returns>硬盘信息描述字符串，多块硬盘用 "；" 分隔</returns>
         private string GetDiskInfo()
         {
             try
@@ -255,9 +245,9 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 获取显卡信息（名称和驱动版本）
+        /// 通过 WMI 获取所有显卡的名称与驱动版本。
         /// </summary>
-        /// <returns>显卡信息字符串，多个显卡用分号分隔</returns>
+        /// <returns>显卡信息描述字符串，多显卡用 "；" 分隔</returns>
         private string GetGpuInfo()
         {
             try
@@ -269,9 +259,9 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 获取 BIOS 信息（制造商、版本、日期）
+        /// 通过 WMI 获取 BIOS 的厂商、版本及发布日期信息。
         /// </summary>
-        /// <returns>BIOS 信息字符串</returns>
+        /// <returns>BIOS 信息描述字符串</returns>
         private string GetBiosInfo()
         {
             try
@@ -285,9 +275,9 @@ namespace Snet.Iot.Daq.utility
         }
 
         /// <summary>
-        /// 获取网络适配器信息（名称和 MAC 地址）
+        /// 通过 WMI 获取所有具有 MAC 地址的网络适配器信息。
         /// </summary>
-        /// <returns>网络适配器信息字符串，多个适配器用分号分隔</returns>
+        /// <returns>网络适配器信息描述字符串，多适配器用 "；" 分隔</returns>
         private string GetNetworkInfo()
         {
             try
@@ -363,15 +353,25 @@ namespace Snet.Iot.Daq.utility
             _ => "未知传感器"
         };
 
+        /// <summary>
+        /// 硬件更新访问者，递归遍历所有硬件和子硬件并触发数据更新。
+        /// </summary>
         private sealed class UpdateVisitor : IVisitor
         {
+            /// <summary>访问计算机节点，触发遍历所有硬件</summary>
             public void VisitComputer(IComputer computer) => computer.Traverse(this);
+
+            /// <summary>访问硬件节点，更新传感器数据并递归访问子硬件</summary>
             public void VisitHardware(IHardware hardware)
             {
                 hardware.Update();
                 foreach (var sub in hardware.SubHardware) sub.Accept(this);
             }
+
+            /// <summary>访问传感器节点（无需额外处理）</summary>
             public void VisitSensor(ISensor sensor) { }
+
+            /// <summary>访问参数节点（无需额外处理）</summary>
             public void VisitParameter(IParameter parameter) { }
         }
 
