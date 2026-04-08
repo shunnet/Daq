@@ -98,6 +98,10 @@ Snet.Iot.Daq 是依托 **Shunnet.top 工业通信库** 开发的插件化采集�
   <img src="images/cs.png" width="900"/>
 </p>
 
+<p align="center">
+  <img src="images/ccs.png" width="900"/>
+</p>
+
 ## 📦 安装与使用
 
 ### 1️⃣克隆仓库
