@@ -149,12 +149,9 @@ namespace Snet.Iot.Daq
                 Height = 16,
                 OffLightness = 0.2
             };
-            led.SetBinding(LedGaugeControl.IsFlashingProperty,
-                new Binding(nameof(ConsoleDeviceModel.DeviceStatusFlashing)) { Source = model });
-            led.SetBinding(LedGaugeControl.IsOnProperty,
-                new Binding(nameof(ConsoleDeviceModel.DeviceStatusChangLiang)) { Source = model });
-            led.SetBinding(LedGaugeControl.ColorProperty,
-                new Binding(nameof(ConsoleDeviceModel.LedColor)) { Source = model });
+            led.SetBinding(LedGaugeControl.IsFlashingProperty, new Binding(nameof(ConsoleDeviceModel.DeviceStatusFlashing)) { Source = model });
+            led.SetBinding(LedGaugeControl.IsOnProperty, new Binding(nameof(ConsoleDeviceModel.DeviceStatusChangLiang)) { Source = model });
+            led.SetBinding(LedGaugeControl.ColorProperty, new Binding(nameof(ConsoleDeviceModel.LedColor)) { Source = model });
             header.Children.Add(led);
 
             // 设备名称文本
@@ -163,8 +160,7 @@ namespace Snet.Iot.Daq
                 Margin = new Thickness(5, 0, 0, 0),
                 VerticalAlignment = VerticalAlignment.Center
             };
-            nameText.SetBinding(TextBlock.TextProperty,
-                new Binding(nameof(ConsoleDeviceModel.DeviceName)) { Source = model });
+            nameText.SetBinding(TextBlock.TextProperty, new Binding(nameof(ConsoleDeviceModel.DeviceName)) { Source = model });
             header.Children.Add(nameText);
 
             // 创建父级菜单项
@@ -175,21 +171,9 @@ namespace Snet.Iot.Daq
             };
 
             // 添加子菜单：采集、停止、重试
-            menuItem.Items.Add(CreateActionMenuItem(
-                LanguageHandler.GetLanguageValue("采集", App.LanguageOperate),
-                model.Collect,
-                "PaletteGreenBrush",
-                Wpf.Ui.Controls.SymbolRegular.Play20));
-            menuItem.Items.Add(CreateActionMenuItem(
-                LanguageHandler.GetLanguageValue("停止", App.LanguageOperate),
-                model.Stop,
-                "PaletteRedBrush",
-                Wpf.Ui.Controls.SymbolRegular.Stop20));
-            menuItem.Items.Add(CreateActionMenuItem(
-                LanguageHandler.GetLanguageValue("重试", App.LanguageOperate),
-                model.Retry,
-                "PaletteBlueBrush",
-                Wpf.Ui.Controls.SymbolRegular.ArrowClockwise20));
+            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("采集", App.LanguageOperate), model.Collect, "PaletteGreenBrush", Wpf.Ui.Controls.SymbolRegular.Play20));
+            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("停止", App.LanguageOperate), model.Stop, "PaletteRedBrush", Wpf.Ui.Controls.SymbolRegular.Stop20));
+            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("重试", App.LanguageOperate), model.Retry, "PaletteBlueBrush", Wpf.Ui.Controls.SymbolRegular.ArrowClockwise20));
 
             return menuItem;
         }
@@ -202,11 +186,7 @@ namespace Snet.Iot.Daq
         /// <param name="brushKey">前景色动态资源键名</param>
         /// <param name="symbol">图标符号</param>
         /// <returns>构建好的操作菜单项</returns>
-        private static Wpf.Ui.Controls.MenuItem CreateActionMenuItem(
-            string header,
-            System.Windows.Input.ICommand command,
-            string brushKey,
-            Wpf.Ui.Controls.SymbolRegular symbol)
+        private static Wpf.Ui.Controls.MenuItem CreateActionMenuItem(string header, System.Windows.Input.ICommand command, string brushKey, Wpf.Ui.Controls.SymbolRegular symbol)
         {
             var item = new Wpf.Ui.Controls.MenuItem
             {

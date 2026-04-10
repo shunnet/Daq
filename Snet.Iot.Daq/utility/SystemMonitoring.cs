@@ -269,7 +269,9 @@ namespace Snet.Iot.Daq.utility
                 using var searcher = new ManagementObjectSearcher("SELECT Manufacturer,SMBIOSBIOSVersion,ReleaseDate FROM Win32_BIOS");
                 var info = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
                 if (info == null) return "未知BIOS";
-                return $"{info["Manufacturer"]} {info["SMBIOSBIOSVersion"]} ({info["ReleaseDate"]?.ToString()?.Substring(0, 8)})";
+                string? releaseDate = info["ReleaseDate"]?.ToString();
+                string datePart = releaseDate?.Length >= 8 ? releaseDate[..8] : releaseDate ?? "";
+                return $"{info["Manufacturer"]} {info["SMBIOSBIOSVersion"]} ({datePart})";
             }
             catch { return "未知BIOS"; }
         }

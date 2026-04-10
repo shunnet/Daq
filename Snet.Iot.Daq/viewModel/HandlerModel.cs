@@ -88,6 +88,17 @@ namespace Snet.Iot.Daq.viewModel
 
         #region 命令
         /// <summary>
+        /// 复制JSON
+        /// </summary>
+        public IAsyncRelayCommand CopyJson => copyJson ??= new AsyncRelayCommand(CopyJsonAsync);
+        private IAsyncRelayCommand? copyJson;
+        private async Task CopyJsonAsync()
+        {
+            string json = HandlerItemsSource.ToJson(true);
+            System.Windows.Clipboard.SetDataObject(json);
+        }
+
+        /// <summary>
         /// 导入
         /// </summary>
         public IAsyncRelayCommand Import => import ??= new AsyncRelayCommand(ImportAsync);

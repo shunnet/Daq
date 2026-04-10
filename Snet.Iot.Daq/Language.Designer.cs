@@ -277,6 +277,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 修改自动组包 的本地化字符串。
+        /// </summary>
+        public static string 修改自动组包 {
+            get {
+                return ResourceManager.GetString("修改自动组包", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 修改项 的本地化字符串。
         /// </summary>
         public static string 修改项 {
@@ -466,15 +475,6 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
-        ///   查找类似 启动自动组包 的本地化字符串。
-        /// </summary>
-        public static string 启动自动组包 {
-            get {
-                return ResourceManager.GetString("启动自动组包", resourceCulture);
-            }
-        }
-        
-        /// <summary>
         ///   查找类似 启动采集 的本地化字符串。
         /// </summary>
         public static string 启动采集 {
@@ -561,6 +561,15 @@ namespace Snet.Iot.Daq {
         public static string 地址配置在项目设置中有使用 {
             get {
                 return ResourceManager.GetString("地址配置在项目设置中有使用", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 复制JSON 的本地化字符串。
+        /// </summary>
+        public static string 复制JSON {
+            get {
+                return ResourceManager.GetString("复制JSON", resourceCulture);
             }
         }
         
@@ -1299,6 +1308,15 @@ namespace Snet.Iot.Daq {
         public static string 设置成功 {
             get {
                 return ResourceManager.GetString("设置成功", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 设置自动组包 的本地化字符串。
+        /// </summary>
+        public static string 设置自动组包 {
+            get {
+                return ResourceManager.GetString("设置自动组包", resourceCulture);
             }
         }
         

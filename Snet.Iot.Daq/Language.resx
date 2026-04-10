@@ -652,13 +652,19 @@
   <data name="采集失败" xml:space="preserve">
     <value>采集失败</value>
   </data>
-  <data name="启动自动组包" xml:space="preserve">
-    <value>启动自动组包</value>
+  <data name="设置自动组包" xml:space="preserve">
+    <value>设置自动组包</value>
   </data>
   <data name="移除自动组包" xml:space="preserve">
     <value>移除自动组包</value>
   </data>
   <data name="显示窗口" xml:space="preserve">
     <value>显示窗口</value>
+  </data>
+  <data name="复制JSON" xml:space="preserve">
+    <value>复制JSON</value>
+  </data>
+  <data name="修改自动组包" xml:space="preserve">
+    <value>修改自动组包</value>
   </data>
 </root>

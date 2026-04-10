@@ -136,7 +136,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 通道配置（延迟创建）
         /// </summary>
-        private BoundedChannelOptions channel => p_Channel ??= new BoundedChannelOptions(int.MaxValue)
+        private BoundedChannelOptions channel => p_Channel ??= new BoundedChannelOptions(ushort.MaxValue)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = false,
@@ -882,9 +882,6 @@ namespace Snet.Iot.Daq.viewModel
                 await ResultMsgAsync(item, result);
             }
         }
-
-
-
 
         /// <summary>
         /// 重建地址查找缓存

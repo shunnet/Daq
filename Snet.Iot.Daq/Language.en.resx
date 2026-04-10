@@ -652,13 +652,19 @@
   <data name="采集失败" xml:space="preserve">
     <value>CollectFailed</value>
   </data>
-  <data name="启动自动组包" xml:space="preserve">
-    <value>StartAutoPack</value>
+  <data name="设置自动组包" xml:space="preserve">
+    <value>SettingsAutoPack</value>
   </data>
   <data name="移除自动组包" xml:space="preserve">
     <value>RemoveAutoPack</value>
   </data>
   <data name="显示窗口" xml:space="preserve">
     <value>ShowWindow</value>
+  </data>
+  <data name="复制JSON" xml:space="preserve">
+    <value>CopyJson</value>
+  </data>
+  <data name="修改自动组包" xml:space="preserve">
+    <value>UpdateAutoPack</value>
   </data>
 </root>

@@ -98,19 +98,50 @@ namespace Snet.Iot.Daq.viewModel
 
         #region 命令
         /// <summary>
-        /// 启动自动组包
+        /// 设置自动组包
         /// </summary>
-        public IAsyncRelayCommand StartAutoPack => p_StartAutoPack ??= new AsyncRelayCommand(StartAutoPackAsync);
-        private IAsyncRelayCommand p_StartAutoPack;
-        private async Task StartAutoPackAsync()
+        public IAsyncRelayCommand SettingsAutoPack => p_SettingsAutoPack ??= new AsyncRelayCommand(SettingsAutoPackAsync);
+        private IAsyncRelayCommand p_SettingsAutoPack;
+        private async Task SettingsAutoPackAsync()
         {
-            GlobalConfigModel.param.SetBasics(new AddressAutoPackModel());
-            if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+            if (PluginConfigSelectedItem?.AutoPack is not null)
             {
-                PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
-                PluginConfigSelectedItem?.SetPlugin();
-                SavePluginConfig();
-                await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                await Windows.Controls.message.MessageBox.Show("设置失败，已存在".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+            }
+            else
+            {
+                GlobalConfigModel.param.SetBasics(new AddressAutoPackModel());
+                if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                {
+                    PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
+                    PluginConfigSelectedItem?.SetPlugin();
+                    SavePluginConfig();
+                    await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                }
+            }
+        }
+
+        /// <summary>
+        /// 修改自动组包
+        /// </summary>
+        public IAsyncRelayCommand UpdateAutoPack => p_UpdateAutoPack ??= new AsyncRelayCommand(UpdateAutoPackAsync);
+        private IAsyncRelayCommand p_UpdateAutoPack;
+        private async Task UpdateAutoPackAsync()
+        {
+            if (PluginConfigSelectedItem?.AutoPack is null)
+            {
+                await Windows.Controls.message.MessageBox.Show("修改失败，尚未添加".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+            }
+            else
+            {
+                GlobalConfigModel.param.SetBasics(PluginConfigSelectedItem?.AutoPack);
+                if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                {
+                    PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
+                    PluginConfigSelectedItem?.SetPlugin();
+                    SavePluginConfig();
+                    await Windows.Controls.message.MessageBox.Show("修改成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                }
             }
         }
 

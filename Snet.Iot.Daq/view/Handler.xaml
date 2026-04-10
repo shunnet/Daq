@@ -66,6 +66,10 @@
                         Header="{snet:Loc 导出}"
                         Icon="{uis:SymbolIcon Symbol=DocumentArrowRight24}" />
                     <uis:MenuItem
+                        Command="{Binding CopyJson}"
+                        Header="{snet:Loc 复制JSON}"
+                        Icon="{uis:SymbolIcon Symbol=Copy24}" />
+                    <uis:MenuItem
                         Command="{x:Static ui:DialogHost.CloseDialogCommand}"
                         Header="{snet:Loc 关闭}"
                         Icon="{uis:SymbolIcon Symbol=ShareScreenStop24}" />

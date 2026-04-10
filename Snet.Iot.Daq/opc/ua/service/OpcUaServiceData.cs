@@ -34,7 +34,7 @@ namespace Snet.Iot.Daq.opc.ua.service
             /// Ip地址
             /// </summary>
             [Description("Ip地址")]
-            [Verify(@"^(25[0-4]|2[0-4]\\d]|[01]?\\d{2}|[1-9])\\.(25[0-5]|2[0-4]\\d]|[01]?\\d?\\d)\\.(25[0-5]|2[0-4]\\d]|[01]?\\d?\\d)\\.(25[0-4]|2[0-4]\\d]|[01]?\\d{2}|[1-9])$", "输入有误")]
+            [Verify(@"^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$", "输入有误")]
             [Display(true, true, true, ParamModel.dataCate.text)]
             public string? IpAddress { get; set; } = "127.0.0.1";
 

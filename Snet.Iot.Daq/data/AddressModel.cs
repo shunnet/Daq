@@ -102,8 +102,9 @@ namespace Snet.Iot.Daq.data
         /// <summary>
         /// 扩展参数
         /// </summary>
+        /// [InputFilePath(".json", "json files (*.json)|*.json")]  选择文件路径的输入框
         [Description("扩展参数")]
-        [InputFilePath(".json", "json files (*.json)|*.json")]
+        [Height(200, 80, double.NaN)]
         public string ExpandParam
         {
             get => GetProperty(() => ExpandParam);
