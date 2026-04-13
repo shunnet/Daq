@@ -4,8 +4,10 @@ using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
 using Snet.Model.data;
 using Snet.Windows.Controls.handler;
+using Snet.Windows.Core.handler;
 using Snet.Windows.Core.mvvm;
 using System.Collections.ObjectModel;
+using System.Diagnostics;
 using System.Windows;
 using Wpf.Ui.Controls;
 
@@ -19,11 +21,37 @@ namespace Snet.Iot.Daq
         /// <summary>
         /// 构造函数，初始化菜单项数据源
         /// </summary>
-        public MainWindowModel()
+        public MainWindowModel(SettingsHandler settings)
         {
             // 初始化菜单项数据源
             MenuItemsSource = MenuItemsOperate(App.LanguageOperate);
             FooterMenuItemsSource = FooterMenuItemsOperate(App.LanguageOperate);
+
+            this.settings = settings;
+            Core.handler.LanguageHandler.OnLanguageEvent += LanguageHandler_OnLanguageEvent;
+            LanguageHandler_OnLanguageEvent(null, null);
+        }
+
+        /// <summary>
+        /// 系统设置处理器
+        /// </summary>
+        private SettingsHandler settings;
+
+        /// <summary>
+        /// 语言切换事件
+        /// </summary>
+        private void LanguageHandler_OnLanguageEvent(object? sender, EventLanguageResult e)
+        {
+            SystemTitle = $"{LanguageHandler.GetLanguageValue("SystemTitle", App.LanguageOperate)}{(settings.IsRunAsAdmin() ? " [ " + LanguageHandler.GetLanguageValue("管理员运行", App.LanguageOperate) + " ]" : string.Empty)}";
+        }
+
+        /// <summary>
+        /// 系统标题
+        /// </summary>
+        public string SystemTitle
+        {
+            get => GetProperty(() => SystemTitle);
+            set => SetProperty(() => SystemTitle, value);
         }
 
         /// <summary>
@@ -78,22 +106,42 @@ namespace Snet.Iot.Daq
         private IAsyncRelayCommand p_ShowWindow;
 
         /// <summary>
-        /// 显示主窗口，恢复任务栏显示并激活窗口
+        /// 安全显示主窗口
         /// </summary>
-        /// <returns>已完成的任务</returns>
         private Task ShowWindowAsync()
         {
             var window = Application.Current.MainWindow;
-            if (window != null)
+            if (window == null)
+                return Task.CompletedTask;
+
+            window.Dispatcher.BeginInvoke(() =>
             {
-                window.Show();
-                window.ShowInTaskbar = true;
-                if (window.WindowState == WindowState.Minimized)
+                try
                 {
-                    window.WindowState = WindowState.Normal;
+                    // 🔥 1. 如果窗口隐藏（托盘）
+                    if (!window.IsVisible)
+                    {
+                        window.ShowInTaskbar = true;
+                        window.Show();
+                    }
+
+                    // 🔥 2. 如果最小化，恢复
+                    if (window.WindowState == WindowState.Minimized)
+                    {
+                        window.WindowState = WindowState.Normal;
+                    }
+
+                    // 🔥 3. 用 Focus 替代 Activate（关键！）
+                    window.Focus();
+
                 }
-                window.Activate();
-            }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"[ShowWindowAsync] 异常: {ex.Message}");
+                }
+
+            }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+
             return Task.CompletedTask;
         }
 

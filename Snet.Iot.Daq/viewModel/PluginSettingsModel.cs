@@ -152,10 +152,17 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand p_RemoveAutoPack;
         private async Task RemoveAutoPackAsync()
         {
-            PluginConfigSelectedItem?.AutoPack = null;
-            PluginConfigSelectedItem?.SetPlugin();
-            SavePluginConfig();
-            await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+            if (PluginConfigSelectedItem?.AutoPack is null)
+            {
+                await Windows.Controls.message.MessageBox.Show("移除失败，尚未添加".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+            }
+            else
+            {
+                PluginConfigSelectedItem?.AutoPack = null;
+                PluginConfigSelectedItem?.SetPlugin();
+                SavePluginConfig();
+                await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+            }
         }
 
 

@@ -112,12 +112,12 @@ namespace Snet.Iot.Daq.data
         /// <summary>
         /// 缓存处理
         /// </summary>
-        public static readonly Handler handler = InjectionWpf.GetService<Handler>();
+        public static readonly view.Handler handler = InjectionWpf.GetService<view.Handler>();
 
         /// <summary>
         /// 缓存处理模型
         /// </summary>
-        public static readonly HandlerModel handlerModel = InjectionWpf.GetService<Handler>().DataContext.GetSource<HandlerModel>();
+        public static readonly HandlerModel handlerModel = InjectionWpf.GetService<view.Handler>().DataContext.GetSource<HandlerModel>();
 
         /// <summary>
         /// 缓存设备选择视图模型

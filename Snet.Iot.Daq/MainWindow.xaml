@@ -8,7 +8,7 @@
     xmlns:snet="https://shunnet.top"
     xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
     xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
-    Title="{snet:Loc SystemTitle}"
+    Title="{Binding SystemTitle}"
     Width="1600"
     Height="900"
     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
@@ -29,18 +29,18 @@
             MenuItemsSource="{Binding MenuItemsSource}"
             OpenPaneLength="260"
             TextOptions.TextFormattingMode="Display">
-            <!--<wpfui:NavigationView.AutoSuggestBox>
-                <wpfui:AutoSuggestBox
+            <!--<uis:NavigationView.AutoSuggestBox>
+                <uis:AutoSuggestBox
                     x:Name="AutoSuggestBox"
                     OriginalItemsSource="{Binding SelectItems}"
                     PlaceholderText="{snet:Loc 搜索}">
-                    <wpfui:AutoSuggestBox.Icon>
-                        <wpfui:IconSourceElement>
-                            <wpfui:SymbolIconSource Symbol="Search24" />
-                        </wpfui:IconSourceElement>
-                    </wpfui:AutoSuggestBox.Icon>
-                </wpfui:AutoSuggestBox>
-            </wpfui:NavigationView.AutoSuggestBox>-->
+                    <uis:AutoSuggestBox.Icon>
+                        <uis:IconSourceElement>
+                            <uis:SymbolIconSource Symbol="Search24" />
+                        </uis:IconSourceElement>
+                    </uis:AutoSuggestBox.Icon>
+                </uis:AutoSuggestBox>
+            </uis:NavigationView.AutoSuggestBox>-->
         </uis:NavigationView>
 
         <!--  托盘  -->
@@ -48,6 +48,7 @@
             x:Name="TrayIcon"
             FocusOnLeftClick="True"
             Icon="/icon.ico"
+            LeftClick="TrayIcon_LeftClick"
             MenuOnRightClick="True"
             TooltipText="{snet:Loc SystemTitle}">
             <snet:NotifyIcon.Menu>

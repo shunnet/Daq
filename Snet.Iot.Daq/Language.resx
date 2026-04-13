@@ -667,4 +667,7 @@
   <data name="修改自动组包" xml:space="preserve">
     <value>修改自动组包</value>
   </data>
+  <data name="管理员运行" xml:space="preserve">
+    <value>管理员运行</value>
+  </data>
 </root>

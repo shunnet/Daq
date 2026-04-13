@@ -1249,6 +1249,15 @@ namespace Snet.Iot.Daq {
         }
         
         /// <summary>
+        ///   查找类似 管理员运行 的本地化字符串。
+        /// </summary>
+        public static string 管理员运行 {
+            get {
+                return ResourceManager.GetString("管理员运行", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 类型 的本地化字符串。
         /// </summary>
         public static string 类型 {

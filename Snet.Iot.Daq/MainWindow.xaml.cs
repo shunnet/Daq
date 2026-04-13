@@ -10,6 +10,7 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
+using System.Windows.Threading;
 
 namespace Snet.Iot.Daq
 {
@@ -63,18 +64,26 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// 托盘图标左键点击事件处理：恢复窗口显示并激活
+        /// 托盘图标左键点击事件：安全恢复窗口
         /// </summary>
-        private void TrayIcon_LeftClick(object sender, RoutedEventArgs e)
+        private void TrayIcon_LeftClick(Windows.Controls.tray.Controls.NotifyIcon sender, RoutedEventArgs e)
         {
-            Show();
-            ShowInTaskbar = true;
-            if (WindowState == WindowState.Minimized)
+            Dispatcher.BeginInvoke(() =>
             {
-                WindowState = WindowState.Normal;
-            }
-            Activate();
+                // 🔥 恢复任务栏
+                ShowInTaskbar = true;
+
+                // 🔥 恢复窗口状态
+                if (WindowState == WindowState.Minimized)
+                {
+                    WindowState = WindowState.Normal;
+                }
+
+                Focus();
+
+            }, DispatcherPriority.ApplicationIdle);
         }
+
 
         /// <summary>
         /// 托盘设备集合变化事件处理：在 UI 线程重建托盘设备状态菜单
@@ -200,5 +209,7 @@ namespace Snet.Iot.Daq
             }
             return item;
         }
+
+
     }
 }

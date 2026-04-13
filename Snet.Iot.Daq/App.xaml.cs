@@ -2,10 +2,12 @@
 using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
+using Snet.Iot.Daq.Handler;
 using Snet.Iot.Daq.view;
 using Snet.Log;
 using Snet.Model.data;
 using Snet.Windows.Controls.data;
+using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.property;
 using Snet.Windows.Core.handler;
 using System.Collections.ObjectModel;
@@ -29,6 +31,13 @@ namespace Snet.Iot.Daq
         public readonly static List<EditModel> EditModels = GetEditModels();
 
         /// <summary>
+        /// 单实例管理器实例
+        /// 需要在整个应用程序生命周期内保持存活
+        /// （持有 Mutex 的所有权，释放后其他实例就能成为首实例）
+        /// </summary>
+        private SingleInstanceHandler _singleInstance;
+
+        /// <summary>
         /// 获取信息框模型集合，定义日志输出文本的颜色高亮规则
         /// </summary>
         /// <returns>编辑模型集合，包含各类日志标签对应的高亮颜色</returns>
@@ -36,7 +45,7 @@ namespace Snet.Iot.Daq
         [
             new() { Name = "[ Info ]",                Color = "#4CAF50" },
             new() { Name = "[ Error ]",               Color = "#F44336" },
-            new() { Name = "异常",                     Color = "#F44336" },
+            new() { Name = "异常",                    Color = "#F44336" },
             new() { Name = "Exception",               Color = "#F44336" },
             new() { Name = "[ Mq ]",                  Color = "#2196F3" },
             new() { Name = "[ Daq ]",                 Color = "#2196F3" },
@@ -51,10 +60,37 @@ namespace Snet.Iot.Daq
         ];
 
         /// <summary>
+        /// 唯一实例处理流程
+        /// </summary>
+        /// <param name="e"></param>
+        private void SingleInstance(StartupEventArgs e)
+        {
+            _singleInstance = new SingleInstanceHandler("Snet.Iot.Daq", out bool isFirst);      // 输出：是否是首实例
+
+            if (!isFirst)
+            {
+                _singleInstance.SignalFirstInstance(e.Args);
+                _singleInstance.Dispose();
+                Shutdown(0);
+                return;
+            }
+            _singleInstance.SignalReceived += OnWakeup;
+        }
+
+        /// <summary>
+        /// 被新实例唤醒时的回调
+        /// </param>
+        private void OnWakeup(string[] args)
+        {
+            _singleInstance.BringToFront();
+        }
+
+        /// <summary>
         /// 在应用程序关闭时发生，释放全局注入的服务资源
         /// </summary>
         private void OnExit(object sender, ExitEventArgs e)
         {
+            _singleInstance?.Dispose();
             InjectionWpf.ClearService();
         }
 
@@ -63,6 +99,9 @@ namespace Snet.Iot.Daq
         /// </summary>
         private void OnStartup(object sender, StartupEventArgs e)
         {
+            //判断是不是唯一打开
+            SingleInstance(e);
+
             // 初始化依赖注入、数据库、插件等
             Init();
 
@@ -73,7 +112,12 @@ namespace Snet.Iot.Daq
             IconsHandler.Loading("pack://application:,,,/Snet.Iot.Daq;component/resources/icons.xaml");
 
             // 打开主窗口
-            InjectionWpf.Window<MainWindow, MainWindowModel>(true).Show();
+            MainWindow window = InjectionWpf.Window<MainWindow, MainWindowModel>(true);
+            window.Show();
+
+            // Show() 之后窗口的 HWND 才真正创建
+            // 此时立即缓存句柄，后续即使窗口 Hide 到托盘也能唤醒
+            _singleInstance.RegisterMainWindow(window);
         }
 
         /// <summary>
@@ -96,7 +140,7 @@ namespace Snet.Iot.Daq
             InjectionWpf.UserControl<SelectAddress, Snet.Iot.Daq.viewModel.SelectAddressModel>(true);
 
             // 注入处理器控件
-            InjectionWpf.UserControl<Handler, Snet.Iot.Daq.viewModel.HandlerModel>(true);
+            InjectionWpf.UserControl<view.Handler, Snet.Iot.Daq.viewModel.HandlerModel>(true);
 
             // 初始化 SQLite 数据库表
             GlobalConfigModel.sqliteOperate.CreateTable<AddressModel>();
@@ -118,6 +162,11 @@ namespace Snet.Iot.Daq
             //获取所有项目
             Snet.Iot.Daq.handler.ProjectHandler.GetAllProject();
 
+            //注入系统操作
+            InjectionWpf.AddService(s =>
+            {
+                s.AddSingleton(new SettingsHandler());
+            });
         }
 
         #region 全局异常捕捉
