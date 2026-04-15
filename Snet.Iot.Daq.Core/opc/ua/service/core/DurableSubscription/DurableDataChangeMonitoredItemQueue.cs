@@ -1,7 +1,7 @@
 using Microsoft.Extensions.Logging;
 using Opc.Ua;
 using Opc.Ua.Server;
-using Snet.Iot.Daq.opc.ua.service.core.DurableSubscription;
+using Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription;
 
 public class DurableDataChangeMonitoredItemQueue : IDataChangeMonitoredItemQueue
 {

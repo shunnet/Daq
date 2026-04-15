@@ -33,7 +33,7 @@ using Opc.Ua;
 using Opc.Ua.Server;
 using Opc.Ua.Test;
 using Snet.Core.handler;
-using Snet.Iot.Daq.opc.core;
+using Snet.Iot.Daq.Core.opc.core;
 using Snet.Model.data;
 using Snet.Utility;
 using System.Collections.Concurrent;
@@ -42,7 +42,7 @@ using System.Globalization;
 using System.IO;
 using Range = Opc.Ua.Range;
 
-namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 {
     /// <summary>
     /// A node manager for a server that exposes several variables.

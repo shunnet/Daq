@@ -36,7 +36,7 @@ using System.Collections.Concurrent;
 using System.IO;
 using System.Text.RegularExpressions;
 
-namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 {
     /// <inheritdoc/>
     public class BatchPersistor : IBatchPersistor

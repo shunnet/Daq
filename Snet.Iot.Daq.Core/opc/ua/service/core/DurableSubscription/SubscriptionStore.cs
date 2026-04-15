@@ -35,7 +35,7 @@ using Opc.Ua.Server;
 using Snet.Utility;
 using System.IO;
 
-namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 {
     public class SubscriptionStore : ISubscriptionStore
     {

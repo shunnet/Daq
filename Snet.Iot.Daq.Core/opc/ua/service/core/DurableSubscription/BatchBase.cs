@@ -27,7 +27,7 @@
  * http://opcfoundation.org/License/MIT/1.00/
  * ======================================================================*/
 
-namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 {
     /// <summary>
     /// Base class for a batch of data

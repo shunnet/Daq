@@ -1,4 +1,4 @@
-﻿namespace Snet.Iot.Daq.opc.core
+﻿namespace Snet.Iot.Daq.Core.opc.core
 {
     /// <summary>
     /// 节点数据结构体

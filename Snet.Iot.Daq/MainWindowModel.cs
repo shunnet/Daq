@@ -4,13 +4,12 @@ using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
 using Snet.Model.data;
 using Snet.Windows.Controls.handler;
-using Snet.Windows.Core.handler;
 using Snet.Windows.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
 using Wpf.Ui.Controls;
-
+using LanguageHandler = Snet.Core.handler.LanguageHandler;
 namespace Snet.Iot.Daq
 {
     /// <summary>
@@ -28,7 +27,7 @@ namespace Snet.Iot.Daq
             FooterMenuItemsSource = FooterMenuItemsOperate(App.LanguageOperate);
 
             this.settings = settings;
-            Core.handler.LanguageHandler.OnLanguageEvent += LanguageHandler_OnLanguageEvent;
+            LanguageHandler.OnLanguageEvent += LanguageHandler_OnLanguageEvent;
             LanguageHandler_OnLanguageEvent(null, null);
         }
 

@@ -4,9 +4,9 @@ using Snet.Model.data;
 using Snet.Model.@interface;
 using System.Dynamic;
 using System.Text;
-using static Snet.Iot.Daq.mqtt.service.MqttServiceData;
+using static Snet.Iot.Daq.Core.mqtt.service.MqttServiceData;
 
-namespace Snet.Iot.Daq.mqtt.service
+namespace Snet.Iot.Daq.Core.mqtt.service
 {
     /// <summary>
     /// MQTT 服务端操作类，基于 MQTTnet 实现 MQTT Broker 服务。

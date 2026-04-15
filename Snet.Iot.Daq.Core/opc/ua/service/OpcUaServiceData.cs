@@ -2,9 +2,9 @@
 using Snet.Model.data;
 using Snet.Utility;
 using System.ComponentModel;
-using static Snet.Iot.Daq.opc.core.Data;
+using static Snet.Iot.Daq.Core.opc.core.Data;
 
-namespace Snet.Iot.Daq.opc.ua.service
+namespace Snet.Iot.Daq.Core.opc.ua.service
 {
     /// <summary>
     /// OPCUA服务端 数据

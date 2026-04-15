@@ -2,15 +2,15 @@
 using Opc.Ua.Configuration;
 using Opc.Ua.Server;
 using Snet.Core.extend;
-using Snet.Iot.Daq.opc.core;
-using Snet.Iot.Daq.opc.ua.service.core.ReferenceServer;
+using Snet.Iot.Daq.Core.opc.core;
+using Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer;
 using Snet.Model.data;
 using Snet.Model.@interface;
 using Snet.Utility;
 using System.Collections.Concurrent;
 using System.IO;
 
-namespace Snet.Iot.Daq.opc.ua.service
+namespace Snet.Iot.Daq.Core.opc.ua.service
 {
     public class OpcUaServiceOperate : CoreUnify<OpcUaServiceOperate, OpcUaServiceData.Basics>, IOn, IOff, IRead, IWrite, IGetStatus, IDisposable, IAsyncDisposable
     {

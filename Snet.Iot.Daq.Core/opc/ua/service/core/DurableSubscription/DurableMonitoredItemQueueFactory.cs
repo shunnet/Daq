@@ -36,7 +36,7 @@ using Snet.Utility;
 using System.Collections.Concurrent;
 using System.IO;
 
-namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 {
     /// <summary>
     /// A factory for <see cref="IDataChangeMonitoredItemQueue"> and </see> <see cref="IEventMonitoredItemQueue"/>

@@ -1,6 +1,6 @@
 ﻿using Opc.Ua;
 
-namespace Snet.Iot.Daq.opc.core
+namespace Snet.Iot.Daq.Core.opc.core
 {
     /// <summary>
     /// 地址结构体<br/>

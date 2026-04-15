@@ -30,13 +30,13 @@
 using Microsoft.Extensions.Logging;
 using Opc.Ua;
 using Opc.Ua.Server;
-using Snet.Iot.Daq.opc.ua.service.core.DurableSubscription;
+using Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription;
 using Snet.Model.data;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
-using static Snet.Iot.Daq.opc.core.Data;
+using static Snet.Iot.Daq.Core.opc.core.Data;
 
-namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 {
     /// <summary>
     /// Implements the Quickstart Reference Server.

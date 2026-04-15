@@ -2,7 +2,7 @@
 using System.IO;
 using System.Text.Json.Serialization;
 
-namespace Snet.Iot.Daq.opc.core
+namespace Snet.Iot.Daq.Core.opc.core
 {
 
     /// <summary>

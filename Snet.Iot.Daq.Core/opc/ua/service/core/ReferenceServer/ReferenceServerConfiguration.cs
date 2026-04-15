@@ -29,7 +29,7 @@
 
 using System.Runtime.Serialization;
 
-namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 {
     /// <summary>
     /// Stores the configuration the data access node manager.

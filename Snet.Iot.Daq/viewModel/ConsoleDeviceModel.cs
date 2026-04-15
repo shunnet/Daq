@@ -1,9 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Opc.Ua;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
-using Snet.Iot.Daq.opc.ua.service;
 using Snet.Model.data;
 using Snet.Model.@enum;
 using Snet.Utility;

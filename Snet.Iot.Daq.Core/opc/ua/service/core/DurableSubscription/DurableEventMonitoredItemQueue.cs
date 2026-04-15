@@ -32,7 +32,7 @@ using Microsoft.Extensions.Logging;
 using Opc.Ua;
 using Opc.Ua.Server;
 
-namespace Snet.Iot.Daq.opc.ua.service.core.DurableSubscription
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 {
     public class DurableEventMonitoredItemQueue : IEventMonitoredItemQueue
     {

@@ -9,7 +9,7 @@ using System.Diagnostics.Metrics;
 using System.IO;
 using System.Reflection;
 
-namespace Snet.Iot.Daq.opc.core
+namespace Snet.Iot.Daq.Core.opc.core
 {
     /// <summary>
     /// OPC UA 遥测上下文

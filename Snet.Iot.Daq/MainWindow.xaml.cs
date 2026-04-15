@@ -11,6 +11,9 @@ using System.Windows.Controls;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
+using Wpf.Ui.Controls;
+using MenuItem = Wpf.Ui.Controls.MenuItem;
+using TextBlock = Wpf.Ui.Controls.TextBlock;
 
 namespace Snet.Iot.Daq
 {
@@ -173,16 +176,16 @@ namespace Snet.Iot.Daq
             header.Children.Add(nameText);
 
             // 创建父级菜单项
-            var menuItem = new Wpf.Ui.Controls.MenuItem
+            var menuItem = new MenuItem
             {
                 Header = header,
                 Tag = DeviceMenuItemTag
             };
 
             // 添加子菜单：采集、停止、重试
-            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("采集", App.LanguageOperate), model.Collect, "PaletteGreenBrush", Wpf.Ui.Controls.SymbolRegular.Play20));
-            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("停止", App.LanguageOperate), model.Stop, "PaletteRedBrush", Wpf.Ui.Controls.SymbolRegular.Stop20));
-            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("重试", App.LanguageOperate), model.Retry, "PaletteBlueBrush", Wpf.Ui.Controls.SymbolRegular.ArrowClockwise20));
+            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("采集", App.LanguageOperate), model.Collect, "PaletteGreenBrush", SymbolRegular.Play20));
+            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("停止", App.LanguageOperate), model.Stop, "PaletteRedBrush", SymbolRegular.Stop20));
+            menuItem.Items.Add(CreateActionMenuItem(LanguageHandler.GetLanguageValue("重试", App.LanguageOperate), model.Retry, "PaletteBlueBrush", SymbolRegular.ArrowClockwise20));
 
             return menuItem;
         }
@@ -195,13 +198,13 @@ namespace Snet.Iot.Daq
         /// <param name="brushKey">前景色动态资源键名</param>
         /// <param name="symbol">图标符号</param>
         /// <returns>构建好的操作菜单项</returns>
-        private static Wpf.Ui.Controls.MenuItem CreateActionMenuItem(string header, System.Windows.Input.ICommand command, string brushKey, Wpf.Ui.Controls.SymbolRegular symbol)
+        private static MenuItem CreateActionMenuItem(string header, System.Windows.Input.ICommand command, string brushKey, SymbolRegular symbol)
         {
-            var item = new Wpf.Ui.Controls.MenuItem
+            var item = new MenuItem
             {
                 Header = header,
                 Command = command,
-                Icon = new Wpf.Ui.Controls.SymbolIcon { Symbol = symbol, Filled = true }
+                Icon = new SymbolIcon { Symbol = symbol, Filled = true }
             };
             if (Application.Current.TryFindResource(brushKey) is Brush brush)
             {

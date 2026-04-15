@@ -27,12 +27,17 @@
  * http://opcfoundation.org/License/MIT/1.00/
  * ======================================================================*/
 
-using Opc.Ua;
-
-namespace Snet.Iot.Daq.opc.ua.service.core.ReferenceServer
+namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 {
-    public interface ITokenValidator
+    /// <summary>
+    /// Defines constants for namespaces used by the servers.
+    /// </summary>
+    public static partial class Namespaces
     {
-        IUserIdentity ValidateToken(IssuedIdentityToken issuedToken);
+        /// <summary>
+        /// The namespace for the nodes provided by the reference server.
+        /// </summary>
+        public const string ReferenceServer
+            = "http://opcfoundation.org/Quickstarts/ReferenceServer";
     }
 }

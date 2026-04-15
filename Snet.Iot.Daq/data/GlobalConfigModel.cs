@@ -1,6 +1,6 @@
 ﻿using Snet.Core.handler;
-using Snet.Iot.Daq.mqtt.service;
-using Snet.Iot.Daq.opc.ua.service;
+using Snet.Iot.Daq.Core.mqtt.service;
+using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
 using Snet.Utility;
