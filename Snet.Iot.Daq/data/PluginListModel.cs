@@ -1,5 +1,6 @@
-﻿using Snet.Iot.Daq.@enum;
-using Snet.Windows.Core.mvvm;
+﻿using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@enum;
+using Snet.Iot.Daq.Core.mvvm;
 
 namespace Snet.Iot.Daq.data
 {

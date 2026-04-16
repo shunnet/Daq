@@ -1,7 +1,8 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@enum;
 using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.@enum;
 using Snet.Log;
 using Snet.Model.data;
 using Snet.Model.@interface;
@@ -71,7 +72,12 @@ namespace Snet.Iot.Daq.handler
             ConcurrentDictionary<(string path, string className), (Type type, PluginLoadContext context)> copy = new();
 
             //库
-            string[] libs = Directory.GetFiles(path, DllWatcherFormat, SearchOption.AllDirectories);
+            string[] libs = [];
+            try
+            {
+                libs = Directory.GetFiles(path, DllWatcherFormat, SearchOption.AllDirectories);
+            }
+            catch { }
             //循环文件，添加程序集
             foreach (var lib in libs)
             {

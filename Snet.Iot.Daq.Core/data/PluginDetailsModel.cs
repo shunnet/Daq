@@ -1,4 +1,4 @@
-﻿namespace Snet.Iot.Daq.data
+﻿namespace Snet.Iot.Daq.Core.data
 {
     /// <summary>
     /// 插件详情模型

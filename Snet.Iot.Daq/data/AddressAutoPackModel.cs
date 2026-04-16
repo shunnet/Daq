@@ -1,5 +1,5 @@
-﻿using Snet.Model.@enum;
-using Snet.Windows.Core.mvvm;
+﻿using Snet.Iot.Daq.Core.mvvm;
+using Snet.Model.@enum;
 using System.ComponentModel;
 
 namespace Snet.Iot.Daq.data

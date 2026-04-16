@@ -1,9 +1,9 @@
 ﻿using Snet.Core.handler;
-using Snet.Iot.Daq.@enum;
+using Snet.Iot.Daq.Core.@enum;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Utility;
-using Snet.Windows.Core.mvvm;
+using Snet.Iot.Daq.Core.mvvm;
 using System.IO;
 
 namespace Snet.Iot.Daq.data

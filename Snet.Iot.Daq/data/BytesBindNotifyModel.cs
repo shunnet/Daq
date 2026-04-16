@@ -1,8 +1,8 @@
 ﻿using Snet.Core.handler;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Model.@enum;
 using Snet.Utility;
 using Snet.Windows.Controls.data;
-using Snet.Windows.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 

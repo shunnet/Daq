@@ -14,7 +14,7 @@ using Snet.Model.data;
 using Snet.Utility;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.message;
-using Snet.Windows.Core.mvvm;
+using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;

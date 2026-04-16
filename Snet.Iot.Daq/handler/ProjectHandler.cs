@@ -1,5 +1,5 @@
-﻿using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.@enum;
+﻿using Snet.Iot.Daq.Core.@enum;
+using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.@interface;
 using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;

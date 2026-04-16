@@ -1,8 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@enum;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.@enum;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Utility;
@@ -10,7 +12,6 @@ using Snet.Windows.Controls.data;
 using Snet.Windows.Controls.@enum;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.message;
-using Snet.Windows.Core.mvvm;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -280,6 +281,12 @@ namespace Snet.Iot.Daq.viewModel
 
                         //添加到集合
                         PluginList.Add(new PluginListModel(details.Name, plugin, details.Version, DateTime.Now, details));
+
+                        //停止该驱动所有连接停止采集
+                        GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == details.Name).ToList().ForEach(d =>
+                        {
+                            d.Stop.Execute(null);
+                        });
                     }
 
                     await MessageBox.Show("插件上传成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -307,40 +314,37 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? removePlugin;
         private async Task RemovePluginAsync()
         {
-            //检索配置目录是否存在该插件的配置文件，存在则不允许移除
-            if (PluginConfig.Any(p => p.Name == PluginListSelectedItem.Name))
-            {
-                await MessageBox.Show("请先移除该插件的所有配置文件".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
-            }
-
-            string name = PluginListSelectedItem.Name;
-            PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
-
-            //创建移除的任务
             if (await MessageBox.Show($"确定移除此插件吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
+                string name = PluginListSelectedItem.Name;
+
+                //停止该驱动所有连接停止采集
+                GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name).ToList().ForEach(d =>
+                {
+                    d.Stop.Execute(null);
+                });
+
+                PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
+
                 if (await PluginHandler.RemovePluginAsync(details.Name))
                 {
                     //强制 GC 回收已卸载的程序集上下文，确保释放所有残留引用
                     GC.Collect();
                     GC.WaitForPendingFinalizers();
                     Directory.Delete(details.PluginPath, true);  //删除插件文件夹
-                    //查询插件路径是否还有一致的，有的话一并删除
-                    for (int i = PluginList.Count - 1; i >= 0; i--)
-                    {
-                        if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
-                        {
-                            PluginList.RemoveAt(i);
-                        }
-                    }
-                    PluginListSelectedItem = null;  //置空
-                    await MessageBox.Show($"插件移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
                 }
-                else
-                {
 
+                //查询插件路径是否还有一致的，有的话一并删除
+                for (int i = PluginList.Count - 1; i >= 0; i--)
+                {
+                    if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
+                    {
+                        PluginList.RemoveAt(i);
+                    }
                 }
+                PluginListSelectedItem = null;  //置空
+
+                await MessageBox.Show($"插件移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             SavePluginListConfig();
         }

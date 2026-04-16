@@ -1,13 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Opc.Ua;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Model.@enum;
 using Snet.Utility;
-using Snet.Windows.Core.mvvm;
 using System.Collections.Concurrent;
 using System.IO;
 using System.Threading.Channels;
@@ -309,6 +309,8 @@ namespace Snet.Iot.Daq.viewModel
         private async Task DqaHandler_OnDataEventAsync(object? sender, EventDataResult e)
         {
             if (DataSyncChannel is null)
+                return;
+            if (TokenSource is null)
                 return;
 
             await DataSyncChannel.Writer.WriteAsync(e, TokenSource.Token);
@@ -861,6 +863,8 @@ namespace Snet.Iot.Daq.viewModel
                     Topic = addressModel.Topic,
                     Type = item.Value.AddressDataType,
                 };
+                if (TokenSource is null)
+                    return;
                 await UaSyncChannel.Writer.WriteAsync(item.Value, TokenSource.Token);
                 await MqTransmissionAsync(new() { [newModel] = item.Value }, pluginConfigs);
             }

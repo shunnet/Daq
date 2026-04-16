@@ -1,4 +1,5 @@
 ﻿using Snet.Core.extend;
+using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Model.data;
 using Snet.Model.@interface;
@@ -65,7 +66,10 @@ namespace Snet.Iot.Daq.handler
             // 快照遍历，避免在迭代期间集合被修改
             foreach (var item in icoDaq.ToArray())
             {
-                await item.Value.DisposeAsync();
+                if (item.Value != null)
+                {
+                    await item.Value.DisposeAsync();
+                }
             }
             icoDaq.Clear();
             _dataHandlers.Clear();
@@ -110,6 +114,11 @@ namespace Snet.Iot.Daq.handler
             {
                 operate = await basics.CreateNewObjetcAsync<IDaq>();
                 icoDaq.TryAdd(guid, operate);
+            }
+
+            if (operate == null)
+            {
+                return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(App.LanguageOperate)));
             }
 
             // 获取驱动状态

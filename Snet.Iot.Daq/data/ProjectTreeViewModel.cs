@@ -1,9 +1,9 @@
 ﻿using MaterialDesignThemes.Wpf;
-using Snet.Iot.Daq.@enum;
+using Snet.Iot.Daq.Core.@enum;
 using Snet.Iot.Daq.handler;
 using Snet.Iot.Daq.@interface;
 using Snet.Windows.Controls.property.core.DataAnnotations;
-using Snet.Windows.Core.mvvm;
+using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 
 namespace Snet.Iot.Daq.data

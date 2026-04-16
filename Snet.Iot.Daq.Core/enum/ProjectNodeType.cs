@@ -1,20 +1,20 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace Snet.Iot.Daq.@enum
+namespace Snet.Iot.Daq.Core.@enum
 {
     /// <summary>
-    /// 项目设备节点类型
+    /// 项目节点类型
     /// </summary>
     [JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum ProjectDetailsNodeType
+    public enum ProjectNodeType
     {
         /// <summary>
-        /// 地址
+        /// 设备
         /// </summary>
-        Address,
+        Device,
         /// <summary>
-        /// 消息传输
+        /// 描述
         /// </summary>
-        Mq
+        Describe
     }
 }

@@ -1,4 +1,5 @@
-﻿using Snet.Windows.Core.mvvm;
+﻿
+using Snet.Iot.Daq.Core.mvvm;
 using System.ComponentModel;
 
 namespace Snet.Iot.Daq.data

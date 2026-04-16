@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Snet.Iot.Daq.data;
 using Snet.Utility;
-using Snet.Windows.Core.mvvm;
+using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows.Controls;

@@ -670,4 +670,7 @@
   <data name="管理员运行" xml:space="preserve">
     <value>AdministratorRun</value>
   </data>
+  <data name="插件尚未加载" xml:space="preserve">
+    <value>The plugin has not been loaded yet</value>
+  </data>
 </root>

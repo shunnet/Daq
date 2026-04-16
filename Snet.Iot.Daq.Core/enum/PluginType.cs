@@ -1,7 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Text.Json.Serialization;
 
-namespace Snet.Iot.Daq.@enum
+namespace Snet.Iot.Daq.Core.@enum
 {
     /// <summary>
     /// 插件类型

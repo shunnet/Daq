@@ -84,11 +84,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="db">SQLite 连接</param>
         /// <param name="items">待插入数据</param>
         /// <param name="keySelectors">查重字段选择器（可多个）</param>
-        public static BatchInsertResult InsertUnique<T, TKey>(
-            SQLiteConnection db,
-            IEnumerable<T> items,
-            params Func<T, TKey>[] keySelectors)
-            where T : class, new()
+        public static BatchInsertResult InsertUnique<T, TKey>(SQLiteConnection db, IEnumerable<T> items, params Func<T, TKey>[] keySelectors) where T : class, new()
         {
             var result = new BatchInsertResult();
 

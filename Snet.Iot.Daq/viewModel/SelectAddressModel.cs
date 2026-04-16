@@ -3,7 +3,7 @@ using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Utility;
 using Snet.Windows.Controls.message;
-using Snet.Windows.Core.mvvm;
+using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
 using System.Windows.Input;

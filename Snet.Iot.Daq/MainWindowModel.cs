@@ -4,7 +4,7 @@ using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
 using Snet.Model.data;
 using Snet.Windows.Controls.handler;
-using Snet.Windows.Core.mvvm;
+using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
