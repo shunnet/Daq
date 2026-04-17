@@ -255,10 +255,21 @@ namespace Snet.Iot.Daq.viewModel
                     directoryInfo.Create();
                 }
                 directoryInfo = new(libPath);
+                //热加载插件的状态
+                ConcurrentDictionary<string, bool> pluginStatus = new();
                 if (directoryInfo.Exists)
                 {
-                    await MessageBox.Show("此插件已上传，请先移除".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
-                    return;
+                    if (!await MessageBox.Show("此插件已上传，是否进行热更新？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
+                    {
+                        return;
+                    }
+                    //停止该驱动所有连接停止采集
+                    GlobalConfigModel.TrayDevices.Where(d => libPath == d.PluginPath).ToList().ForEach(d =>
+                    {
+                        pluginStatus.AddOrUpdate(d.DeviceType, d.IsRun, (k, v) => d.IsRun);
+                        PluginListSelectedItem = PluginList.FirstOrDefault(p => p.Name == d.DeviceType && p.PluginDetails.PluginPath == libPath);
+                    });
+                    await PrivateRemovalPlugin();
                 }
 
                 //解压zip到指定路径
@@ -281,15 +292,35 @@ namespace Snet.Iot.Daq.viewModel
 
                         //添加到集合
                         PluginList.Add(new PluginListModel(details.Name, plugin, details.Version, DateTime.Now, details));
-
-                        //停止该驱动所有连接停止采集
-                        GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == details.Name || details.PluginPath == d.PluginPath).ToList().ForEach(d =>
-                        {
-                            d.Stop.Execute(null);
-                        });
                     }
 
-                    await MessageBox.Show("插件上传成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                    SavePluginListConfig();
+
+                    if (pluginStatus.Count > 0)
+                    {
+                        await MessageBox.Show("插件热更新成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+                    else
+                    {
+                        await MessageBox.Show("插件上传成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                    }
+
+
+                    //热更新后如果之前是运行状态则继续运行
+                    foreach (var pStatus in pluginStatus)
+                    {
+                        //停止该驱动所有连接停止采集
+                        GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == pStatus.Key || libPath == d.PluginPath).ToList().ForEach(d =>
+                        {
+                            //停止
+                            d.Stop.Execute(null);
+                            if (pStatus.Value)
+                            {
+                                //采集
+                                d.Retry.ExecuteAsync(null);
+                            }
+                        });
+                    }
                 }
                 else
                 {
@@ -316,35 +347,44 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (await MessageBox.Show($"确定移除此插件吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
-                string name = PluginListSelectedItem.Name;
-                PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
-
-                //停止该驱动所有连接停止采集
-                GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.PluginPath == d.PluginPath).ToList().ForEach(d =>
-                {
-                    d.Stop.Execute(null);
-                });
-
-                if (await PluginHandler.RemovePluginAsync(details.Name))
-                {
-                    //强制 GC 回收已卸载的程序集上下文，确保释放所有残留引用
-                    GC.Collect();
-                    GC.WaitForPendingFinalizers();
-                    Directory.Delete(details.PluginPath, true);  //删除插件文件夹
-                }
-
-                //查询插件路径是否还有一致的，有的话一并删除
-                for (int i = PluginList.Count - 1; i >= 0; i--)
-                {
-                    if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
-                    {
-                        PluginList.RemoveAt(i);
-                    }
-                }
-                PluginListSelectedItem = null;  //置空
-
+                await PrivateRemovalPlugin();
                 await MessageBox.Show($"插件移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
             }
+            SavePluginListConfig();
+        }
+
+        /// <summary>
+        /// 私有移除插件
+        /// </summary>
+        /// <returns></returns>
+        private async Task PrivateRemovalPlugin()
+        {
+            string name = PluginListSelectedItem.Name;
+            PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
+
+            //停止该驱动所有连接停止采集
+            GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.PluginPath == d.PluginPath).ToList().ForEach(d =>
+            {
+                d.Stop.Execute(null);
+            });
+
+            if (await PluginHandler.RemovePluginAsync(details.Name))
+            {
+                //强制 GC 回收已卸载的程序集上下文，确保释放所有残留引用
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                Directory.Delete(details.PluginPath, true);  //删除插件文件夹
+            }
+
+            //查询插件路径是否还有一致的，有的话一并删除
+            for (int i = PluginList.Count - 1; i >= 0; i--)
+            {
+                if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
+                {
+                    PluginList.RemoveAt(i);
+                }
+            }
+            PluginListSelectedItem = null;  //置空
             SavePluginListConfig();
         }
 

@@ -673,4 +673,10 @@
   <data name="插件尚未加载" xml:space="preserve">
     <value>插件尚未加载</value>
   </data>
+  <data name="插件热更新成功" xml:space="preserve">
+    <value>插件热更新成功</value>
+  </data>
+  <data name="此插件已上传，是否进行热更新？" xml:space="preserve">
+    <value>此插件已上传，是否进行热更新？</value>
+  </data>
 </root>

@@ -673,4 +673,10 @@
   <data name="插件尚未加载" xml:space="preserve">
     <value>The plugin has not been loaded yet</value>
   </data>
+  <data name="插件热更新成功" xml:space="preserve">
+    <value>The hot update of the plugin has been successful</value>
+  </data>
+  <data name="此插件已上传，是否进行热更新？" xml:space="preserve">
+    <value>This plugin has been uploaded. Do you want to perform a hot update?</value>
+  </data>
 </root>

@@ -162,7 +162,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 是否在运行采集
         /// </summary>
-        private bool IsRun = false;
+        public bool IsRun = false;
 
         /// <summary>
         /// 采集数据
@@ -518,10 +518,14 @@ namespace Snet.Iot.Daq.viewModel
                 await WAStopAsync();
             }
 
-            await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
-            daqHandler.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
-            daqHandler.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
-            await daqHandler.DisposeAsync();
+            daqHandler?.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
+            daqHandler?.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
+            if (daqHandler is not null)
+            {
+                await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
+                await daqHandler.DisposeAsync();
+            }
+
             daqHandler = null;
 
             CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
@@ -815,6 +819,8 @@ namespace Snet.Iot.Daq.viewModel
                             // 无字节模型，直接转发
                             if (bm == null)
                             {
+                                if (TokenSource is null)
+                                    return;
                                 await UaSyncChannel.Writer.WriteAsync(kv.Value, TokenSource.Token);
                                 await MqTransmissionAsync(new() { [addressModel] = kv.Value }, pluginConfigs);
                                 continue;
