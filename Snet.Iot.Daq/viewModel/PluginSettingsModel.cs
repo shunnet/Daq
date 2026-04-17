@@ -312,12 +312,15 @@ namespace Snet.Iot.Daq.viewModel
                         //停止该驱动所有连接停止采集
                         GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == pStatus.Key || libPath == d.PluginPath).ToList().ForEach(d =>
                         {
-                            //停止
-                            d.Stop.Execute(null);
                             if (pStatus.Value)
                             {
                                 //采集
                                 d.Retry.ExecuteAsync(null);
+                            }
+                            else
+                            {
+                                //停止
+                                d.Stop.Execute(null);
                             }
                         });
                     }
