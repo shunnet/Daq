@@ -54,7 +54,6 @@ namespace Snet.Iot.Daq.handler
             return typeObj.ToString() == criteriaObj.ToString();
         }
 
-
         /// <summary>
         /// 插件初始化加载<br/>
         /// 扫描指定路径下的所有符合命名规则的 DLL，通过反射加载实现了指定接口的类型，<br/>
@@ -219,11 +218,23 @@ namespace Snet.Iot.Daq.handler
             {
                 if (icoDaq.TryRemove(name, out IDaq? daq))
                 {
-                    try { await daq.DisposeAsync(); } catch { }
+                    if (daq is not null)
+                    {
+                        if ((await daq.GetStatusAsync()).Status)
+                        {
+                            try { await daq.DisposeAsync(); } catch { }
+                        }
+                    }
                 }
                 if (icoMq.TryRemove(name, out IMq? mq))
                 {
-                    try { await mq.DisposeAsync(); } catch { }
+                    if (mq is not null)
+                    {
+                        if ((await mq.GetStatusAsync()).Status)
+                        {
+                            try { await mq.DisposeAsync(); } catch { }
+                        }
+                    }
                 }
                 iocType.TryRemove(name, out _);
                 pluginContexts.TryRemove(name, out _);
@@ -786,6 +797,20 @@ namespace Snet.Iot.Daq.handler
             Address address = new();
             address.AddressArray = new() { models.Convert() };
             return address;
+        }
+
+        /// <summary>
+        /// 通过名称获取插件路径
+        /// </summary>
+        /// <param name="name">名称</param>
+        /// <returns>插件的路径</returns>
+        public static string GetPluginPath(string name)
+        {
+            if (pluginContexts.TryGetValue(name, out PluginLoadContext? value))
+            {
+                return Path.GetDirectoryName(value.pluginPath);
+            }
+            return string.Empty;
         }
     }
 }

@@ -4,6 +4,7 @@ using ScottPlot.WPF;
 using Snet.Core.handler;
 using Snet.Iot.Daq.chart;
 using Snet.Iot.Daq.Core.mqtt.service;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
@@ -14,7 +15,6 @@ using Snet.Model.data;
 using Snet.Utility;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.message;
-using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
@@ -604,6 +604,7 @@ namespace Snet.Iot.Daq.viewModel
 
             // 系统监控
             systemMonitoring = SystemMonitoring.Instance();
+
             // 更新系统检测值
             _ = UpdateSystemMonitoringValueAsync(globalToken.Token).ConfigureAwait(false);
 

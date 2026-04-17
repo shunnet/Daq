@@ -46,14 +46,17 @@
         /// 名称
         /// </summary>
         public string Name { get; set; } = string.Empty;
+
         /// <summary>
         /// 命名空间
         /// </summary>
         public string Namespace { get; set; } = string.Empty;
+
         /// <summary>
         /// 配置格式
         /// </summary>
         public string ConfigFormat { get; set; } = string.Empty;
+
         /// <summary>
         /// 插件的路径
         /// </summary>

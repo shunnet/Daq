@@ -165,7 +165,7 @@
                         HorizontalAlignment="Left"
                         IsFlashing="{Binding DeviceStatusFlashing}"
                         IsOn="{Binding DeviceStatusChangLiang}"
-                        OffLightness="0.2"
+                        OffLightness="0.1"
                         Color="{Binding LedColor}" />
                     <Menu HorizontalAlignment="Right">
                         <uis:MenuItem Header="{x:Null}" Icon="{uis:SymbolIcon Symbol=ReOrderDotsVertical24, Filled=True}">

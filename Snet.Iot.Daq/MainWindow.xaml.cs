@@ -159,7 +159,7 @@ namespace Snet.Iot.Daq
             {
                 Width = 16,
                 Height = 16,
-                OffLightness = 0.2
+                OffLightness = 0.1
             };
             led.SetBinding(LedGaugeControl.IsFlashingProperty, new Binding(nameof(ConsoleDeviceModel.DeviceStatusFlashing)) { Source = model });
             led.SetBinding(LedGaugeControl.IsOnProperty, new Binding(nameof(ConsoleDeviceModel.DeviceStatusChangLiang)) { Source = model });

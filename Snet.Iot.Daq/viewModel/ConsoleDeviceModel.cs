@@ -174,6 +174,11 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
+        /// 插件路径
+        /// </summary>
+        public string PluginPath { get; set; }
+
+        /// <summary>
         /// 地址数量
         /// </summary>
         public int AddressCount
@@ -908,6 +913,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <param name="model">项目信息</param>
         public async Task SettingsAsync(ProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
+            PluginPath = PluginHandler.GetPluginPath(model.DaqDetails.Name);
             ResultAsync = resultAsync;
             ShowAsync = showAsync;
             Project = model;

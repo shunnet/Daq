@@ -15,11 +15,17 @@ namespace Snet.Iot.Daq.handler
         private readonly AssemblyDependencyResolver _resolver;
 
         /// <summary>
+        /// 插件路径
+        /// </summary>
+        public string pluginPath;
+
+        /// <summary>
         /// 创建可回收的插件加载上下文
         /// </summary>
         /// <param name="pluginPath">插件 DLL 的完整路径，用于解析依赖项</param>
         public PluginLoadContext(string pluginPath) : base(isCollectible: true)
         {
+            this.pluginPath = pluginPath;
             _resolver = new AssemblyDependencyResolver(pluginPath);
         }
 

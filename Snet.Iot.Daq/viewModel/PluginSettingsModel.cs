@@ -283,7 +283,7 @@ namespace Snet.Iot.Daq.viewModel
                         PluginList.Add(new PluginListModel(details.Name, plugin, details.Version, DateTime.Now, details));
 
                         //停止该驱动所有连接停止采集
-                        GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == details.Name).ToList().ForEach(d =>
+                        GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == details.Name || details.PluginPath == d.PluginPath).ToList().ForEach(d =>
                         {
                             d.Stop.Execute(null);
                         });
@@ -317,14 +317,13 @@ namespace Snet.Iot.Daq.viewModel
             if (await MessageBox.Show($"确定移除此插件吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
                 string name = PluginListSelectedItem.Name;
+                PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
 
                 //停止该驱动所有连接停止采集
-                GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name).ToList().ForEach(d =>
+                GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.PluginPath == d.PluginPath).ToList().ForEach(d =>
                 {
                     d.Stop.Execute(null);
                 });
-
-                PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
 
                 if (await PluginHandler.RemovePluginAsync(details.Name))
                 {
