@@ -1,4 +1,5 @@
 ﻿using Snet.Core.extend;
+using Snet.Core.handler;
 using Snet.Iot.Daq.data;
 using Snet.Model.data;
 using Snet.Model.@interface;
@@ -112,6 +113,11 @@ namespace Snet.Iot.Daq.handler
                 icoMq.TryAdd(guid, operate);
             }
 
+            if (operate == null)
+            {
+                return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(App.LanguageOperate)));
+            }
+
             // 获取驱动状态
             OperateResult result = await operate.GetStatusAsync();
 
@@ -185,6 +191,7 @@ namespace Snet.Iot.Daq.handler
             {
                 return open.result;
             }
+
             IMq mq = open.operate;
             ConcurrentBag<string> errors = new();
             List<Task> tasks = new(values.Count);

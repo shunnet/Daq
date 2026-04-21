@@ -20,9 +20,15 @@ namespace Snet.Iot.Daq.handler
         public string pluginPath;
 
         /// <summary>
+        /// 插件版本
+        /// </summary>
+        public string pluginVersion;
+
+        /// <summary>
         /// 创建可回收的插件加载上下文
         /// </summary>
         /// <param name="pluginPath">插件 DLL 的完整路径，用于解析依赖项</param>
+        /// <param name="pluginVersion">插件版本</param>
         public PluginLoadContext(string pluginPath) : base(isCollectible: true)
         {
             this.pluginPath = pluginPath;

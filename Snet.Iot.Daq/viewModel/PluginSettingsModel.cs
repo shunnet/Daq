@@ -256,19 +256,32 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 directoryInfo = new(libPath);
                 //热加载插件的状态
-                ConcurrentDictionary<string, bool> pluginStatus = new();
-                if (directoryInfo.Exists)
+                ConcurrentDictionary<string, (string type, bool status)> pluginStatus = new();
+                //是否存在
+                bool exists = directoryInfo.Exists;
+                if (exists)
                 {
                     if (!await MessageBox.Show("此插件已上传，是否进行热更新？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
                     {
                         return;
                     }
-                    //停止该驱动所有连接停止采集
-                    GlobalConfigModel.TrayDevices.Where(d => libPath == d.PluginPath).ToList().ForEach(d =>
+                    switch (plugin)
                     {
-                        pluginStatus.AddOrUpdate(d.DeviceType, d.IsRun, (k, v) => d.IsRun);
-                        PluginListSelectedItem = PluginList.FirstOrDefault(p => p.Name == d.DeviceType && p.PluginDetails.PluginPath == libPath);
-                    });
+                        case PluginType.Daq:
+                            //停止该驱动所有连接停止采集
+                            GlobalConfigModel.TrayDevices.Where(d => libPath == d.DaqPluginPath).ToList().ForEach(d =>
+                            {
+                                pluginStatus.AddOrUpdate(d.ToString(), (d.DeviceType, d.IsRun), (k, v) => (d.DeviceType, d.IsRun));
+                            });
+                            break;
+                        case PluginType.Mq:
+                            GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(libPath)).ToList().ForEach(d =>
+                            {
+                                pluginStatus.AddOrUpdate(d.ToString(), (d.DeviceType, d.IsRun), (k, v) => (d.DeviceType, d.IsRun));
+                            });
+                            break;
+                    }
+                    PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.PluginPath == libPath);
                     await PrivateRemovalPlugin();
                 }
 
@@ -296,33 +309,32 @@ namespace Snet.Iot.Daq.viewModel
 
                     SavePluginListConfig();
 
-                    if (pluginStatus.Count > 0)
+                    if (pluginStatus.Count > 0 || exists)
                     {
                         await MessageBox.Show("插件热更新成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+
+                        //热更新后如果之前是运行状态则继续运行
+                        switch (plugin)
+                        {
+                            case PluginType.Daq:
+                                //停止该驱动所有连接停止采集
+                                GlobalConfigModel.TrayDevices.Where(d => libPath == d.DaqPluginPath).ToList().ForEach(d =>
+                                {
+                                    PrivateInit(d, pluginStatus);
+                                });
+                                break;
+                            case PluginType.Mq:
+                                //停止该驱动所有连接停止采集
+                                GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(libPath)).ToList().ForEach(d =>
+                                {
+                                    PrivateInit(d, pluginStatus);
+                                });
+                                break;
+                        }
                     }
                     else
                     {
                         await MessageBox.Show("插件上传成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
-
-
-                    //热更新后如果之前是运行状态则继续运行
-                    foreach (var pStatus in pluginStatus)
-                    {
-                        //停止该驱动所有连接停止采集
-                        GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == pStatus.Key || libPath == d.PluginPath).ToList().ForEach(d =>
-                        {
-                            if (pStatus.Value)
-                            {
-                                //采集
-                                d.Retry.ExecuteAsync(null);
-                            }
-                            else
-                            {
-                                //停止
-                                d.Stop.Execute(null);
-                            }
-                        });
                     }
                 }
                 else
@@ -339,6 +351,26 @@ namespace Snet.Iot.Daq.viewModel
             }
 
             SavePluginListConfig();
+        }
+
+        /// <summary>
+        /// 私有初始化
+        /// </summary>
+        /// <param name="d">控制台设备对象</param>
+        /// <param name="pluginStatus">插件状态</param>
+        private void PrivateInit(ConsoleDeviceModel d, ConcurrentDictionary<string, (string type, bool status)> pluginStatus)
+        {
+            bool status = pluginStatus.TryGetValue(d.ToString(), out (string type, bool status) plugin) ? plugin.status : false;
+            if (status)
+            {
+                //采集
+                d.Retry.ExecuteAsync(null);
+            }
+            else
+            {
+                //停止
+                d.Stop.Execute(null);
+            }
         }
 
         /// <summary>
@@ -365,11 +397,22 @@ namespace Snet.Iot.Daq.viewModel
             string name = PluginListSelectedItem.Name;
             PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
 
-            //停止该驱动所有连接停止采集
-            GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.PluginPath == d.PluginPath).ToList().ForEach(d =>
+            switch (PluginListSelectedItem.Type)
             {
-                d.Stop.Execute(null);
-            });
+                case PluginType.Daq:
+                    //停止该驱动所有连接停止采集
+                    GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.PluginPath == d.DaqPluginPath).ToList().ForEach(d =>
+                    {
+                        d.Stop.Execute(null);
+                    });
+                    break;
+                case PluginType.Mq:
+                    GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(details.PluginPath)).ToList().ForEach(d =>
+                    {
+                        d.Stop.Execute(null);
+                    });
+                    break;
+            }
 
             if (await PluginHandler.RemovePluginAsync(details.Name))
             {

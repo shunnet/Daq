@@ -174,9 +174,14 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// 插件路径
+        /// 采集插件路径
         /// </summary>
-        public string PluginPath { get; set; }
+        public string DaqPluginPath { get; set; }
+
+        /// <summary>
+        /// 传输插件路径
+        /// </summary>
+        public List<string> MqPluginPath { get; set; }
 
         /// <summary>
         /// 地址数量
@@ -525,8 +530,13 @@ namespace Snet.Iot.Daq.viewModel
                 await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
                 await daqHandler.DisposeAsync();
             }
-
             daqHandler = null;
+
+            foreach (var item in mqHandlers)
+            {
+                await item.Value.DisposeAsync();
+            }
+            mqHandlers.Clear();
 
             CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
             DeviceStatusFlashing = false;
@@ -763,6 +773,8 @@ namespace Snet.Iot.Daq.viewModel
             {
                 while (await DataSyncChannel.Reader.WaitToReadAsync(token))
                 {
+                    if (DataSyncChannel is null)
+                        return;
                     while (DataSyncChannel.Reader.TryRead(out EventDataResult? e))
                     {
                         if (token.IsCancellationRequested)
@@ -832,8 +844,9 @@ namespace Snet.Iot.Daq.viewModel
                     }
                 }
             }
-            catch (TaskCanceledException)
+            catch (TaskCanceledException ex1)
             {
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 任务被取消：" + ex1.Message));
             }
             catch (ChannelClosedException ex2)
             {
@@ -911,6 +924,20 @@ namespace Snet.Iot.Daq.viewModel
                 .Where(kv => !string.IsNullOrEmpty(kv.Key.Address))
                 .GroupBy(kv => kv.Key.Address!)
                 .ToDictionary(g => g.Key, g => g.SelectMany(x => x.Value).ToList());
+
+            //复制MQ插件路径
+            foreach (var item in _mqPluginMap)
+            {
+                if (MqPluginPath is not null)
+                    MqPluginPath.Clear();
+                else
+                    MqPluginPath = new();
+
+                foreach (var model in item.Value)
+                {
+                    MqPluginPath.Add(PluginHandler.GetPluginPath(model.Name));
+                }
+            }
         }
 
         /// <summary>
@@ -919,7 +946,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <param name="model">项目信息</param>
         public async Task SettingsAsync(ProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
-            PluginPath = PluginHandler.GetPluginPath(model.DaqDetails.Name);
+            DaqPluginPath = PluginHandler.GetPluginPath(model.DaqDetails.Name);
             ResultAsync = resultAsync;
             ShowAsync = showAsync;
             Project = model;
@@ -1008,6 +1035,7 @@ namespace Snet.Iot.Daq.viewModel
                 item.Value.Dispose();
             }
             mqHandlers.Clear();
+            _mqPluginMap.Clear();
             runtime.Stop();
             StopPolling();
             bytesHandler?.Dispose();
@@ -1025,6 +1053,7 @@ namespace Snet.Iot.Daq.viewModel
                 await item.Value.DisposeAsync();
             }
             mqHandlers.Clear();
+            _mqPluginMap.Clear();
             runtime.Stop();
             StopPolling();
             if (bytesHandler != null)

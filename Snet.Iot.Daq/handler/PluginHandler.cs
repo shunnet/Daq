@@ -568,6 +568,22 @@ namespace Snet.Iot.Daq.handler
         }
 
         /// <summary>
+        /// 获取当前插件配置库的版本
+        /// </summary>
+        /// <param name="plugin">插件配置信息，包含类名和连接参数</param>
+        /// <returns>返回库的版本号</returns>
+        public static string GetVersion(this PluginConfigModel plugin)
+        {
+            if (iocType.TryGetValue(plugin.Name, out Type? type))
+            {
+                //版本号
+                AssemblyName assemblyName = type.Assembly.GetName();
+                return assemblyName.Version.ToString().Replace(".0", string.Empty);
+            }
+            return "1.0.0";
+        }
+
+        /// <summary>
         /// 测试生产消息<br/>
         /// 创建临时 MQ 实例进行单次消息生产测试，完成后释放资源。
         /// 使用 try/finally 确保资源可靠释放，即使发生异常也不会泄漏连接。
