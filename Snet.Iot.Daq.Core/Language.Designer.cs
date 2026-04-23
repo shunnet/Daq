@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace Snet.Iot.Daq {
+namespace Snet.Iot.Daq.Core {
     using System;
     
     
@@ -39,7 +39,7 @@ namespace Snet.Iot.Daq {
         public static global::System.Resources.ResourceManager ResourceManager {
             get {
                 if (object.ReferenceEquals(resourceMan, null)) {
-                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Snet.Iot.Daq.Language", typeof(Language).Assembly);
+                    global::System.Resources.ResourceManager temp = new global::System.Resources.ResourceManager("Snet.Iot.Daq.Core.Language", typeof(Language).Assembly);
                     resourceMan = temp;
                 }
                 return resourceMan;

@@ -1,12 +1,13 @@
 ﻿using Snet.Core.extend;
 using Snet.Core.handler;
-using Snet.Iot.Daq.data;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@interface;
 using Snet.Model.data;
 using Snet.Model.@interface;
 using Snet.Utility;
 using System.Collections.Concurrent;
 
-namespace Snet.Iot.Daq.handler
+namespace Snet.Iot.Daq.Core.handler
 {
     /// <summary>
     /// 消息传输处理器<br/>
@@ -115,7 +116,7 @@ namespace Snet.Iot.Daq.handler
 
             if (operate == null)
             {
-                return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(App.LanguageOperate)));
+                return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(Core.LanguageOperate)));
             }
 
             // 获取驱动状态
@@ -156,7 +157,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="address">地址模型，包含主题、精简值设置、编码类型等</param>
         /// <param name="value">待发送的地址值数据</param>
         /// <returns>操作结果，包含生产成功/失败状态</returns>
-        public async Task<OperateResult> ProduceAsync(string guid, AddressModel address, AddressValue value)
+        public async Task<OperateResult> ProduceAsync(string guid, IAddressModel address, AddressValue value)
         {
             //打开
             (IMq operate, OperateResult result) open = await OpenAsync(guid);
@@ -181,7 +182,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="guid">传输设备唯一标识符</param>
         /// <param name="values">地址与值的映射字典</param>
         /// <returns>操作结果，包含批量生产状态，失败时返回详细错误信息</returns>
-        public async Task<OperateResult> ProduceAsync(string guid, IDictionary<AddressModel, AddressValue> values)
+        public async Task<OperateResult> ProduceAsync(string guid, IDictionary<IAddressModel, AddressValue> values)
         {
             //打开
             (IMq operate, OperateResult result) open = await OpenAsync(guid);
@@ -213,7 +214,7 @@ namespace Snet.Iot.Daq.handler
         /// <summary>
         /// 单条生产（提取自批量循环，避免 Task.Run 包装 IO 密集型操作）
         /// </summary>
-        private static async Task ProduceSingleAsync(IMq mq, AddressModel key, AddressValue value, ConcurrentBag<string> errors)
+        private static async Task ProduceSingleAsync(IMq mq, IAddressModel key, AddressValue value, ConcurrentBag<string> errors)
         {
             try
             {
@@ -257,7 +258,5 @@ namespace Snet.Iot.Daq.handler
             // 执行消费订阅
             return await open.operate.ConsumeAsync(topic);
         }
-
-
     }
 }

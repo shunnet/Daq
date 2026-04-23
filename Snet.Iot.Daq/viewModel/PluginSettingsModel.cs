@@ -3,12 +3,12 @@ using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@enum;
+using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Utility;
-using Snet.Windows.Controls.data;
 using Snet.Windows.Controls.@enum;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.message;
@@ -292,7 +292,7 @@ namespace Snet.Iot.Daq.viewModel
                 string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
 
                 //获取基础数据
-                List<(PluginDetailsModel Model, object? Param)> result = PluginHandler.InitPlugin(libPath, iName);
+                List<(PluginDetailsModel Model, object? Param)> result = PluginHandlerCore.InitPlugin(libPath, iName);
                 if (result.Count > 0)
                 {
                     foreach (var item in result)
@@ -414,7 +414,7 @@ namespace Snet.Iot.Daq.viewModel
                     break;
             }
 
-            if (await PluginHandler.RemovePluginAsync(details.Name))
+            if (await PluginHandlerCore.RemovePluginAsync(details.Name))
             {
                 //强制 GC 回收已卸载的程序集上下文，确保释放所有残留引用
                 GC.Collect();
@@ -442,7 +442,7 @@ namespace Snet.Iot.Daq.viewModel
         private async Task AddPluginConfigAsync()
         {
             PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
-            object? obj = PluginHandler.GetPluginParamObject(string.Format(GlobalConfigModel.InterfaceFullName, PluginListSelectedItem.Type), details.Name);
+            object? obj = PluginHandlerCore.GetPluginParamObject(string.Format(GlobalConfigModel.InterfaceFullName, PluginListSelectedItem.Type), details.Name);
             GlobalConfigModel.param.SetBasics(obj);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
@@ -496,7 +496,7 @@ namespace Snet.Iot.Daq.viewModel
                     PluginType plugin = item.Type;
                     //接口名称
                     string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
-                    item.Status = (await PluginHandler.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
+                    item.Status = (await PluginHandlerCore.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
                 }
             });
         }
@@ -508,7 +508,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? updatePluginConfig;
         private async Task UpdatePluginConfigAsync()
         {
-            object? obj = PluginHandler.ConvertPluginJsonParam(PluginConfigSelectedItem.Name, PluginConfigSelectedItem.Param);
+            object? obj = PluginHandlerCore.ConvertPluginJsonParam(PluginConfigSelectedItem.Name, PluginConfigSelectedItem.Param);
 
             //获取旧的唯一标识符
             Type type = obj.GetType();
@@ -712,7 +712,7 @@ namespace Snet.Iot.Daq.viewModel
             ComboBoxSelectedItem = ComboBoxItemsSource[0];
 
             //获取本地配置
-            PluginList = PluginHandler.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
+            PluginList = PluginHandlerCore.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
             //插件配置
             if (GlobalConfigModel.PluginDict.Count > 0)
             {
@@ -752,7 +752,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 Directory.CreateDirectory(GlobalConfigModel.UiConfigPath);
             }
-            PluginHandler.SavePluginUIConfig(PluginConfig, GlobalConfigModel.UI_PluginConfigPath);
+            PluginHandlerCore.SavePluginUIConfig(PluginConfig, GlobalConfigModel.UI_PluginConfigPath);
         }
 
         /// <summary>
@@ -764,7 +764,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 Directory.CreateDirectory(GlobalConfigModel.UiConfigPath);
             }
-            PluginHandler.SavePluginUIConfig(PluginList, GlobalConfigModel.UI_PluginListConfigPath);
+            PluginHandlerCore.SavePluginUIConfig(PluginList, GlobalConfigModel.UI_PluginListConfigPath);
         }
         #endregion
 

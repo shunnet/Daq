@@ -2,7 +2,7 @@
 using Snet.Iot.Daq.Core.mvvm;
 using System.ComponentModel;
 
-namespace Snet.Iot.Daq.data
+namespace Snet.Iot.Daq.Core.data
 {
     /// <summary>
     /// 地址源模型<br/>

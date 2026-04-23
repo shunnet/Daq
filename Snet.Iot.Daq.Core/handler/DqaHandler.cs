@@ -1,12 +1,13 @@
 ﻿using Snet.Core.extend;
 using Snet.Core.handler;
-using Snet.Iot.Daq.data;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@interface;
 using Snet.Model.data;
 using Snet.Model.@interface;
 using Snet.Utility;
 using System.Collections.Concurrent;
 
-namespace Snet.Iot.Daq.handler
+namespace Snet.Iot.Daq.Core.handler
 {
     /// <summary>
     /// 数据采集处理器<br/>
@@ -118,7 +119,7 @@ namespace Snet.Iot.Daq.handler
 
             if (operate == null)
             {
-                return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(App.LanguageOperate)));
+                return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(Core.LanguageOperate)));
             }
 
             // 获取驱动状态
@@ -237,7 +238,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待读取的地址模型</param>
         /// <returns>操作结果，ResultData 中包含读取到的数据</returns>
-        public async Task<OperateResult> ReadAsync(string guid, AddressModel address)
+        public async Task<OperateResult> ReadAsync(string guid, IAddressModel address)
         {
             //打开
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);
@@ -259,7 +260,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待读取的地址模型集合</param>
         /// <returns>操作结果，ResultData 中包含批量读取到的数据</returns>
-        public async Task<OperateResult> ReadAsync(string guid, List<AddressModel> address)
+        public async Task<OperateResult> ReadAsync(string guid, List<IAddressModel> address)
         {
             //打开
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);
@@ -282,7 +283,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="address">目标地址模型</param>
         /// <param name="write">待写入的数据模型</param>
         /// <returns>操作结果，包含写入成功/失败状态</returns>
-        public async Task<OperateResult> WriteAsync(string guid, AddressModel address, WriteModel write)
+        public async Task<OperateResult> WriteAsync(string guid, IAddressModel address, WriteModel write)
         {
             // 打开或获取设备实例
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);
@@ -309,7 +310,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待订阅的地址模型</param>
         /// <returns>操作结果，包含订阅成功/失败状态</returns>
-        public async Task<OperateResult> SubscribeAsync(string guid, AddressModel address)
+        public async Task<OperateResult> SubscribeAsync(string guid, IAddressModel address)
         {
             // 打开或获取设备实例
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);
@@ -329,7 +330,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待订阅的地址模型集合</param>
         /// <returns>操作结果，包含批量订阅成功/失败状态</returns>
-        public async Task<OperateResult> SubscribeAsync(string guid, List<AddressModel> address)
+        public async Task<OperateResult> SubscribeAsync(string guid, List<IAddressModel> address)
         {
             // 打开或获取设备实例
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);
@@ -349,7 +350,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待取消订阅的地址模型</param>
         /// <returns>操作结果，包含取消订阅成功/失败状态</returns>
-        public async Task<OperateResult> UnSubscribeAsync(string guid, AddressModel address)
+        public async Task<OperateResult> UnSubscribeAsync(string guid, IAddressModel address)
         {
             // 打开或获取设备实例
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);
@@ -369,7 +370,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待取消订阅的地址模型集合</param>
         /// <returns>操作结果，包含批量取消订阅成功/失败状态</returns>
-        public async Task<OperateResult> UnSubscribeAsync(string guid, List<AddressModel> address)
+        public async Task<OperateResult> UnSubscribeAsync(string guid, List<IAddressModel> address)
         {
             // 打开或获取设备实例
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);

@@ -3,11 +3,13 @@ using MaterialDesignThemes.Wpf;
 using ScottPlot.WPF;
 using Snet.Core.handler;
 using Snet.Iot.Daq.chart;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.handler;
+using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mqtt.service;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.handler;
 using Snet.Iot.Daq.utility;
 using Snet.Iot.Daq.view;
 using Snet.Log;
@@ -478,7 +480,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand refresh;
         public async Task RefreshAsync()
         {
-            List<ProjectTreeViewModel> devices = GlobalConfigModel.ProjectDict.GetAllDeviceNodes();
+            List<IProjectTreeViewModel> devices = GlobalConfigModel.ProjectDict.GetAllDeviceNodes();
             await ShowAsync(devices.Count + " " + "台设备已成功加载".GetLanguageValue(App.LanguageOperate));
             await SyncDevicesAsync(devices, Devices, ResultAsync, ShowAsync);
         }
@@ -491,7 +493,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <param name="resultAsync">结果回调</param>
         /// <param name="showAsync">提示回调</param>
         private async Task SyncDevicesAsync(
-            List<ProjectTreeViewModel> sourceDevices,
+            List<IProjectTreeViewModel> sourceDevices,
             ObservableCollection<ConsoleDevice> uiDevices,
             Func<PluginConfigModel, BaseModel, Task> resultAsync,
             Func<string, Task> showAsync)

@@ -1,4 +1,4 @@
-﻿namespace Snet.Iot.Daq.handler
+﻿namespace Snet.Iot.Daq.Core.handler
 {
     /// <summary>
     /// 运行时间记录器（单位：秒）

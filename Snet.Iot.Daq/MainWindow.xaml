@@ -11,7 +11,7 @@
     Title="{Binding SystemTitle}"
     Width="1600"
     Height="900"
-    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
     snet:ResxLocalizationProvider.DefaultDictionary="Language"
     AnimationTime="4000"
     Icon="/icon.ico"

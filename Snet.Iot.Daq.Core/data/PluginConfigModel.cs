@@ -1,12 +1,11 @@
 ﻿using Snet.Core.handler;
 using Snet.Iot.Daq.Core.@enum;
-using Snet.Iot.Daq.handler;
+using Snet.Iot.Daq.Core.handler;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Model.data;
 using Snet.Utility;
-using Snet.Iot.Daq.Core.mvvm;
-using System.IO;
 
-namespace Snet.Iot.Daq.data
+namespace Snet.Iot.Daq.Core.data
 {
     /// <summary>
     /// 插件配置模型
@@ -90,7 +89,7 @@ namespace Snet.Iot.Daq.data
             get => GetProperty(() => Status);
             set
             {
-                StatusMessage = value ? App.LanguageOperate.GetLanguageValue("正常") : App.LanguageOperate.GetLanguageValue("异常");
+                StatusMessage = value ? Core.LanguageOperate.GetLanguageValue("正常") : Core.LanguageOperate.GetLanguageValue("异常");
                 SetProperty(() => Status, value);
             }
         }
@@ -187,7 +186,7 @@ namespace Snet.Iot.Daq.data
         /// <returns>SN</returns>
         public string GetObjSn()
         {
-            return PluginHandler.PluginFileNameToSN(SN, Type);
+            return PluginHandlerCore.PluginFileNameToSN(SN, Type);
         }
 
         /// <summary>

@@ -1,7 +1,8 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.handler;
 using Snet.Iot.Daq.Handler;
 using Snet.Iot.Daq.view;
 using Snet.Log;
@@ -23,7 +24,7 @@ namespace Snet.Iot.Daq
         /// <summary>
         /// 语言操作
         /// </summary>
-        public readonly static LanguageModel LanguageOperate = new LanguageModel("Snet.Iot.Daq", "Language", "Snet.Iot.Daq.dll");
+        public readonly static LanguageModel LanguageOperate = Snet.Iot.Daq.Core.Core.LanguageOperate;
 
         /// <summary>
         /// 信息框模型集合
@@ -137,7 +138,7 @@ namespace Snet.Iot.Daq
             InjectionWpf.UserControl<SelectDevice, Snet.Iot.Daq.viewModel.SelectDeviceModel>(true);
 
             // 注入地址选择控件
-            InjectionWpf.UserControl<SelectAddress, Snet.Iot.Daq.viewModel.SelectAddressModel>(true);
+            SelectAddress selectAddress = InjectionWpf.UserControl<SelectAddress, Snet.Iot.Daq.viewModel.SelectAddressModel>(true);
 
             // 注入处理器控件
             InjectionWpf.UserControl<view.Handler, Snet.Iot.Daq.viewModel.HandlerModel>(true);
@@ -146,11 +147,11 @@ namespace Snet.Iot.Daq
             GlobalConfigModel.sqliteOperate.CreateTable<AddressModel>();
 
             // 加载并初始化所有已配置的插件
-            ObservableCollection<PluginListModel> plugins = PluginHandler.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
+            ObservableCollection<PluginListModel> plugins = PluginHandlerCore.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
             //初始化插件
             foreach (var item in plugins)
             {
-                PluginHandler.InitPlugin(item.PluginDetails.PluginPath, string.Format(GlobalConfigModel.InterfaceFullName, item.Type));
+                PluginHandlerCore.InitPlugin(item.PluginDetails.PluginPath, string.Format(GlobalConfigModel.InterfaceFullName, item.Type));
             }
 
             //获取所有已存在的插件

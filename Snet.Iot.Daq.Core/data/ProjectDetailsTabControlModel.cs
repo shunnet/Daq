@@ -1,8 +1,7 @@
 ﻿using Snet.Iot.Daq.Core.mvvm;
 
-namespace Snet.Iot.Daq.data
+namespace Snet.Iot.Daq.Core.data
 {
-
     /// <summary>
     /// 项目详情选项卡控件模型，封装单个选项卡页的头文本、特殊数据和内容，并监听设备详情变更自动刷新显示。
     /// </summary>

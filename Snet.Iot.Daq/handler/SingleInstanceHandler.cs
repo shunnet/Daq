@@ -1,4 +1,4 @@
-﻿using System.Diagnostics;
+﻿using Snet.Log;
 using System.IO;
 using System.IO.Pipes;
 using System.Windows;
@@ -108,7 +108,7 @@ namespace Snet.Iot.Daq.Handler
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[SingleInstance] BringToFront异常: {ex.Message}");
+                    LogHelper.Error($"[SingleInstance] BringToFront异常: {ex.Message}");
                 }
 
             }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
@@ -170,7 +170,7 @@ namespace Snet.Iot.Daq.Handler
                 }
                 catch (Exception ex)
                 {
-                    Debug.WriteLine($"[SingleInstance] 管道异常: {ex.Message}");
+                    LogHelper.Error($"[SingleInstance] 管道异常: {ex.Message}");
                 }
                 finally
                 {

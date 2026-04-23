@@ -1,12 +1,15 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@enum;
+using Snet.Iot.Daq.Core.handler;
+using Snet.Iot.Daq.Core.@interface;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Iot.Daq.view;
 using Snet.Utility;
-using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Windows;
@@ -35,17 +38,17 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 节点集合
         /// </summary>
-        public ObservableCollection<ProjectTreeViewModel> ProjectNode
+        public ObservableCollection<IProjectTreeViewModel> ProjectNode
         {
             get => projectNode;
             set => SetProperty(ref projectNode, value);
         }
-        private ObservableCollection<ProjectTreeViewModel> projectNode = new ObservableCollection<ProjectTreeViewModel>();
+        private ObservableCollection<IProjectTreeViewModel> projectNode = new ObservableCollection<IProjectTreeViewModel>();
 
         /// <summary>
         /// 选中的节点
         /// </summary>
-        public ProjectTreeViewModel? ProjectNodeSelectedItem
+        public IProjectTreeViewModel? ProjectNodeSelectedItem
         {
             get => GetProperty(() => ProjectNodeSelectedItem);
             set => SetProperty(() => ProjectNodeSelectedItem, value);
@@ -78,19 +81,6 @@ namespace Snet.Iot.Daq.viewModel
         {
             get => GetProperty(() => DetailsNodeSelectedItem);
             set => SetProperty(() => DetailsNodeSelectedItem, value);
-            //{
-            //    // 如果选中的项与当前的第一项不同
-            //    if (detailsNode.Contains(value) && !ReferenceEquals(detailsNode[0], value))
-            //    {
-            //        // 移除原来的位置
-            //        detailsNode.Remove(value);
-
-            //        // 插入到第一个位置
-            //        detailsNode.Insert(0, value);
-            //    }
-
-            //    SetProperty(() => DetailsNodeSelectedItem, value);
-            //}
         }
 
         /// <summary>
@@ -162,11 +152,11 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? addTopProject;
         private async Task AddTopProjectAsync()
         {
-            ProjectTreeViewModel project = new ProjectTreeViewModel(string.Empty);
+            IProjectTreeViewModel project = new ProjectTreeViewModel(string.Empty);
             GlobalConfigModel.param.SetBasics(project);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
-                ProjectTreeViewModel item = GlobalConfigModel.param.GetBasics().GetSource<ProjectTreeViewModel>();
+                IProjectTreeViewModel item = GlobalConfigModel.param.GetBasics().GetSource<IProjectTreeViewModel>();
                 if (item.Name.IsNullOrWhiteSpace())
                 {
                     await Windows.Controls.message.MessageBox.Show("存在空数据！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
@@ -207,7 +197,7 @@ namespace Snet.Iot.Daq.viewModel
             string file = GlobalConfigModel.SelectFiles("json");
             if (!string.IsNullOrEmpty(file))
             {
-                ObservableCollection<ProjectTreeViewModel>? models = FileHandler.FileToString(file).ToJsonEntity<ObservableCollection<ProjectTreeViewModel>>();
+                ObservableCollection<IProjectTreeViewModel>? models = FileHandler.FileToString(file).ToJsonEntity<ObservableCollection<IProjectTreeViewModel>>();
                 if (models == null)
                 {
                     await Windows.Controls.message.MessageBox.Show("导入失败".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
@@ -226,7 +216,7 @@ namespace Snet.Iot.Daq.viewModel
                     models.InitChildrenParent();
                     ProjectNode.Clear();
                     ProjectNode = models;
-                    ProjectNodeSelectedItem = ProjectHandler.GetFirstSelectItem(ProjectNode);
+                    ProjectNodeSelectedItem = ProjectHandlerCore.GetFirstSelectItem(ProjectNode);
                     if (ProjectNodeSelectedItem?.NodeType == ProjectNodeType.Device)
                     {
                         DetailsNode.Clear();
@@ -246,11 +236,11 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? addProject;
         private async Task AddProjectAsync()
         {
-            ProjectTreeViewModel project = new ProjectTreeViewModel(string.Empty);
+            IProjectTreeViewModel project = new ProjectTreeViewModel(string.Empty);
             GlobalConfigModel.param.SetBasics(project);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
-                ProjectTreeViewModel item = GlobalConfigModel.param.GetBasics().GetSource<ProjectTreeViewModel>();
+                IProjectTreeViewModel item = GlobalConfigModel.param.GetBasics().GetSource<IProjectTreeViewModel>();
                 if (item.Name.IsNullOrWhiteSpace())
                 {
                     await Windows.Controls.message.MessageBox.Show("存在空数据！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
@@ -273,7 +263,7 @@ namespace Snet.Iot.Daq.viewModel
             GlobalConfigModel.param.SetBasics(ProjectNodeSelectedItem);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
-                ProjectTreeViewModel item = GlobalConfigModel.param.GetBasics().GetSource<ProjectTreeViewModel>();
+                IProjectTreeViewModel item = GlobalConfigModel.param.GetBasics().GetSource<IProjectTreeViewModel>();
                 if (item.Name.IsNullOrWhiteSpace())
                 {
                     await Windows.Controls.message.MessageBox.Show("存在空数据！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
@@ -295,7 +285,7 @@ namespace Snet.Iot.Daq.viewModel
             if ((await DialogHost.Show(GlobalConfigModel.device, GlobalConfigModel.DialogHostTag_ClickClose)).ToBool())
             {
                 PluginConfigModel plugin = GlobalConfigModel.deviceModel.GetValue().Guid.GetPlugin();
-                ProjectTreeViewModel item = new ProjectTreeViewModel(plugin);
+                IProjectTreeViewModel item = new ProjectTreeViewModel(plugin);
 
                 if (ProjectNode.QueryDeviceUnique(item))
                 {
@@ -324,7 +314,7 @@ namespace Snet.Iot.Daq.viewModel
                 if (await Windows.Controls.message.MessageBox.Show("确定移除选中的项吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Question))
                 {
                     //拷贝
-                    ProjectTreeViewModel? Parent = ProjectNodeSelectedItem?.Parent;
+                    IProjectTreeViewModel? Parent = ProjectNodeSelectedItem?.Parent;
                     //移除
                     ProjectNode.RemoveNode(ProjectNodeSelectedItem);
                     //更新特殊数据
@@ -379,7 +369,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 if (treeItem != null)
                 {
-                    ProjectTreeViewModel? model = treeItem?.DataContext.GetSource<ProjectTreeViewModel>();
+                    IProjectTreeViewModel? model = treeItem?.DataContext.GetSource<IProjectTreeViewModel>();
                     ProjectNodeSelectedItem = model;
                     _ = ProjectNodeSelectedItem?.SetAsync(ProjectNode).ConfigureAwait(false);
                 }
@@ -401,7 +391,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? treeView_SelectedItemChanged;
         private async Task TreeView_SelectedItemChangedAsync(RoutedPropertyChangedEventArgs<object>? e)
         {
-            if (e?.NewValue is not ProjectTreeViewModel model)
+            if (e?.NewValue is not IProjectTreeViewModel model)
                 return;
             _ = model?.SetAsync(ProjectNode).ConfigureAwait(false);
             if (model?.NodeType == ProjectNodeType.Device)
@@ -491,7 +481,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             ProjectNode = GlobalConfigModel.ProjectDict;
 
-            ProjectNodeSelectedItem = ProjectHandler.GetFirstSelectItem(ProjectNode);
+            ProjectNodeSelectedItem = ProjectHandlerCore.GetFirstSelectItem(ProjectNode);
             if (ProjectNodeSelectedItem?.NodeType == ProjectNodeType.Device)
                 await AddSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
         }
@@ -499,7 +489,7 @@ namespace Snet.Iot.Daq.viewModel
         /// 移除设备节点
         /// </summary>
         /// <param name="model">模型</param>
-        private async Task RemoveSelectDeviceNodeAsync(ProjectTreeViewModel model)
+        private async Task RemoveSelectDeviceNodeAsync(IProjectTreeViewModel model)
         {
             List<ProjectDetailsTabControlModel> device;
             if (model.DaqDetails != null)
@@ -532,7 +522,7 @@ namespace Snet.Iot.Daq.viewModel
         /// 添加并选中设备节点
         /// </summary>
         /// <param name="model">模型</param>
-        public async Task AddSelectDeviceNodeAsync(ProjectTreeViewModel project)
+        public async Task AddSelectDeviceNodeAsync(IProjectTreeViewModel project)
         {
             (ProjectDetails view, ProjectDetailsModel model) details = ProjectNode.CreateDetails(project);
             ProjectDetailsTabControlModel tabModel = new ProjectDetailsTabControlModel(project.DaqDetails.Guid.GetPlugin(), details.view);
@@ -557,7 +547,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (!QueryCntent.IsNullOrWhiteSpace())
             {
-                ProjectTreeViewModel? project = ProjectNode.FindByName(QueryCntent);
+                IProjectTreeViewModel? project = ProjectNode.FindByName(QueryCntent);
                 if (project is not null)
                 {
                     _ = project?.SetAsync(ProjectNode).ConfigureAwait(false);

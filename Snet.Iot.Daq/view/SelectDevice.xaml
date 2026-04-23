@@ -12,7 +12,7 @@
     xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
     Width="900"
     Height="600"
-    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
     snet:ResxLocalizationProvider.DefaultDictionary="Language">
     <Grid>
         <GroupBox
@@ -151,7 +151,7 @@
                             </ContextMenu.Style>
 
                             <uis:MenuItem
-                                snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                 snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                 Command="{x:Static ui:DialogHost.CloseDialogCommand}"
                                 Header="{snet:Loc 选择}"
@@ -163,7 +163,7 @@
                             </uis:MenuItem>
 
                             <uis:MenuItem
-                                snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                 snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                 Command="{x:Static ui:DialogHost.CloseDialogCommand}"
                                 Header="{snet:Loc 退出选择}"
@@ -178,7 +178,7 @@
                     </DataGrid.ContextMenu>
                     <DataGrid.Columns>
                         <DataGridTextColumn
-                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             Binding="{Binding Index}"
                             CellStyle="{StaticResource DataGridCellStyle}"
@@ -207,7 +207,7 @@
 
 
                         <DataGridTemplateColumn
-                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             CellStyle="{StaticResource DataGridCellStyle}"
                             HeaderStyle="{StaticResource DataGridColumnHeaderStyle}">
@@ -249,7 +249,7 @@
 
 
                         <DataGridTextColumn
-                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             Binding="{Binding Type}"
                             CellStyle="{StaticResource DataGridCellStyle}"
@@ -279,7 +279,7 @@
 
 
                         <DataGridTextColumn
-                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             Binding="{Binding Name}"
                             CellStyle="{StaticResource DataGridCellStyle}"
@@ -309,7 +309,7 @@
 
                         <DataGridTextColumn
                             Width="*"
-                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             Binding="{Binding SN}"
                             CellStyle="{StaticResource DataGridCellStyle}"
@@ -338,7 +338,7 @@
 
                         <DataGridTextColumn
                             Width="170"
-                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                            snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             Binding="{Binding Time, StringFormat=yyyy-MM-dd HH:mm:ss}"
                             CellStyle="{StaticResource DataGridCellStyle}"

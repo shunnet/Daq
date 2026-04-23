@@ -2,7 +2,7 @@
 using Snet.Iot.Daq.Core.@enum;
 using Snet.Iot.Daq.Core.mvvm;
 
-namespace Snet.Iot.Daq.data
+namespace Snet.Iot.Daq.Core.data
 {
     /// <summary>
     /// 插件列表模型

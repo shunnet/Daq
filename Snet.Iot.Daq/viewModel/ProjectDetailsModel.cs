@@ -1,12 +1,15 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@enum;
+using Snet.Iot.Daq.Core.handler;
+using Snet.Iot.Daq.Core.@interface;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Utility;
-using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.Text;
@@ -28,28 +31,28 @@ namespace Snet.Iot.Daq.viewModel
         /// 用于操作完成赋值
         /// </summary>
 
-        private ProjectTreeViewModel ProjectTree;
+        private IProjectTreeViewModel ProjectTree;
 
         /// <summary>
         /// 父类的集合对象
         /// </summary>
-        private ObservableCollection<ProjectTreeViewModel> BossProjectTree;
+        private ObservableCollection<IProjectTreeViewModel> BossProjectTree;
 
 
         /// <summary>
         /// 节点集合
         /// </summary>
-        public ObservableCollection<ProjectDetailsTreeViewModel> DetailsNode
+        public ObservableCollection<IProjectDetailsTreeViewModel> DetailsNode
         {
             get => detailsNode;
             set => SetProperty(ref detailsNode, value);
         }
-        private ObservableCollection<ProjectDetailsTreeViewModel> detailsNode = new ObservableCollection<ProjectDetailsTreeViewModel>();
+        private ObservableCollection<IProjectDetailsTreeViewModel> detailsNode = new ObservableCollection<IProjectDetailsTreeViewModel>();
 
         /// <summary>
         /// 选中的节点
         /// </summary>
-        public ProjectDetailsTreeViewModel? DetailsNodeSelectedItem
+        public IProjectDetailsTreeViewModel? DetailsNodeSelectedItem
         {
             get => GetProperty(() => DetailsNodeSelectedItem);
             set
@@ -88,6 +91,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? addAddress;
         private async Task AddAddressAsync()
         {
+            await GlobalConfigModel.addressModel.QueryAddressAsync();
             GlobalConfigModel.addressModel.SetSelectItem();
             if ((await DialogHost.Show(GlobalConfigModel.address, GlobalConfigModel.DialogHostTag_ClickClose)).ToBool())
             {
@@ -120,7 +124,7 @@ namespace Snet.Iot.Daq.viewModel
                 PluginConfigModel plugin = GlobalConfigModel.deviceModel.GetValue();
                 foreach (var items in DetailsNode)
                 {
-                    ProjectDetailsTreeViewModel item = new ProjectDetailsTreeViewModel(plugin);
+                    IProjectDetailsTreeViewModel item = new ProjectDetailsTreeViewModel(plugin);
                     if (!items?.Children.Any(c => c.MqDetails.SN == item.MqDetails.SN) ?? true)
                     {
                         items?.Children.Add(item);
@@ -148,7 +152,7 @@ namespace Snet.Iot.Daq.viewModel
             {
 
                 PluginConfigModel plugin = GlobalConfigModel.deviceModel.GetValue().Guid.GetPlugin();
-                ProjectDetailsTreeViewModel item = new ProjectDetailsTreeViewModel(plugin);
+                IProjectDetailsTreeViewModel item = new ProjectDetailsTreeViewModel(plugin);
 
                 if (DetailsNodeSelectedItem?.Children.Any(c => c.MqDetails.SN == item.MqDetails.SN) == false)
                 {
@@ -218,7 +222,7 @@ namespace Snet.Iot.Daq.viewModel
                 if (await Windows.Controls.message.MessageBox.Show("确定移除选中的项吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Question))
                 {
                     //拷贝
-                    ProjectDetailsTreeViewModel? Parent = DetailsNodeSelectedItem?.Parent;
+                    IProjectDetailsTreeViewModel? Parent = DetailsNodeSelectedItem?.Parent;
                     //移除
                     DetailsNode.RemoveNode(DetailsNodeSelectedItem);
                     //更新特殊数据
@@ -263,7 +267,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? read;
         public async Task ReadAsync()
         {
-            AddressModel address = DetailsNodeSelectedItem.AddressDetails;
+            IAddressModel address = DetailsNodeSelectedItem.AddressDetails;
             PluginConfigModel daq = ProjectTree.DaqDetails;
             OperateResult result = await address.TestReadAddressAsync(daq);
             if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data))
@@ -283,6 +287,10 @@ namespace Snet.Iot.Daq.viewModel
                             error_strs.AppendLine();
                             error_strs.AppendLine($"{desName} - {"传输失败".GetLanguageValue(App.LanguageOperate)}");
                             error_strs.AppendLine(msg);
+                        }
+                        else
+                        {
+                            error_strs.Remove(0, error_strs.Length);
                         }
                     }
                     if (error_strs.Length > 1)
@@ -316,7 +324,7 @@ namespace Snet.Iot.Daq.viewModel
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
                 WriteModel write = GlobalConfigModel.param.GetBasics().GetSource<WriteModel>();
-                AddressModel address = DetailsNodeSelectedItem.AddressDetails;
+                IAddressModel address = DetailsNodeSelectedItem.AddressDetails;
                 PluginConfigModel daq = ProjectTree.DaqDetails;
                 OperateResult result = await address.TestWriteAddressAsync(daq, write);
                 await Windows.Controls.message.MessageBox.Show($"{"写入".GetLanguageValue(App.LanguageOperate)}{(result.Status ? "成功".GetLanguageValue(App.LanguageOperate) : "失败".GetLanguageValue(App.LanguageOperate) + $":{result.Message}")}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, result.Status ? Windows.Controls.@enum.MessageBoxImage.Information : Windows.Controls.@enum.MessageBoxImage.Error);
@@ -362,7 +370,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 if (treeItem != null)
                 {
-                    ProjectDetailsTreeViewModel? model = treeItem?.DataContext.GetSource<ProjectDetailsTreeViewModel>();
+                    IProjectDetailsTreeViewModel? model = treeItem?.DataContext.GetSource<IProjectDetailsTreeViewModel>();
                     DetailsNodeSelectedItem = model;
                     if (DetailsNodeSelectedItem != null)
                     {
@@ -388,7 +396,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? treeView_SelectedItemChanged;
         private async Task TreeView_SelectedItemChangedAsync(RoutedPropertyChangedEventArgs<object>? e)
         {
-            if (e?.NewValue is not ProjectDetailsTreeViewModel model)
+            if (e?.NewValue is not IProjectDetailsTreeViewModel model)
                 return;
             DetailsNode.EnsureSingleSelection(model);
             model.ExpandParents();
@@ -435,7 +443,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (!QueryCntent.IsNullOrWhiteSpace())
             {
-                ProjectDetailsTreeViewModel? project = DetailsNode.FindByName(QueryCntent);
+                IProjectDetailsTreeViewModel? project = DetailsNode.FindByName(QueryCntent);
                 if (project is not null)
                 {
                     _ = project?.SetAsync(DetailsNode).ConfigureAwait(false);
@@ -453,7 +461,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <param name="details">设备详情</param>
         /// <param name="bossProject">父类的设备集合</param>
         /// <param name="project">项目</param>
-        public void SetValue(ProjectTreeViewModel project, ObservableCollection<ProjectTreeViewModel> bossProject)
+        public void SetValue(IProjectTreeViewModel project, ObservableCollection<IProjectTreeViewModel> bossProject)
         {
             this.BossProjectTree = bossProject;
             this.ProjectTree = project;
@@ -461,7 +469,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 if (project.Details != null && project.Details.Count > 0)
                 {
-                    DetailsNode = new ObservableCollection<ProjectDetailsTreeViewModel>(project.Details);
+                    DetailsNode = new ObservableCollection<IProjectDetailsTreeViewModel>(project.Details);
                     DetailsNode.RebindGlobals();
                     DetailsNode.InitChildrenParent();
                 }

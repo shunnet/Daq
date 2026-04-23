@@ -14,7 +14,7 @@
     xmlns:view="clr-namespace:Snet.Iot.Daq.view"
     Width="323.4"
     Height="305"
-    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
     snet:ResxLocalizationProvider.DefaultDictionary="Language"
     mc:Ignorable="d">
     <UserControl.DataContext>

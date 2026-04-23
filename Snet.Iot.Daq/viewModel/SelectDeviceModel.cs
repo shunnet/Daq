@@ -1,8 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@enum;
-using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.handler;
+using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.mvvm;
+using Snet.Iot.Daq.data;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -52,7 +53,7 @@ namespace Snet.Iot.Daq.viewModel
                     PluginType plugin = item.Type;
                     //接口名称
                     string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
-                    item.Status = (await PluginHandler.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
+                    item.Status = (await PluginHandlerCore.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
                 }
             });
         }
@@ -125,7 +126,7 @@ namespace Snet.Iot.Daq.viewModel
         public void SetValue(PluginType type)
         {
             PluginConfig.Clear();
-            foreach (var item in PluginHandler.GetPluginUIConfig<ObservableCollection<PluginConfigModel>>(GlobalConfigModel.UI_PluginConfigPath) ?? new())
+            foreach (var item in PluginHandlerCore.GetPluginUIConfig<ObservableCollection<PluginConfigModel>>(GlobalConfigModel.UI_PluginConfigPath) ?? new())
             {
                 if (item.Type == type)
                     PluginConfig.Add(item);

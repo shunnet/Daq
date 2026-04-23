@@ -1,11 +1,13 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@interface;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Model.data;
 using Snet.Utility;
 using Snet.Windows.Controls.message;
-using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.IO;
 using System.Text;
@@ -21,21 +23,26 @@ namespace Snet.Iot.Daq.viewModel
     /// </summary>
     public class AddressSettingsModel : BindNotify
     {
+        public AddressSettingsModel()
+        {
+            _ = QueryAddressAsync();
+        }
+
         #region 属性
         /// <summary>
         /// 地址配置集合
         /// </summary>
-        public ObservableCollection<Snet.Iot.Daq.data.AddressModel> AddressConfig
+        public ObservableCollection<IAddressModel> AddressConfig
         {
             get => addressConfig;
             set => SetProperty(ref addressConfig, value);
         }
-        private ObservableCollection<Snet.Iot.Daq.data.AddressModel> addressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>();
+        private ObservableCollection<IAddressModel> addressConfig = new ObservableCollection<IAddressModel>();
 
         /// <summary>
         /// 地址配置被选中的项
         /// </summary>
-        public Snet.Iot.Daq.data.AddressModel AddressConfigSelectedItem
+        public IAddressModel AddressConfigSelectedItem
         {
             get => GetProperty(() => AddressConfigSelectedItem);
             set => SetProperty(() => AddressConfigSelectedItem, value);
@@ -84,9 +91,11 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public int PageIndex
         {
-            get => GetProperty(() => PageIndex);
-            set => SetProperty(() => PageIndex, value);
+            get => pageIndex;
+            set => SetProperty(ref pageIndex, value);
         }
+        private int pageIndex = 1;
+
         #endregion
 
         #region 命令
@@ -118,7 +127,7 @@ namespace Snet.Iot.Daq.viewModel
             else
             {
                 //模糊查询
-                List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().Where(p =>
+                List<AddressModel> models = GlobalConfigModel.sqliteOperate.Table<AddressModel>().Where(p =>
                 p.AnotherName.Contains(QueryCntent) ||
                 p.Address.Contains(QueryCntent) ||
                 p.Describe.Contains(QueryCntent)).ToList();
@@ -312,7 +321,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? deleteAddress;
         private async Task DeleteAddressAsync()
         {
-            List<Snet.Iot.Daq.data.AddressModel> models = AddressConfig.Where(x => x.IsSelected).ToList();
+            List<IAddressModel> models = AddressConfig.Where(x => x.IsSelected).ToList();
             if (models.Count > 0)
             {
                 StringBuilder builder = new StringBuilder();
@@ -415,7 +424,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? pageIndexChanged;
         private async Task PageIndexChangedExecuteAsync(int index)
         {
-            var table = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>();
+            var table = GlobalConfigModel.sqliteOperate.Table<AddressModel>();
             int total = table.Count();
             var page = table.OrderByDescending(x => x.Time)
                             .Skip((index - 1) * PageSize)
@@ -423,7 +432,7 @@ namespace Snet.Iot.Daq.viewModel
                             .ToList();
             PageIndex = index;
             Total = total;
-            AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(page);
+            AddressConfig = new ObservableCollection<IAddressModel>(page);
         }
         #endregion
 
@@ -432,7 +441,7 @@ namespace Snet.Iot.Daq.viewModel
         /// 使用检查
         /// </summary>
         /// <returns>false:没有被使用  true:被使用了</returns>
-        private bool UseCheck(AddressModel model)
+        private bool UseCheck(IAddressModel model)
         {
             //检查是否有被使用
             string checkFile = GlobalConfigModel.UI_ProjectConfigPath;
@@ -454,12 +463,11 @@ namespace Snet.Iot.Daq.viewModel
         /// <param name="pageIndex">页码</param>
         /// <param name="models">数据</param>
         /// <returns></returns>
-        private Task ResetUiAsync(int total, int pageIndex, List<Snet.Iot.Daq.data.AddressModel> models)
+        private Task ResetUiAsync(int total, int pageIndex, List<AddressModel> models)
         {
             PageIndex = pageIndex;
             Total = total;
-            AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(
-                models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize));
+            AddressConfig = new ObservableCollection<IAddressModel>(models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize));
             return Task.CompletedTask;
         }
         #endregion

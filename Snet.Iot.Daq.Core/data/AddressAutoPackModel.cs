@@ -2,7 +2,7 @@
 using Snet.Model.@enum;
 using System.ComponentModel;
 
-namespace Snet.Iot.Daq.data
+namespace Snet.Iot.Daq.Core.data
 {
     /// <summary>
     /// 地址自动组包模型

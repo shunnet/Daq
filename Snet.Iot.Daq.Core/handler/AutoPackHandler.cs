@@ -1,10 +1,11 @@
 ﻿using Snet.Core.extend;
-using Snet.Iot.Daq.data;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@interface;
 using Snet.Model.data;
 using Snet.Model.@enum;
 using Snet.Utility;
 
-namespace Snet.Iot.Daq.handler
+namespace Snet.Iot.Daq.Core.handler
 {
     /// <summary>
     /// 自动组包处理类
@@ -140,7 +141,7 @@ namespace Snet.Iot.Daq.handler
         /// <param name="maxByteLength">单次批量读取的最大字节数（西门子S7默认240/400）</param>
         /// <param name="format">数据字节序格式</param>
         /// <returns>组包后的地址对象，失败返回null</returns>
-        public List<AddressModel>? AddressAutoPack(List<AddressModel> addressModels, string deviceType = "SiemensS7Net", int maxByteLength = 200, DataFormat format = DataFormat.ABCD)
+        public List<IAddressModel>? AddressAutoPack(List<IAddressModel> addressModels, string deviceType = "SiemensS7Net", int maxByteLength = 200, DataFormat format = DataFormat.ABCD)
         {
             Address address = new Address();
             address.AddressArray = addressModels.Where(m => m.ExpandParam == null).Select(m => new AddressDetails
@@ -151,10 +152,10 @@ namespace Snet.Iot.Daq.handler
             }).ToList();
             Address? result = AddressAutoPack(address, deviceType, maxByteLength, format);
             if (result == null) return null;
-            List<AddressModel> models = new List<AddressModel>();
+            List<IAddressModel> models = new List<IAddressModel>();
             foreach (var model in result.AddressArray)
             {
-                models.Add(new AddressModel
+                models.Add(new AddressModelCore
                 {
                     Length = model.Length,
                     EncodingType = model.EncodingType,

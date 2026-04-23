@@ -11,7 +11,7 @@
     xmlns:snet="https://shunnet.top"
     xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
     xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
-    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
     snet:ResxLocalizationProvider.DefaultDictionary="Language">
     <UserControl.DataContext>
         <model:ProjectSettingsModel />
@@ -176,7 +176,7 @@
                                     </Style>
                                 </ContextMenu.Style>
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding AddProject}"
                                     Header="{snet:Loc 添加项}"
@@ -193,7 +193,7 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding UpdateProject}"
                                     Header="{snet:Loc 修改项}"
@@ -210,7 +210,7 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding AddDevice}"
                                     Header="{snet:Loc 添加设备}"
@@ -240,7 +240,7 @@
                                     </Separator.Style>
                                 </Separator>
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding ExpandProject}"
                                     Header="{snet:Loc 展开}"
@@ -257,7 +257,7 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding CollapseProject}"
                                     Header="{snet:Loc 折叠}"
@@ -274,7 +274,7 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding ExpandAllProject}"
                                     Header="{snet:Loc 展开所有}"
@@ -291,7 +291,7 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding CollapseAllProject}"
                                     Header="{snet:Loc 折叠所有}"
@@ -322,7 +322,7 @@
                                 </Separator>
 
                                 <uis:MenuItem
-                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                                    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding Remove}"
                                     Header="{snet:Loc 移除}"

@@ -14,7 +14,7 @@
     xmlns:view="clr-namespace:Snet.Iot.Daq.view"
     Width="1100"
     MaxHeight="900"
-    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+    snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
     snet:ResxLocalizationProvider.DefaultDictionary="Language">
     <UserControl.DataContext>
         <model:HandlerModel />
@@ -150,7 +150,7 @@
 
                     <DataGridTextColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         Binding="{Binding Address}"
                         CellStyle="{StaticResource DataGridCellStyle}"
@@ -179,7 +179,7 @@
 
                     <DataGridTextColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         Binding="{Binding Describe}"
                         CellStyle="{StaticResource DataGridCellStyle}"
@@ -208,7 +208,7 @@
 
                     <DataGridTextColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         Binding="{Binding StartBit}"
                         CellStyle="{StaticResource DataGridCellStyle}"
@@ -237,7 +237,7 @@
 
                     <DataGridTextColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         Binding="{Binding Length}"
                         CellStyle="{StaticResource DataGridCellStyle}"
@@ -267,7 +267,7 @@
 
                     <ui:DataGridComboBoxColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         DisplayMemberPath="Key"
                         HeaderStyle="{StaticResource DataGridColumnHeaderStyle}"
@@ -297,7 +297,7 @@
 
                     <ui:DataGridComboBoxColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         DisplayMemberPath="Key"
                         HeaderStyle="{StaticResource DataGridColumnHeaderStyle}"
@@ -327,7 +327,7 @@
 
                     <ui:DataGridComboBoxColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         DisplayMemberPath="Key"
                         HeaderStyle="{StaticResource DataGridColumnHeaderStyle}"
@@ -357,7 +357,7 @@
 
                     <DataGridTextColumn
                         Width="*"
-                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq"
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         Binding="{Binding BoolIndex}"
                         CellStyle="{StaticResource DataGridCellStyle}"

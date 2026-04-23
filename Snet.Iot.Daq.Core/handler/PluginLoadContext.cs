@@ -1,8 +1,7 @@
-using System.IO;
 using System.Reflection;
 using System.Runtime.Loader;
 
-namespace Snet.Iot.Daq.handler
+namespace Snet.Iot.Daq.Core.handler
 {
     /// <summary>
     /// 可回收的插件程序集加载上下文<br/>

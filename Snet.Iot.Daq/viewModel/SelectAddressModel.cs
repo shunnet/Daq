@@ -1,9 +1,9 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Utility;
 using Snet.Windows.Controls.message;
-using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -80,9 +80,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public int PageIndex
         {
-            get => GetProperty(() => PageIndex);
-            set => SetProperty(() => PageIndex, value);
+            get => pageIndex;
+            set => SetProperty(ref pageIndex, value);
         }
+        private int pageIndex = 1;
         #endregion
 
         #region 命令
@@ -91,7 +92,7 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand QueryAddress => queryAddress ??= new AsyncRelayCommand(QueryAddressAsync);
         private IAsyncRelayCommand? queryAddress;
-        private async Task QueryAddressAsync()
+        public async Task QueryAddressAsync()
         {
             if (QueryCntent.IsNullOrWhiteSpace())
             {

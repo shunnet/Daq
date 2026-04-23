@@ -1,10 +1,12 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Opc.Ua;
 using Snet.Core.handler;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.handler;
+using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Model.@enum;
 using Snet.Utility;
@@ -100,7 +102,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 地址索引缓存（避免热路径每次重建）
         /// </summary>
-        private Dictionary<string, AddressModel> _addressIndex = new();
+        private Dictionary<string, IAddressModel> _addressIndex = new();
 
         /// <summary>
         /// MQ插件映射缓存（避免热路径每次重建）
@@ -195,7 +197,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 地址数据
         /// </summary>
-        private ConcurrentDictionary<AddressModel, List<PluginConfigModel>> AddressDatas
+        private ConcurrentDictionary<IAddressModel, List<PluginConfigModel>> AddressDatas
         {
             get => GetProperty(() => AddressDatas);
             set => SetProperty(() => AddressDatas, value);
@@ -204,7 +206,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 项目详情
         /// </summary>
-        private ProjectTreeViewModel Project
+        private IProjectTreeViewModel Project
         {
             get => GetProperty(() => Project);
             set => SetProperty(() => Project, value);
@@ -432,7 +434,7 @@ namespace Snet.Iot.Daq.viewModel
                 if (key != null && DaqData.AutoPack != null)
                 {
                     autoPack ??= AutoPackHandler.Instance(key);
-                    List<AddressModel>? models = autoPack.AddressAutoPack(AddressDatas.Keys.ToList(), key, DaqData.AutoPack.MaxByteLength, DaqData.AutoPack.Format);
+                    List<IAddressModel>? models = autoPack.AddressAutoPack(AddressDatas.Keys.ToList(), key, DaqData.AutoPack.MaxByteLength, DaqData.AutoPack.Format);
                     if (models != null)
                     {
                         result = await daqHandler.SubscribeAsync(DaqData.Guid, models);
@@ -865,7 +867,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 字节转换并转发结果到 UA 通道和 MQ
         /// </summary>
-        private async Task TransformAndForwardAsync(AddressValue addressValue, List<BytesModel> bm, AddressModel addressModel, List<PluginConfigModel> pluginConfigs)
+        private async Task TransformAndForwardAsync(AddressValue addressValue, List<BytesModel> bm, IAddressModel addressModel, List<PluginConfigModel> pluginConfigs)
         {
             bytesHandler ??= await BytesHandler.InstanceAsync(DeviceName);
 
@@ -897,7 +899,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// MQ传输
         /// </summary>
-        private async Task MqTransmissionAsync(Dictionary<AddressModel, AddressValue> inParam, List<PluginConfigModel> pluginConfigs)
+        private async Task MqTransmissionAsync(Dictionary<IAddressModel, AddressValue> inParam, List<PluginConfigModel> pluginConfigs)
         {
             foreach (var item in pluginConfigs)
             {
@@ -935,7 +937,7 @@ namespace Snet.Iot.Daq.viewModel
 
                 foreach (var model in item.Value)
                 {
-                    MqPluginPath.Add(PluginHandler.GetPluginPath(model.Name));
+                    MqPluginPath.Add(PluginHandlerCore.GetPluginPath(model.Name));
                 }
             }
         }
@@ -944,9 +946,9 @@ namespace Snet.Iot.Daq.viewModel
         /// 设置
         /// </summary>
         /// <param name="model">项目信息</param>
-        public async Task SettingsAsync(ProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
+        public async Task SettingsAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
-            DaqPluginPath = PluginHandler.GetPluginPath(model.DaqDetails.Name);
+            DaqPluginPath = PluginHandlerCore.GetPluginPath(model.DaqDetails.Name);
             ResultAsync = resultAsync;
             ShowAsync = showAsync;
             Project = model;

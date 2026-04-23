@@ -1,4 +1,6 @@
 ﻿using Snet.Core.handler;
+using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mqtt.service;
 using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.view;
@@ -37,7 +39,7 @@ namespace Snet.Iot.Daq.data
         /// <summary>
         /// 地址数据
         /// </summary>
-        public static readonly ConcurrentDictionary<string, AddressModel> AddressDict = new();
+        public static readonly ConcurrentDictionary<string, IAddressModel> AddressDict = new();
 
         /// <summary>
         /// 设备 / 插件数据
@@ -47,7 +49,7 @@ namespace Snet.Iot.Daq.data
         /// <summary>
         /// 项目数据
         /// </summary>
-        public static ObservableCollection<ProjectTreeViewModel> ProjectDict { get; set; }
+        public static ObservableCollection<IProjectTreeViewModel> ProjectDict { get; set; }
 
         /// <summary>
         /// 数据库路径
@@ -205,6 +207,6 @@ namespace Snet.Iot.Daq.data
         /// 托盘设备状态集合，供系统托盘右键菜单绑定使用。<br/>
         /// 由 ConsoleModel 在刷新设备时同步维护。
         /// </summary>
-        public static ObservableCollection<Snet.Iot.Daq.viewModel.ConsoleDeviceModel> TrayDevices { get; } = new();
+        public static ObservableCollection<ConsoleDeviceModel> TrayDevices { get; } = new();
     }
 }

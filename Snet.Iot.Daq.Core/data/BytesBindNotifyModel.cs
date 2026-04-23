@@ -2,11 +2,10 @@
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Model.@enum;
 using Snet.Utility;
-using Snet.Windows.Controls.data;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 
-namespace Snet.Iot.Daq.data
+namespace Snet.Iot.Daq.Core.data
 {
     /// <summary>
     /// 字节绑定通知模型
@@ -111,7 +110,7 @@ namespace Snet.Iot.Daq.data
             get => address;
             set => SetProperty(ref address, value);
         }
-        private string address = "请输入地址名称".GetLanguageValue(App.LanguageOperate);
+        private string address = "请输入地址名称".GetLanguageValue(Core.LanguageOperate);
 
         /// <summary>
         /// 描述
@@ -122,7 +121,7 @@ namespace Snet.Iot.Daq.data
             get => describe;
             set => SetProperty(ref describe, value);
         }
-        private string describe = "请输入描述".GetLanguageValue(App.LanguageOperate);
+        private string describe = "请输入描述".GetLanguageValue(Core.LanguageOperate);
 
         /// <summary>
         /// 起始位
@@ -198,17 +197,6 @@ namespace Snet.Iot.Daq.data
             }
         }
 
-
-
-
-
-
-
-
-
-
-
-
         /// <summary>
         /// 编码类型
         /// </summary>
@@ -250,12 +238,6 @@ namespace Snet.Iot.Daq.data
                 EncodingType = (EncodingType)value.Value;
             }
         }
-
-
-
-
-
-
 
         /// <summary>
         /// 数据格式

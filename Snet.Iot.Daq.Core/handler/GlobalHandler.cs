@@ -1,6 +1,6 @@
 ﻿using System.Text;
 
-namespace Snet.Iot.Daq.handler
+namespace Snet.Iot.Daq.Core.handler
 {
     /// <summary>
     /// 全局工具处理类<br/>

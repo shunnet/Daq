@@ -1,7 +1,6 @@
-﻿using MaterialDesignThemes.Wpf;
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 
-namespace Snet.Iot.Daq.@interface
+namespace Snet.Iot.Daq.Core.@interface
 {
     /// <summary>
     /// 树节点模型接口
@@ -11,7 +10,7 @@ namespace Snet.Iot.Daq.@interface
         /// <summary>
         /// 节点图片
         /// </summary>
-        PackIconKind Icon { get; set; }
+        object Icon { get; set; }
 
         /// <summary>
         /// 节点名称

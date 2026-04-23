@@ -4,7 +4,7 @@ using SQLite;
 using System.ComponentModel;
 using System.Text.Json.Serialization;
 
-namespace Snet.Iot.Daq.data
+namespace Snet.Iot.Daq.Core.data
 {
     /// <summary>
     /// 采集插件操作模型
