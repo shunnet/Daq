@@ -260,6 +260,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? updateProject;
         private async Task UpdateProjectAsync()
         {
+            string name = ProjectNodeSelectedItem.Name;
             GlobalConfigModel.param.SetBasics(ProjectNodeSelectedItem);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
@@ -271,6 +272,10 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 await ProjectNodeSelectedItem?.SetAsync(ProjectNode);
                 await GlobalConfigModel.RefreshAsync();
+            }
+            else
+            {
+                ProjectNodeSelectedItem.Name = name;
             }
         }
 
@@ -396,7 +401,7 @@ namespace Snet.Iot.Daq.viewModel
             _ = model?.SetAsync(ProjectNode).ConfigureAwait(false);
             if (model?.NodeType == ProjectNodeType.Device)
             {
-                (ProjectDetails view, ProjectDetailsModel model) details = ProjectNode.CreateDetails(model);
+                ProjectNode.CreateDetails(model);
                 _ = AddSelectDeviceNodeAsync(model).ConfigureAwait(false);
             }
         }

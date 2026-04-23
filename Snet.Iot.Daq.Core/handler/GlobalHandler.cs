@@ -60,5 +60,20 @@ namespace Snet.Iot.Daq.Core.handler
             sb.Append(ellipsis);
             return sb.ToString();
         }
+
+        /// <summary>
+        /// 解析首选类型
+        /// </summary>
+        /// <param name="typeNames">类型名称</param>
+        /// <returns>指定类型</returns>
+        public static Type? ResolvePreferredType(params string[] typeNames)
+        {
+            foreach (var name in typeNames)
+            {
+                var t = Type.GetType(name, throwOnError: false);
+                if (t != null) return t;
+            }
+            return null;
+        }
     }
 }

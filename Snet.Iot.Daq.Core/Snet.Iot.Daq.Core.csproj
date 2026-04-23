@@ -33,8 +33,4 @@
 			<LastGenOutput>Language.Designer.cs</LastGenOutput>
 		</EmbeddedResource>
 	</ItemGroup>
-
-	<ItemGroup>
-	  <Folder Include="chart\" />
-	</ItemGroup>
 </Project>

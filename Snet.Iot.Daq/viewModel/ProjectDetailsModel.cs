@@ -443,7 +443,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (!QueryCntent.IsNullOrWhiteSpace())
             {
-                IProjectDetailsTreeViewModel? project = DetailsNode.FindByName(QueryCntent);
+                ProjectDetailsTreeViewModel? project = DetailsNode.FindByName(QueryCntent) as ProjectDetailsTreeViewModel;
                 if (project is not null)
                 {
                     _ = project?.SetAsync(DetailsNode).ConfigureAwait(false);
