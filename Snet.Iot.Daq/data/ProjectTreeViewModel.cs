@@ -48,13 +48,7 @@ namespace Snet.Iot.Daq.data
             UpdateSpecialData();
         }
 
-        /// <summary>
-        /// 设置<br/>
-        /// 唯一选中<br/>
-        /// 父级关系<br/>
-        /// 展开所有父级<br/>
-        /// </summary>
-        /// <param name="models">外部的集合</param>
+        /// <inheritdoc/>
         public override async Task SetAsync(ObservableCollection<IProjectTreeViewModel> models)
         {
             //设置父级关系
@@ -72,9 +66,7 @@ namespace Snet.Iot.Daq.data
             }));
         }
 
-        /// <summary>
-        /// 设备详情 - 采集设备
-        /// </summary>
+        /// <inheritdoc/>
         [Browsable(false)]
         [Description("设备详情")]
         public override PluginConfigModel DaqDetails

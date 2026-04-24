@@ -27,6 +27,7 @@ namespace Snet.Iot.Daq.data
             set => SetProperty(() => ExpandParam, value);
         }
 
+        /// <inheritdoc/>
         public override async Task UpdateAsync()
         {
             IAddressModel? model = null;
@@ -69,9 +70,7 @@ namespace Snet.Iot.Daq.data
             }
         }
 
-        /// <summary>
-        /// 撤销修改
-        /// </summary>
+        /// <inheritdoc/>
         public override void Revoke(int index)
         {
             AddressModel model = GlobalConfigModel.sqliteOperate.Table<AddressModel>().FirstOrDefault(x => x.Index == index);

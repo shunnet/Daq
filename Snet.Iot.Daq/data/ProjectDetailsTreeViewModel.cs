@@ -37,13 +37,7 @@ namespace Snet.Iot.Daq.data
             Icon = PackIconKind.Transfer;
         }
 
-        /// <summary>
-        /// 设置<br/>
-        /// 唯一选中<br/>
-        /// 父级关系<br/>
-        /// 展开所有父级<br/>
-        /// </summary>
-        /// <param name="models">外部的集合</param>
+        /// <inheritdoc/>
         public override async Task SetAsync(ObservableCollection<IProjectDetailsTreeViewModel> models)
         {
             //设置父级关系

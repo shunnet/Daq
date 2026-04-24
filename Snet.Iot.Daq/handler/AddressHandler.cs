@@ -8,8 +8,7 @@ using System.Collections.Concurrent;
 namespace Snet.Iot.Daq.handler
 {
     /// <summary>
-    /// 地址处理静态类<br/>
-    /// 提供地址数据的 CRUD 操作，包括 SQLite 批量插入、全局字典管理等功能
+    /// 地址处理静态类
     /// </summary>
     public static class AddressHandler
     {
