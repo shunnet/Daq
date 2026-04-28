@@ -2,13 +2,13 @@
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
-using Snet.Iot.Daq.Core.@enum;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
+using Snet.Model.@enum;
 using Snet.Utility;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;

@@ -9,6 +9,7 @@ using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Iot.Daq.view;
+using Snet.Model.@enum;
 using Snet.Utility;
 using System.Collections.ObjectModel;
 using System.IO;

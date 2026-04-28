@@ -937,7 +937,7 @@ namespace Snet.Iot.Daq.viewModel
 
                 foreach (var model in item.Value)
                 {
-                    MqPluginPath.Add(PluginHandlerCore.GetPluginPath(model.Name));
+                    MqPluginPath.Add(PluginHandlerCore.pluginOperate.GetPluginPath(model.Name));
                 }
             }
         }
@@ -948,7 +948,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <param name="model">项目信息</param>
         public async Task SettingsAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
-            DaqPluginPath = PluginHandlerCore.GetPluginPath(model.DaqDetails.Name);
+            DaqPluginPath = PluginHandlerCore.pluginOperate.GetPluginPath(model.DaqDetails.Name);
             ResultAsync = resultAsync;
             ShowAsync = showAsync;
             Project = model;

@@ -1,6 +1,6 @@
-﻿using Snet.Iot.Daq.Core.data;
-using Snet.Iot.Daq.Core.@enum;
-using Snet.Iot.Daq.Core.mvvm;
+﻿using Snet.Iot.Daq.Core.mvvm;
+using Snet.Model.data;
+using Snet.Model.@enum;
 
 namespace Snet.Iot.Daq.Core.data
 {
@@ -21,7 +21,7 @@ namespace Snet.Iot.Daq.Core.data
         /// <param name="version">版本</param>
         /// <param name="time">添加时间</param>
         /// <param name="pluginDetails">插件详情数据</param>
-        public PluginListModel(string name, PluginType type, string version, DateTime time, PluginDetailsModel pluginDetails)
+        public PluginListModel(string name, PluginType type, string version, DateTime time, PluginModel pluginDetails)
         {
             Name = name;
             Type = type;
@@ -69,7 +69,7 @@ namespace Snet.Iot.Daq.Core.data
         /// <summary>
         /// 插件详情数据
         /// </summary>
-        public PluginDetailsModel PluginDetails { get; set; }
+        public PluginModel PluginDetails { get; set; }
 
     }
 }

@@ -2,12 +2,12 @@
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
-using Snet.Iot.Daq.Core.@enum;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
+using Snet.Model.@enum;
 using Snet.Utility;
 using Snet.Windows.Controls.@enum;
 using Snet.Windows.Controls.handler;
@@ -281,7 +281,7 @@ namespace Snet.Iot.Daq.viewModel
                             });
                             break;
                     }
-                    PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.PluginPath == libPath);
+                    PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.Path == libPath);
                     await PrivateRemovalPlugin();
                 }
 
@@ -292,16 +292,16 @@ namespace Snet.Iot.Daq.viewModel
                 string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
 
                 //获取基础数据
-                List<(PluginDetailsModel Model, object? Param)> result = PluginHandlerCore.InitPlugin(libPath, iName);
+                List<(PluginModel Model, object? Param)> result = PluginHandlerCore.pluginOperate.InitPlugin(libPath, iName);
                 if (result.Count > 0)
                 {
                     foreach (var item in result)
                     {
                         //存入本地，方便下次初始化
-                        PluginDetailsModel details = item.Model;
+                        PluginModel details = item.Model;
 
                         //设置插件路径
-                        details.PluginPath = libPath;
+                        details.Path = libPath;
 
                         //添加到集合
                         PluginList.Add(new PluginListModel(details.Name, plugin, details.Version, DateTime.Now, details));
@@ -395,37 +395,37 @@ namespace Snet.Iot.Daq.viewModel
         private async Task PrivateRemovalPlugin()
         {
             string name = PluginListSelectedItem.Name;
-            PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
+            PluginModel details = PluginListSelectedItem.PluginDetails;
 
             switch (PluginListSelectedItem.Type)
             {
                 case PluginType.Daq:
                     //停止该驱动所有连接停止采集
-                    GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.PluginPath == d.DaqPluginPath).ToList().ForEach(d =>
+                    GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.Path == d.DaqPluginPath).ToList().ForEach(d =>
                     {
                         d.Stop.Execute(null);
                     });
                     break;
                 case PluginType.Mq:
-                    GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(details.PluginPath)).ToList().ForEach(d =>
+                    GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(details.Path)).ToList().ForEach(d =>
                     {
                         d.Stop.Execute(null);
                     });
                     break;
             }
 
-            if (await PluginHandlerCore.RemovePluginAsync(details.Name))
+            if (await PluginHandlerCore.pluginOperate.RemovePluginAsync(details.Name))
             {
                 //强制 GC 回收已卸载的程序集上下文，确保释放所有残留引用
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                Directory.Delete(details.PluginPath, true);  //删除插件文件夹
+                Directory.Delete(details.Path, true);  //删除插件文件夹
             }
 
             //查询插件路径是否还有一致的，有的话一并删除
             for (int i = PluginList.Count - 1; i >= 0; i--)
             {
-                if (PluginList[i].PluginDetails.PluginPath == details.PluginPath)
+                if (PluginList[i].PluginDetails.Path == details.Path)
                 {
                     PluginList.RemoveAt(i);
                 }
@@ -441,8 +441,8 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? addPluginConfig;
         private async Task AddPluginConfigAsync()
         {
-            PluginDetailsModel details = PluginListSelectedItem.PluginDetails;
-            object? obj = PluginHandlerCore.GetPluginParamObject(string.Format(GlobalConfigModel.InterfaceFullName, PluginListSelectedItem.Type), details.Name);
+            PluginModel details = PluginListSelectedItem.PluginDetails;
+            object? obj = PluginHandlerCore.pluginOperate.GetPluginParamObject(string.Format(GlobalConfigModel.InterfaceFullName, PluginListSelectedItem.Type), details.Name);
             GlobalConfigModel.param.SetBasics(obj);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
@@ -496,7 +496,7 @@ namespace Snet.Iot.Daq.viewModel
                     PluginType plugin = item.Type;
                     //接口名称
                     string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
-                    item.Status = (await PluginHandlerCore.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
+                    item.Status = (await PluginHandlerCore.pluginOperate.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
                 }
             });
         }
@@ -508,7 +508,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? updatePluginConfig;
         private async Task UpdatePluginConfigAsync()
         {
-            object? obj = PluginHandlerCore.ConvertPluginJsonParam(PluginConfigSelectedItem.Name, PluginConfigSelectedItem.Param);
+            object? obj = PluginHandlerCore.pluginOperate.ConvertPluginJsonParam(PluginConfigSelectedItem.Name, PluginConfigSelectedItem.Param);
 
             //获取旧的唯一标识符
             Type type = obj.GetType();

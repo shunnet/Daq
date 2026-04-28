@@ -151,7 +151,7 @@ namespace Snet.Iot.Daq
             //初始化插件
             foreach (var item in plugins)
             {
-                PluginHandlerCore.InitPlugin(item.PluginDetails.PluginPath, string.Format(GlobalConfigModel.InterfaceFullName, item.Type));
+                PluginHandlerCore.pluginOperate.InitPlugin(item.PluginDetails.Path, string.Format(GlobalConfigModel.InterfaceFullName, item.Type));
             }
 
             //获取所有已存在的插件
