@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        arch: [win-x64, win-x86]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version from .csproj
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$csproj = Get-Content Snet.Iot.Daq/Snet.Iot.Daq.csproj -Raw
+          $ver = $csproj.Project.PropertyGroup.Version
+          if (-not $ver) { $ver = "1.0.0" }
+          echo "VERSION=$ver" >> $env:GITHUB_OUTPUT
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Build (${{ matrix.arch }})
+        run: |
+          dotnet publish Snet.Iot.Daq/Snet.Iot.Daq.csproj `
+            -c Release `
+            -r ${{ matrix.arch }} `
+            --self-contained false `
+            -p:Version=${{ steps.version.outputs.VERSION }} `
+            -o publish/${{ matrix.arch }}
+
+      - name: Create ZIP (${{ matrix.arch }})
+        shell: pwsh
+        run: Compress-Archive -Path publish/${{ matrix.arch }}/* -DestinationPath "publish/Snet.Iot.Daq-v${{ steps.version.outputs.VERSION }}-${{ matrix.arch }}.zip"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snet.Iot.Daq-${{ matrix.arch }}
+          path: publish/*.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          VER=$(grep -oP '<Version>\K[^<]+' Snet.Iot.Daq/Snet.Iot.Daq.csproj | head -1)
+          echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Snet.Iot.Daq-*
+          path: publish
+          merge-multiple: true
+
+      - name: Delete old tag & release (manual dispatch only)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git push origin ":refs/tags/v${{ steps.version.outputs.VERSION }}" 2>/dev/null || true
+          git tag -d "v${{ steps.version.outputs.VERSION }}" 2>/dev/null || true
+          gh release delete "v${{ steps.version.outputs.VERSION }}" --yes 2>/dev/null || true
+          git tag -a "v${{ steps.version.outputs.VERSION }}" -m "Release v${{ steps.version.outputs.VERSION }}"
+          git push origin "v${{ steps.version.outputs.VERSION }}"
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "v${{ steps.version.outputs.VERSION }}"
+          tag_name: "v${{ steps.version.outputs.VERSION }}"
+          files: publish/*.zip
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
