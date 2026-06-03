@@ -1,6 +1,7 @@
 ﻿using NuGet.Versioning;
 using Snet.Core.extend;
 using Snet.Iot.Daq.Core.data;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -123,6 +124,9 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>用于 HTTP 请求的客户端，生命周期由本类管理</summary>
         private readonly HttpClient _httpClient;
 
+        /// <summary>版本发布时间缓存，避免同一包的注册索引被重复请求</summary>
+        private readonly ConcurrentDictionary<string, Dictionary<string, DateTime>> _versionTimesCache = new(StringComparer.OrdinalIgnoreCase);
+
         /// <summary>
         /// 无参构造函数（建议仅在反射/序列化时使用）
         /// </summary>
@@ -132,7 +136,10 @@ namespace Snet.Iot.Daq.Core.handler
             {
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             };
-            _httpClient = new HttpClient(handler);
+            _httpClient = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
         }
 
         /// <summary>
@@ -144,7 +151,10 @@ namespace Snet.Iot.Daq.Core.handler
             {
                 AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
             };
-            _httpClient = new HttpClient(handler);
+            _httpClient = new HttpClient(handler)
+            {
+                Timeout = TimeSpan.FromSeconds(30)
+            };
         }
 
         #region 核心方法
@@ -155,25 +165,26 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         /// <param name="includePrerelease">是否包含预发行版本，默认 false（仅稳定版）</param>
         /// <returns>成功获取的元数据列表</returns>
-        public async Task<List<NuspecMetadata>> GetNuspecAsync(bool includePrerelease = false)
+        public async Task<List<NuspecMetadata>> GetNuspecAsync(bool includePrerelease = false, CancellationToken cancellationToken = default)
         {
-            var metadataList = new List<NuspecMetadata>();
-            foreach (var packageName in _plugins)
-            {
-                try
+            var results = new ConcurrentBag<NuspecMetadata>();
+            await Parallel.ForEachAsync(_plugins,
+                new ParallelOptions { MaxDegreeOfParallelism = 8, CancellationToken = cancellationToken },
+                async (packageName, ct) =>
                 {
-                    // 重载方法内部已处理版本选择与 XML 下载
-                    var metadata = await GetNuspecAsync(packageName, version: null, includePrerelease);
-                    if (metadata != null)
-                        metadataList.Add(metadata);
-                }
-                catch (Exception ex)
-                {
-                    // 单个包失败不应影响其余包的获取
-                    System.Diagnostics.Debug.WriteLine($"获取包 {packageName} 信息失败: {ex.Message}");
-                }
-            }
-            return metadataList;
+                    try
+                    {
+                        var metadata = await GetNuspecAsync(packageName, version: null, includePrerelease, ct);
+                        if (metadata != null)
+                            results.Add(metadata);
+                    }
+                    catch (Exception ex)
+                    {
+                        System.Diagnostics.Debug.WriteLine($"获取包 {packageName} 信息失败: {ex.Message}");
+                    }
+                });
+
+            return results.ToList();
         }
 
         /// <summary>
@@ -183,7 +194,7 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="version">版本号（可选），为 null 时自动获取最新稳定版</param>
         /// <param name="includePrerelease">仅在 version 为 null 时生效，是否包含预发行版本</param>
         /// <returns>解析后的元数据对象</returns>
-        public async Task<NuspecMetadata> GetNuspecAsync(string packageName, string version = null, bool includePrerelease = false)
+        public async Task<NuspecMetadata> GetNuspecAsync(string packageName, string version = null, bool includePrerelease = false, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(packageName))
                 throw new ArgumentException("包名不能为空", nameof(packageName));
@@ -213,7 +224,7 @@ namespace Snet.Iot.Daq.Core.handler
 
             // 2. 构建 nuspec 文件 URL 并下载
             string nuspecUrl = $"https://api.nuget.org/v3-flatcontainer/{lowerName}/{version}/{lowerName}.nuspec";
-            var response = await _httpClient.GetAsync(nuspecUrl);
+            var response = await _httpClient.GetAsync(nuspecUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             string xml = await response.Content.ReadAsStringAsync();
@@ -227,12 +238,12 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="version">版本号，为 null 时获取最新稳定版</param>
         /// <param name="includePrerelease">是否包含预发行版</param>
         /// <param name="index">序号（用于列表显示）</param>
-        public async Task<PluginBrowseDataGridModel> GetPluginBrowseDataGridModelAsync(string packageName, string version = null, bool includePrerelease = false, int index = 0)
+        public async Task<PluginBrowseDataGridModel> GetPluginBrowseDataGridModelAsync(string packageName, string version = null, bool includePrerelease = false, int index = 0, CancellationToken cancellationToken = default)
         {
             // 1. 获取 nuspec 元数据（包含作者、描述、图标等）
-            var metadata = await GetNuspecAsync(packageName, version, includePrerelease);
+            var metadata = await GetNuspecAsync(packageName, version, includePrerelease, cancellationToken);
 
-            // 2. 获取发布时间（若调用时未指定版本，则已通过版本列表获取，可复用）
+            // 2. 获取发布时间（利用缓存，GetNuspecAsync 内部已填充）
             DateTime publishedTime = await GetPublishedTimeAsync(packageName, metadata.Version);
 
             // 3. 下载图标为字节数组
@@ -306,6 +317,9 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         private async Task<Dictionary<string, DateTime>> GetVersionPublishedTimesAsync(string lowerPackageName)
         {
+            if (_versionTimesCache.TryGetValue(lowerPackageName, out var cached))
+                return cached;
+
             string registrationUrl = $"https://api.nuget.org/v3/registration5-gz-semver2/{lowerPackageName}/index.json";
             var response = await _httpClient.GetAsync(registrationUrl);
             response.EnsureSuccessStatusCode();
@@ -334,6 +348,8 @@ namespace Snet.Iot.Daq.Core.handler
                     }
                 }
             }
+
+            _versionTimesCache[lowerPackageName] = dict;
             return dict;
         }
 
@@ -351,7 +367,10 @@ namespace Snet.Iot.Daq.Core.handler
                     resp.EnsureSuccessStatusCode();
                     return await resp.Content.ReadAsByteArrayAsync();
                 }
-                catch { /* 失败则尝试下一个 */ }
+                catch (Exception ex)
+                {
+                    System.Diagnostics.Debug.WriteLine($"旧式 iconUrl 下载失败 ({packageName}): {ex.Message}");
+                }
             }
 
             // 2. 新式内嵌图标（通过 NuGet 统一端点）
@@ -363,7 +382,10 @@ namespace Snet.Iot.Daq.Core.handler
                 resp.EnsureSuccessStatusCode();
                 return await resp.Content.ReadAsByteArrayAsync();
             }
-            catch { }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"NuGet 图标端点下载失败 ({packageName} {version}): {ex.Message}");
+            }
 
             return null;
         }
@@ -377,30 +399,33 @@ namespace Snet.Iot.Daq.Core.handler
         private NuspecMetadata ParseNuspec(string xml)
         {
             var doc = XDocument.Parse(xml);
-            // 尝试获取 <metadata> 元素（忽略命名空间）
             var metadataEl = doc.Root?.Elements()
                 .FirstOrDefault(e => e.Name.LocalName == "metadata");
 
             if (metadataEl == null)
                 throw new FormatException("无效的 .nuspec 文件：缺少 <metadata> 元素。");
 
+            // 一次性扫描所有子元素到字典，避免重复 Linear Scan
+            var elementDict = metadataEl.Elements()
+                .ToDictionary(e => e.Name.LocalName, e => e.Value, StringComparer.OrdinalIgnoreCase);
+
             var md = new NuspecMetadata
             {
-                Id = GetSimpleValue(metadataEl, "id"),
-                Version = GetSimpleValue(metadataEl, "version"),
-                Title = GetSimpleValue(metadataEl, "title"),
-                Authors = GetSimpleValue(metadataEl, "authors"),
-                Owners = GetSimpleValue(metadataEl, "owners"),
-                Description = GetSimpleValue(metadataEl, "description"),
-                ReleaseNotes = GetSimpleValue(metadataEl, "releaseNotes"),
-                Summary = GetSimpleValue(metadataEl, "summary"),
-                Copyright = GetSimpleValue(metadataEl, "copyright"),
-                Tags = GetSimpleValue(metadataEl, "tags"),
-                ProjectUrl = GetSimpleValue(metadataEl, "projectUrl"),
-                IconUrl = GetSimpleValue(metadataEl, "iconUrl"),
-                LicenseUrl = GetSimpleValue(metadataEl, "licenseUrl"),
+                Id = elementDict.GetValueOrDefault("id"),
+                Version = elementDict.GetValueOrDefault("version"),
+                Title = elementDict.GetValueOrDefault("title"),
+                Authors = elementDict.GetValueOrDefault("authors"),
+                Owners = elementDict.GetValueOrDefault("owners"),
+                Description = elementDict.GetValueOrDefault("description"),
+                ReleaseNotes = elementDict.GetValueOrDefault("releaseNotes"),
+                Summary = elementDict.GetValueOrDefault("summary"),
+                Copyright = elementDict.GetValueOrDefault("copyright"),
+                Tags = elementDict.GetValueOrDefault("tags"),
+                ProjectUrl = elementDict.GetValueOrDefault("projectUrl"),
+                IconUrl = elementDict.GetValueOrDefault("iconUrl"),
+                LicenseUrl = elementDict.GetValueOrDefault("licenseUrl"),
                 RequireLicenseAcceptance = string.Equals(
-                    GetSimpleValue(metadataEl, "requireLicenseAcceptance"),
+                    elementDict.GetValueOrDefault("requireLicenseAcceptance"),
                     "true", StringComparison.OrdinalIgnoreCase)
             };
 
@@ -441,14 +466,6 @@ namespace Snet.Iot.Daq.Core.handler
             }
 
             return md;
-        }
-
-        /// <summary>
-        /// 获取指定父元素下第一个匹配 LocalName 的子元素的文本值
-        /// </summary>
-        private static string GetSimpleValue(XElement parent, string localName)
-        {
-            return parent.Elements().FirstOrDefault(e => e.Name.LocalName == localName)?.Value;
         }
 
         #endregion

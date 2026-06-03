@@ -9,13 +9,9 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.AddressTest", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.MqPerformanceTesting", "Snet.Iot.Daq.MqPerformanceTesting\Snet.Iot.Daq.MqPerformanceTesting.csproj", "{766A4681-0AC6-4312-960B-E079ADB11EEE}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Pack.Manage.Tool", "Snet.Pack.Manage.Tool\Snet.Pack.Manage.Tool.csproj", "{29AAC564-8690-EEC0-77CE-40D97468184B}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.Core", "Snet.Iot.Daq.Core\Snet.Iot.Daq.Core.csproj", "{2C9A5818-334A-4C27-B85C-049F950B9069}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "debug", "debug", "{B39AC3F5-1B3B-40EE-8F96-B3C86B3F7FA3}"
-EndProject
-Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tool", "tool", "{54B59276-9F16-49CF-A3B4-52158FEEC903}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -35,10 +31,6 @@ Global
 		{766A4681-0AC6-4312-960B-E079ADB11EEE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{766A4681-0AC6-4312-960B-E079ADB11EEE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{766A4681-0AC6-4312-960B-E079ADB11EEE}.Release|Any CPU.Build.0 = Release|Any CPU
-		{29AAC564-8690-EEC0-77CE-40D97468184B}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{29AAC564-8690-EEC0-77CE-40D97468184B}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{29AAC564-8690-EEC0-77CE-40D97468184B}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{29AAC564-8690-EEC0-77CE-40D97468184B}.Release|Any CPU.Build.0 = Release|Any CPU
 		{2C9A5818-334A-4C27-B85C-049F950B9069}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{2C9A5818-334A-4C27-B85C-049F950B9069}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C9A5818-334A-4C27-B85C-049F950B9069}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -50,7 +42,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{295DC98C-E8FE-400E-959D-C9048771E74F} = {B39AC3F5-1B3B-40EE-8F96-B3C86B3F7FA3}
 		{766A4681-0AC6-4312-960B-E079ADB11EEE} = {B39AC3F5-1B3B-40EE-8F96-B3C86B3F7FA3}
-		{29AAC564-8690-EEC0-77CE-40D97468184B} = {54B59276-9F16-49CF-A3B4-52158FEEC903}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {BDF0D381-C17D-4004-892A-571F614EC594}
