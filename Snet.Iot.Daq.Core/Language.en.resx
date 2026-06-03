@@ -679,4 +679,58 @@
   <data name="此插件已上传，是否进行热更新？" xml:space="preserve">
     <value>This plugin has been uploaded. Do you want to perform a hot update?</value>
   </data>
+  <data name="插件浏览" xml:space="preserve">
+    <value>PluginBrowse</value>
+  </data>
+  <data name="包名" xml:space="preserve">
+    <value>PackName</value>
+  </data>
+  <data name="图标" xml:space="preserve">
+    <value>Icon</value>
+  </data>
+  <data name="选则插件存储路径" xml:space="preserve">
+    <value>Select plugin storage path</value>
+  </data>
+  <data name="打开插件存储路径" xml:space="preserve">
+    <value>Open plugin storage path</value>
+  </data>
+  <data name="清空插件存储路径" xml:space="preserve">
+    <value>Clear plugin storage path</value>
+  </data>
+  <data name="已选择插件存储路径：" xml:space="preserve">
+    <value>Selected plugin storage path:</value>
+  </data>
+  <data name="已清空插件存储路径：" xml:space="preserve">
+    <value>Cleared plugin storage path:</value>
+  </data>
+  <data name="清空插件存储路径失败：" xml:space="preserve">
+    <value>Failed to clear plugin storage path:</value>
+  </data>
+  <data name="插件存储路径不存在" xml:space="preserve">
+    <value>The plugin storage path does not exist</value>
+  </data>
+  <data name="下载选中的插件" xml:space="preserve">
+    <value>Download the selected plugin</value>
+  </data>
+  <data name="是否需要打包 ZIP？只有打包成 zip 文件后才能进行上传！" xml:space="preserve">
+    <value>Do I need to package a ZIP file? Only after packaging it into a zip file can it be uploaded!</value>
+  </data>
+  <data name="停止下载插件" xml:space="preserve">
+    <value>Stop downloading plugins</value>
+  </data>
+  <data name="已停止下载插件" xml:space="preserve">
+    <value>Download plugin stopped</value>
+  </data>
+  <data name="插件下载完成" xml:space="preserve">
+    <value>Plugin download completed</value>
+  </data>
+  <data name="插件下载失败" xml:space="preserve">
+    <value>Plugin download failed</value>
+  </data>
+  <data name="请先选择要下载的插件" xml:space="preserve">
+    <value>Please select the plugin to download first</value>
+  </data>
+  <data name="开始下载插件，请耐心等待" xml:space="preserve">
+    <value>Start downloading the plugin, please be patient and wait</value>
+  </data>
 </root>

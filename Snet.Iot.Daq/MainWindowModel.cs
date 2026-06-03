@@ -1,10 +1,10 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
 using Snet.Model.data;
 using Snet.Windows.Controls.handler;
-using Snet.Iot.Daq.Core.mvvm;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
@@ -83,6 +83,7 @@ namespace Snet.Iot.Daq
         /// <returns>返回主菜单项集合</returns>
         public ObservableCollection<object> MenuItemsOperate(LanguageModel model) => new(){
             WpfUiHandler.CreationControl("主页", SymbolRegular.Home24, typeof(Home),true,model),
+            WpfUiHandler.CreationControl("插件浏览", SymbolRegular.GlobeSurface24, typeof(PluginBrowse),true,model),
             WpfUiHandler.CreationControl("插件设置", SymbolRegular.DocumentQueue20, typeof(PluginSettings),true,model),
             WpfUiHandler.CreationControl("地址设置", SymbolRegular.Fluid20, typeof(AddressSettings),true,model),
             WpfUiHandler.CreationControl("项目设置", SymbolRegular.ProjectionScreen16, typeof(ProjectSettings),true,model),

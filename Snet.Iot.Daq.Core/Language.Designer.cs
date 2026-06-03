@@ -160,6 +160,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 下载选中的插件 的本地化字符串。
+        /// </summary>
+        public static string 下载选中的插件 {
+            get {
+                return ResourceManager.GetString("下载选中的插件", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 不支持类型转换 的本地化字符串。
         /// </summary>
         public static string 不支持类型转换 {
@@ -304,6 +313,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 停止下载插件 的本地化字符串。
+        /// </summary>
+        public static string 停止下载插件 {
+            get {
+                return ResourceManager.GetString("停止下载插件", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 停止采集 的本地化字符串。
         /// </summary>
         public static string 停止采集 {
@@ -412,6 +430,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 包名 的本地化字符串。
+        /// </summary>
+        public static string 包名 {
+            get {
+                return ResourceManager.GetString("包名", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 参数设置 的本地化字符串。
         /// </summary>
         public static string 参数设置 {
@@ -489,6 +516,15 @@ namespace Snet.Iot.Daq.Core {
         public static string 唯一标识符 {
             get {
                 return ResourceManager.GetString("唯一标识符", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 图标 的本地化字符串。
+        /// </summary>
+        public static string 图标 {
+            get {
+                return ResourceManager.GetString("图标", resourceCulture);
             }
         }
         
@@ -691,6 +727,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 已停止下载插件 的本地化字符串。
+        /// </summary>
+        public static string 已停止下载插件 {
+            get {
+                return ResourceManager.GetString("已停止下载插件", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 已启动 的本地化字符串。
         /// </summary>
         public static string 已启动 {
@@ -750,6 +795,15 @@ namespace Snet.Iot.Daq.Core {
         public static string 手动添加一个地址 {
             get {
                 return ResourceManager.GetString("手动添加一个地址", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 打开插件存储路径 的本地化字符串。
+        /// </summary>
+        public static string 打开插件存储路径 {
+            get {
+                return ResourceManager.GetString("打开插件存储路径", resourceCulture);
             }
         }
         
@@ -817,6 +871,24 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 插件下载失败 的本地化字符串。
+        /// </summary>
+        public static string 插件下载失败 {
+            get {
+                return ResourceManager.GetString("插件下载失败", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 插件下载完成 的本地化字符串。
+        /// </summary>
+        public static string 插件下载完成 {
+            get {
+                return ResourceManager.GetString("插件下载完成", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 插件列表 的本地化字符串。
         /// </summary>
         public static string 插件列表 {
@@ -826,11 +898,29 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 插件存储路径不存在 的本地化字符串。
+        /// </summary>
+        public static string 插件存储路径不存在 {
+            get {
+                return ResourceManager.GetString("插件存储路径不存在", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 插件尚未加载 的本地化字符串。
         /// </summary>
         public static string 插件尚未加载 {
             get {
                 return ResourceManager.GetString("插件尚未加载", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 插件浏览 的本地化字符串。
+        /// </summary>
+        public static string 插件浏览 {
+            get {
+                return ResourceManager.GetString("插件浏览", resourceCulture);
             }
         }
         
@@ -1132,6 +1222,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 清空插件存储路径 的本地化字符串。
+        /// </summary>
+        public static string 清空插件存储路径 {
+            get {
+                return ResourceManager.GetString("清空插件存储路径", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 温馨提示 的本地化字符串。
         /// </summary>
         public static string 温馨提示 {
@@ -1375,6 +1474,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 请先选择要下载的插件 的本地化字符串。
+        /// </summary>
+        public static string 请先选择要下载的插件 {
+            get {
+                return ResourceManager.GetString("请先选择要下载的插件", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 请求示例 的本地化字符串。
         /// </summary>
         public static string 请求示例 {
@@ -1479,6 +1587,15 @@ namespace Snet.Iot.Daq.Core {
         public static string 选中 {
             get {
                 return ResourceManager.GetString("选中", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 选则插件存储路径 的本地化字符串。
+        /// </summary>
+        public static string 选则插件存储路径 {
+            get {
+                return ResourceManager.GetString("选则插件存储路径", resourceCulture);
             }
         }
         

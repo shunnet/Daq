@@ -679,4 +679,58 @@
   <data name="此插件已上传，是否进行热更新？" xml:space="preserve">
     <value>此插件已上传，是否进行热更新？</value>
   </data>
+  <data name="插件浏览" xml:space="preserve">
+    <value>插件浏览</value>
+  </data>
+  <data name="包名" xml:space="preserve">
+    <value>包名</value>
+  </data>
+  <data name="图标" xml:space="preserve">
+    <value>图标</value>
+  </data>
+  <data name="选则插件存储路径" xml:space="preserve">
+    <value>选则插件存储路径</value>
+  </data>
+  <data name="打开插件存储路径" xml:space="preserve">
+    <value>打开插件存储路径</value>
+  </data>
+  <data name="清空插件存储路径" xml:space="preserve">
+    <value>清空插件存储路径</value>
+  </data>
+  <data name="已选择插件存储路径：" xml:space="preserve">
+    <value>已选择插件存储路径：</value>
+  </data>
+  <data name="已清空插件存储路径：" xml:space="preserve">
+    <value>已清空插件存储路径：</value>
+  </data>
+  <data name="清空插件存储路径失败：" xml:space="preserve">
+    <value>清空插件存储路径失败：</value>
+  </data>
+  <data name="插件存储路径不存在" xml:space="preserve">
+    <value>插件存储路径不存在</value>
+  </data>
+  <data name="下载选中的插件" xml:space="preserve">
+    <value>下载选中的插件</value>
+  </data>
+  <data name="是否需要打包 ZIP？只有打包成 zip 文件后才能进行上传！" xml:space="preserve">
+    <value>是否需要打包 ZIP？只有打包成 zip 文件后才能进行上传！</value>
+  </data>
+  <data name="停止下载插件" xml:space="preserve">
+    <value>停止下载插件</value>
+  </data>
+  <data name="已停止下载插件" xml:space="preserve">
+    <value>已停止下载插件</value>
+  </data>
+  <data name="插件下载完成" xml:space="preserve">
+    <value>插件下载完成</value>
+  </data>
+  <data name="插件下载失败" xml:space="preserve">
+    <value>插件下载失败</value>
+  </data>
+  <data name="请先选择要下载的插件" xml:space="preserve">
+    <value>请先选择要下载的插件</value>
+  </data>
+  <data name="开始下载插件，请耐心等待" xml:space="preserve">
+    <value>开始下载插件，请耐心等待</value>
+  </data>
 </root>
