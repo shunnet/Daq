@@ -235,14 +235,6 @@ cd Daq
 | 💬 **QQ群** | [点击加群](https://qm.qq.com/q/gPjrD9wGty) — 技术交流与问答 |
 | ⭐ **Star** | 如果这个项目对你有帮助，请点亮 Star 支持我们 ❤️ |
 
-## 📈 Star History
-
-<p align="center">
-  <a href="https://star-history.com/#shunnet/Daq&Date">
-    <img src="https://api.star-history.com/svg?repos=shunnet/Daq&type=Date" alt="Star History Chart" width="600"/>
-  </a>
-</p>
-
 ## 📜 License
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
@@ -252,3 +244,13 @@ cd Daq
 📄 完整条款请阅读 [LICENSE](LICENSE) 文件。
 
 > ⚠️ 软件按「原样」提供，作者不对使用后果承担责任。
+
+## 📈 Star History
+
+<a href="https://www.star-history.com/?repos=shunnet%2FDaq&type=date&legend=bottom-right">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&theme=dark&legend=bottom-right" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right" />
+ </picture>
+</a>
