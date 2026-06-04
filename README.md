@@ -159,32 +159,24 @@ Snet.Iot.Daq 是依托 **Shunnet.top 工业通信库** 开发的插件化数采�
 
 ## 🖥️ 界面展示
 
-<p align="center"><b>🏠 主界面</b></p>
 <p align="center">
   <img src="images/home.png" width="900"/>
 </p>
-
-<p align="center"><b>📊 性能监控</b></p>
+<p align="center">
+  <img src="images/pb.png" width="900"/>
+</p>
 <p align="center">
   <img src="images/ps.png" width="900"/>
 </p>
-
-<p align="center"><b>📡 OPC UA 地址空间</b></p>
 <p align="center">
   <img src="images/as.png" width="900"/>
 </p>
-
-<p align="center"><b>🔌 协议解析器</b></p>
 <p align="center">
   <img src="images/prs.png" width="900"/>
 </p>
-
-<p align="center"><b>⚙️ 采集配置</b></p>
 <p align="center">
   <img src="images/cs.png" width="900"/>
 </p>
-
-<p align="center"><b>🎨 主题定制</b></p>
 <p align="center">
   <img src="images/ccs.png" width="900"/>
 </p>
