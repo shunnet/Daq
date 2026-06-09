@@ -174,14 +174,16 @@
                         </ContextMenu.Style>
 
                         <uis:MenuItem
+                            Margin="0,0,0,3"
                             snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             Command="{Binding Path=DataContext.AddressConfigSelectedItem.Update, RelativeSource={RelativeSource Self}}"
                             Header="{snet:Loc 修改}"
                             Icon="{uis:SymbolIcon Symbol=DualScreenUpdate24,
                                                   Filled=False}" />
-                        <Separator Margin="0,-4,0,-3" Padding="0" />
+                        <Separator />
                         <uis:MenuItem
+                            Margin="0,3,0,0"
                             snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                             snet:ResxLocalizationProvider.DefaultDictionary="Language"
                             Command="{Binding InverseAddress}"

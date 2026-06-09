@@ -259,7 +259,9 @@ namespace Snet.Iot.Daq.viewModel
                 ConcurrentDictionary<string, (string type, bool status)> pluginStatus = new();
                 //是否存在
                 bool exists = directoryInfo.Exists;
-                if (exists)
+                //查找插件列表中是否已存在同名或同路径插件
+                PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.Path == libPath || p.Name == zipName);
+                if (PluginListSelectedItem != null || exists)
                 {
                     if (!await MessageBox.Show("此插件已上传，是否进行热更新？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
                     {
@@ -281,8 +283,10 @@ namespace Snet.Iot.Daq.viewModel
                             });
                             break;
                     }
-                    PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.Path == libPath);
-                    await PrivateRemovalPlugin();
+                    if (PluginListSelectedItem != null)
+                    {
+                        await PrivateRemovalPlugin();
+                    }
                 }
 
                 //解压zip到指定路径
@@ -394,6 +398,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <returns></returns>
         private async Task PrivateRemovalPlugin()
         {
+            if (PluginListSelectedItem == null) return;
             string name = PluginListSelectedItem.Name;
             PluginModel details = PluginListSelectedItem.PluginDetails;
 

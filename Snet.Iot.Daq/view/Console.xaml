@@ -141,7 +141,7 @@
                                     <ToolTip>
                                         <TextBlock>
                                             <Run Text="OpcUa" />
-                                            <Run Text="{snet:Loc 服务数据修改}" />
+                                            <Run Text="{snet:Loc 服务启动}" />
                                         </TextBlock>
                                     </ToolTip>
                                 </Button.ToolTip>

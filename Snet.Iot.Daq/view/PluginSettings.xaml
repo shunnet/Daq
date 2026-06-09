@@ -171,14 +171,16 @@
                                         </Style>
                                     </ContextMenu.Style>
                                     <uis:MenuItem
+                                        Margin="0,0,0,3"
                                         snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                         Command="{Binding AddPluginConfig}"
                                         Header="{snet:Loc 添加插件配置}"
                                         Icon="{uis:SymbolIcon Symbol=Add24,
                                                               Filled=False}" />
-                                    <Separator Margin="0,-4,0,-3" Padding="0" />
+                                    <Separator />
                                     <uis:MenuItem
+                                        Margin="0,3,0,0"
                                         snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                         snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                         Command="{Binding RemovePlugin}"
@@ -455,6 +457,7 @@
                                     Icon="{uis:SymbolIcon Symbol=Copy24,
                                                           Filled=False}" />
                                 <uis:MenuItem
+                                    Margin="0,0,0,3"
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding Produce}"
@@ -563,6 +566,7 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
                                 <uis:MenuItem
+                                    Margin="0,0,0,3"
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding UpdateWebApi}"
@@ -584,7 +588,6 @@
                                     <Separator.Style>
                                         <Style BasedOn="{StaticResource MaterialDesignSeparator}" TargetType="Separator">
                                             <Setter Property="Visibility" Value="Collapsed" />
-                                            <Setter Property="Margin" Value="0,-4,0,-3" />
                                             <Style.Triggers>
                                                 <DataTrigger Binding="{Binding PlacementTarget.DataContext.PluginConfigSelectedItem.Type, RelativeSource={RelativeSource AncestorType=ContextMenu}}" Value="Daq">
                                                     <Setter Property="Visibility" Value="Visible" />
@@ -594,6 +597,7 @@
                                     </Separator.Style>
                                 </Separator>
                                 <uis:MenuItem
+                                    Margin="0,3,0,0"
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding RemoveAutoPack}"
@@ -612,6 +616,7 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
                                 <uis:MenuItem
+                                    Margin="0,0,0,3"
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding RemoveWebApi}"
@@ -630,8 +635,9 @@
                                     </uis:MenuItem.Style>
                                 </uis:MenuItem>
 
-                                <Separator Margin="0,-4,0,-3" Padding="0" />
+                                <Separator />
                                 <uis:MenuItem
+                                    Margin="0,3,0,0"
                                     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
                                     snet:ResxLocalizationProvider.DefaultDictionary="Language"
                                     Command="{Binding RemovePluginConfig}"
