@@ -24,13 +24,13 @@ using System.Windows.Media;
 namespace Snet.Iot.Daq.viewModel
 {
     /// <summary>
-    /// ���������ͼģ�ͣ��ṩ����ϴ�/�Ƴ��������½�/�޸�/ɾ����WebAPI �����Լ����״̬��֤�ȹ��ܡ�
+    /// 插件设置视图模型，提供插件上传/移除、配置新建/修改/删除、WebAPI 设置以及状态验证等功能。
     /// </summary>
     public class PluginSettingsModel : BindNotify
     {
-        #region ���캯��
+        #region 构造函数
         /// <summary>
-        /// ���캯������ʼ�������������
+        /// 构造函数，用于初始化集合和数据
         /// </summary>
         public PluginSettingsModel()
         {
@@ -38,9 +38,9 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        #region ����
+        #region 属性
         /// <summary>
-        /// ����������Դ
+        /// 插件类型下拉框数据源
         /// </summary>
         public ObservableCollection<ComboBoxModel> ComboBoxItemsSource
         {
@@ -50,7 +50,7 @@ namespace Snet.Iot.Daq.viewModel
         private ObservableCollection<ComboBoxModel> _ComboBoxItemsSource = new ObservableCollection<ComboBoxModel>();
 
         /// <summary>
-        /// ��������ѡ�е�����
+        /// 插件类型下拉框选中的项
         /// </summary>
         public ComboBoxModel ComboBoxSelectedItem
         {
@@ -59,7 +59,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �������
+        /// 插件列表
         /// </summary>
         public ObservableCollection<PluginListModel> PluginList
         {
@@ -69,7 +69,7 @@ namespace Snet.Iot.Daq.viewModel
         private ObservableCollection<PluginListModel> _PluginList = new ObservableCollection<PluginListModel>();
 
         /// <summary>
-        /// ���ѡ��
+        /// 列表选中项
         /// </summary>
         public PluginListModel PluginListSelectedItem
         {
@@ -78,7 +78,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ������ü���
+        /// 插件配置集合
         /// </summary>
         public ObservableCollection<PluginConfigModel> PluginConfig
         {
@@ -88,7 +88,7 @@ namespace Snet.Iot.Daq.viewModel
         private ObservableCollection<PluginConfigModel> _PluginConfig = new ObservableCollection<PluginConfigModel>();
 
         /// <summary>
-        /// ѡ�еĲ������
+        /// 选中的插件配置
         /// </summary>
         public PluginConfigModel PluginConfigSelectedItem
         {
@@ -97,9 +97,9 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        #region ����
+        #region 命令
         /// <summary>
-        /// �����Զ����
+        /// 设置自动组包
         /// </summary>
         public IAsyncRelayCommand SettingsAutoPack => p_SettingsAutoPack ??= new AsyncRelayCommand(SettingsAutoPackAsync);
         private IAsyncRelayCommand p_SettingsAutoPack;
@@ -107,7 +107,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.AutoPack is not null)
             {
-                await Windows.Controls.message.MessageBox.Show("����ʧ�ܣ��Ѵ���".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("设置失败，已存在".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
@@ -117,13 +117,13 @@ namespace Snet.Iot.Daq.viewModel
                     PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
                     PluginConfigSelectedItem?.SetPlugin();
                     SavePluginConfig();
-                    await Windows.Controls.message.MessageBox.Show("���óɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
         }
 
         /// <summary>
-        /// �޸��Զ����
+        /// 修改自动组包
         /// </summary>
         public IAsyncRelayCommand UpdateAutoPack => p_UpdateAutoPack ??= new AsyncRelayCommand(UpdateAutoPackAsync);
         private IAsyncRelayCommand p_UpdateAutoPack;
@@ -131,7 +131,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.AutoPack is null)
             {
-                await Windows.Controls.message.MessageBox.Show("�޸�ʧ�ܣ���δ����".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("修改失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
@@ -141,13 +141,13 @@ namespace Snet.Iot.Daq.viewModel
                     PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
                     PluginConfigSelectedItem?.SetPlugin();
                     SavePluginConfig();
-                    await Windows.Controls.message.MessageBox.Show("�޸ĳɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    await Windows.Controls.message.MessageBox.Show("修改成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
         }
 
         /// <summary>
-        /// �Ƴ��Զ����
+        /// 移除自动组包
         /// </summary>
         public IAsyncRelayCommand RemoveAutoPack => p_RemoveAutoPack ??= new AsyncRelayCommand(RemoveAutoPackAsync);
         private IAsyncRelayCommand p_RemoveAutoPack;
@@ -155,20 +155,20 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.AutoPack is null)
             {
-                await Windows.Controls.message.MessageBox.Show("�Ƴ�ʧ�ܣ���δ����".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("移除失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
                 PluginConfigSelectedItem?.AutoPack = null;
                 PluginConfigSelectedItem?.SetPlugin();
                 SavePluginConfig();
-                await Windows.Controls.message.MessageBox.Show("�Ƴ��ɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
             }
         }
 
 
         /// <summary>
-        /// ����WEBapi
+        /// 设置 WEBapi
         /// </summary>
         public IAsyncRelayCommand SettingsWebApi => p_SettingsWebApi ??= new AsyncRelayCommand(SettingsWebApiAsync);
         private IAsyncRelayCommand p_SettingsWebApi;
@@ -176,7 +176,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.WebApi is not null)
             {
-                await Windows.Controls.message.MessageBox.Show("����ʧ�ܣ��Ѵ���".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("设置失败，已存在".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
@@ -186,13 +186,13 @@ namespace Snet.Iot.Daq.viewModel
                     PluginConfigSelectedItem?.WebApi = GlobalConfigModel.param.GetBasics().GetSource<WAModel>();
                     PluginConfigSelectedItem?.SetPlugin();
                     SavePluginConfig();
-                    await Windows.Controls.message.MessageBox.Show("���óɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
         }
 
         /// <summary>
-        /// �޸�WEBapi
+        /// 修改 WEBapi
         /// </summary>
         public IAsyncRelayCommand UpdateWebApi => p_UpdateWebApi ??= new AsyncRelayCommand(UpdateWebApiAsync);
         private IAsyncRelayCommand p_UpdateWebApi;
@@ -200,7 +200,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.WebApi is null)
             {
-                await Windows.Controls.message.MessageBox.Show("�޸�ʧ�ܣ���δ����".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("修改失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
@@ -210,13 +210,13 @@ namespace Snet.Iot.Daq.viewModel
                     PluginConfigSelectedItem?.WebApi = GlobalConfigModel.param.GetBasics().GetSource<WAModel>();
                     PluginConfigSelectedItem?.SetPlugin();
                     SavePluginConfig();
-                    await Windows.Controls.message.MessageBox.Show("�޸ĳɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    await Windows.Controls.message.MessageBox.Show("修改成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
         }
 
         /// <summary>
-        /// ɾ��WEBapi
+        /// 删除 WEBapi
         /// </summary>
         public IAsyncRelayCommand RemoveWebApi => p_RemoveWebApi ??= new AsyncRelayCommand(RemoveWebApiAsync);
         private IAsyncRelayCommand p_RemoveWebApi;
@@ -224,26 +224,26 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.WebApi is null)
             {
-                await Windows.Controls.message.MessageBox.Show("�Ƴ�ʧ�ܣ���δ����".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("移除失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
                 PluginConfigSelectedItem?.WebApi = null;
                 PluginConfigSelectedItem?.SetPlugin();
                 SavePluginConfig();
-                await Windows.Controls.message.MessageBox.Show("�Ƴ��ɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
             }
         }
 
         /// <summary>
-        /// �ϴ����
+        /// 上传插件
         /// </summary>
         public IAsyncRelayCommand UploadPlugin => uploadPlugin ??= new AsyncRelayCommand(UploadPluginAsync);
         private IAsyncRelayCommand? uploadPlugin;
         private async Task UploadPluginAsync()
         {
             PluginType plugin = ComboBoxSelectedItem.Value.GetSource<PluginType>();
-            string path = Win32Handler.Select(App.LanguageOperate.GetLanguageValue("��ѡ���ļ�"), false, new Dictionary<string, string> { { $"(*.zip)", $"*.zip" }, });
+            string path = Win32Handler.Select(App.LanguageOperate.GetLanguageValue("请选择文件"), false, new Dictionary<string, string> { { $"(*.zip)", $"*.zip" }, });
             if (!path.IsNullOrWhiteSpace())
             {
                 string typePath = Path.Combine(GlobalConfigModel.FilePath, plugin.ToString().ToLower());
@@ -255,22 +255,22 @@ namespace Snet.Iot.Daq.viewModel
                     directoryInfo.Create();
                 }
                 directoryInfo = new(libPath);
-                //�ȼ��ز����״̬
+                //先记录插件状态
                 ConcurrentDictionary<string, (string type, bool status)> pluginStatus = new();
-                //�Ƿ����
+                //是否存在
                 bool exists = directoryInfo.Exists;
-                //���Ҳ���б����Ƿ��Ѵ���ͬ����ͬ·�����
+                //检查插件列表内是否已存在同名或同路径的插件
                 PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.Path == libPath || p.Name == zipName);
                 if (PluginListSelectedItem != null || exists)
                 {
-                    if (!await MessageBox.Show("�˲�����ϴ����Ƿ�����ȸ��£�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
+                    if (!await MessageBox.Show("此插件已上传，是否覆盖更新？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
                     {
                         return;
                     }
                     switch (plugin)
                     {
                         case PluginType.Daq:
-                            //ֹͣ��������������ֹͣ�ɼ�
+                            //停止所有采集设备（后续恢复采集）
                             GlobalConfigModel.TrayDevices.Where(d => libPath == d.DaqPluginPath).ToList().ForEach(d =>
                             {
                                 pluginStatus.AddOrUpdate(d.ToString(), (d.DeviceType, d.IsRun), (k, v) => (d.DeviceType, d.IsRun));
@@ -289,25 +289,25 @@ namespace Snet.Iot.Daq.viewModel
                     }
                 }
 
-                //��ѹzip��ָ��·��
+                //解压zip到指定路径
                 await ZipFile.ExtractToDirectoryAsync(path, libPath, true);
 
-                //�ӿ�����
+                //接口名称
                 string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
 
-                //��ȡ��������
+                //获取插件信息
                 List<(PluginModel Model, object? Param)> result = PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
                 if (result.Count > 0)
                 {
                     foreach (var item in result)
                     {
-                        //���뱾�أ������´γ�ʼ��
+                        //加入本地，用于下次初始化
                         PluginModel details = item.Model;
 
-                        //���ò��·��
+                        //设置插件路径
                         details.Path = libPath;
 
-                        //���ӵ�����
+                        //添加到列表
                         PluginList.Add(new PluginListModel(details.Name, plugin, details.Version, DateTime.Now, details));
                     }
 
@@ -315,20 +315,20 @@ namespace Snet.Iot.Daq.viewModel
 
                     if (pluginStatus.Count > 0 || exists)
                     {
-                        await MessageBox.Show("����ȸ��³ɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                        await MessageBox.Show("插件更新成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
 
-                        //�ȸ��º����֮ǰ������״̬���������
+                        //更新后，恢复之前的运行状态
                         switch (plugin)
                         {
                             case PluginType.Daq:
-                                //ֹͣ��������������ֹͣ�ɼ�
+                                //停止所有采集设备（后续恢复采集）
                                 GlobalConfigModel.TrayDevices.Where(d => libPath == d.DaqPluginPath).ToList().ForEach(d =>
                                 {
                                     PrivateInit(d, pluginStatus);
                                 });
                                 break;
                             case PluginType.Mq:
-                                //ֹͣ��������������ֹͣ�ɼ�
+                                //停止所有采集设备（后续恢复采集）
                                 GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(libPath)).ToList().ForEach(d =>
                                 {
                                     PrivateInit(d, pluginStatus);
@@ -338,18 +338,18 @@ namespace Snet.Iot.Daq.viewModel
                     }
                     else
                     {
-                        await MessageBox.Show("����ϴ��ɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                        await MessageBox.Show("插件上传成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
                     }
                 }
                 else
                 {
                     try
                     {
-                        //�Ƴ�������ļ�
+                        //移除插件文件夹
                         Directory.Delete(libPath, true);
                     }
                     catch (Exception) { }
-                    await MessageBox.Show("����ϴ�ʧ�ܣ�δ��������Ӧ�ӿ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    await MessageBox.Show("插件上传失败，未查询到对应接口".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
 
                 }
             }
@@ -358,42 +358,42 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ˽�г�ʼ��
+        /// 私有初始化
         /// </summary>
-        /// <param name="d">����̨�豸����</param>
-        /// <param name="pluginStatus">���״̬</param>
+        /// <param name="d">控制台设备对象</param>
+        /// <param name="pluginStatus">插件状态</param>
         private void PrivateInit(ConsoleDeviceModel d, ConcurrentDictionary<string, (string type, bool status)> pluginStatus)
         {
             bool status = pluginStatus.TryGetValue(d.ToString(), out (string type, bool status) plugin) ? plugin.status : false;
             if (status)
             {
-                //�ɼ�
+                //采集
                 d.Retry.ExecuteAsync(null);
             }
             else
             {
-                //ֹͣ
+                //停止
                 d.Stop.Execute(null);
             }
         }
 
         /// <summary>
-        /// �Ƴ����
+        /// 移除插件
         /// </summary>
         public IAsyncRelayCommand RemovePlugin => removePlugin ??= new AsyncRelayCommand(RemovePluginAsync);
         private IAsyncRelayCommand? removePlugin;
         private async Task RemovePluginAsync()
         {
-            if (await MessageBox.Show($"ȷ���Ƴ��˲����".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
+            if (await MessageBox.Show($"确定移除此插件？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
                 await PrivateRemovalPlugin();
-                await MessageBox.Show($"����Ƴ��ɹ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                await MessageBox.Show($"插件移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
             }
             SavePluginListConfig();
         }
 
         /// <summary>
-        /// ˽���Ƴ����
+        /// 私有移除插件
         /// </summary>
         /// <returns></returns>
         private async Task PrivateRemovalPlugin()
@@ -405,7 +405,7 @@ namespace Snet.Iot.Daq.viewModel
             switch (PluginListSelectedItem.Type)
             {
                 case PluginType.Daq:
-                    //ֹͣ��������������ֹͣ�ɼ�
+                    //停止所有采集设备（后续恢复采集）
                     GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.Path == d.DaqPluginPath).ToList().ForEach(d =>
                     {
                         d.Stop.Execute(null);
@@ -421,13 +421,13 @@ namespace Snet.Iot.Daq.viewModel
 
             if (await PluginHandlerCore.PluginOperate.RemovePluginAsync(details.Name))
             {
-                //ǿ�� GC ������ж�صĳ��������ģ�ȷ���ͷ����в�������
+                //强制 GC 回收可卸载的程序集上下文，确保释放所有文件句柄
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
-                Directory.Delete(details.Path, true);  //ɾ������ļ���
+                Directory.Delete(details.Path, true);  //删除插件文件夹
             }
 
-            //��ѯ���·���Ƿ���һ�µģ��еĻ�һ��ɾ��
+            //查询旧路径是否一致的，有的话一并删除
             for (int i = PluginList.Count - 1; i >= 0; i--)
             {
                 if (PluginList[i].PluginDetails.Path == details.Path)
@@ -435,12 +435,12 @@ namespace Snet.Iot.Daq.viewModel
                     PluginList.RemoveAt(i);
                 }
             }
-            PluginListSelectedItem = null;  //�ÿ�
+            PluginListSelectedItem = null;  //清空
             SavePluginListConfig();
         }
 
         /// <summary>
-        /// ���Ӳ������
+        /// 添加插件配置
         /// </summary>
         public IAsyncRelayCommand AddPluginConfig => addPluginConfig ??= new AsyncRelayCommand(AddPluginConfigAsync);
         private IAsyncRelayCommand? addPluginConfig;
@@ -451,34 +451,34 @@ namespace Snet.Iot.Daq.viewModel
             GlobalConfigModel.param.SetBasics(obj);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
-                obj = GlobalConfigModel.param.GetBasics();  //�û��Ѿ��޸ĺõĲ���
+                obj = GlobalConfigModel.param.GetBasics();  //用户已经修改好的参数
 
-                PluginType plugin = PluginListSelectedItem.Type;   //ѡ�еĲ������
-                string name = plugin.ToString().ToLower();  //�����������
-                string libConfigPath = Path.Combine(GlobalConfigModel.ConfigPath, name);  //��������ļ��洢·��
+                PluginType plugin = PluginListSelectedItem.Type;   //选中的插件类型
+                string name = plugin.ToString().ToLower();  //插件类型转小写
+                string libConfigPath = Path.Combine(GlobalConfigModel.ConfigPath, name);  //插件配置文件存储路径
                 if (!Directory.Exists(libConfigPath))
                 {
                     Directory.CreateDirectory(libConfigPath);
                 }
-                //��ȡΨһ��ʶ��
+                //获取唯一标识符
                 Type type = obj.GetType();
                 PropertyInfo? prop = type.GetProperty(GlobalConfigModel.LibConfigSNKey);
                 object? snValue = prop?.GetValue(obj);
-                //ƴ������
+                //拼接文件名
                 string fileName = string.Format(details.ConfigFormat, snValue);
                 string path = Path.Combine(libConfigPath, fileName);
                 if (!File.Exists(path))
                 {
                     FileHandler.StringToFile(path, obj.ToJson(true));
-                    //���ӵ�����
+                    //添加到列表
                     PluginConfigModel p = new PluginConfigModel(PluginConfig.Count + 1, false, fileName, plugin, details.Name, DateTime.Now, obj.ToJson(), libConfigPath);
-                    //���ӵ�ȫ�ּ���
+                    //添加到全局集合
                     p.SetPlugin();
                     PluginConfig.Add(p);
                 }
                 else
                 {
-                    await MessageBox.Show($"����ʧ�ܣ���������ļ��Ѿ����ڣ�".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                    await MessageBox.Show($"添加失败，该插件配置文件已经存在！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
             }
@@ -487,7 +487,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ״̬��֤
+        /// 状态验证
         /// </summary>
         public IAsyncRelayCommand StatusVerification => statusVerification ??= new AsyncRelayCommand(StatusVerificationAsync);
         private IAsyncRelayCommand? statusVerification;
@@ -497,9 +497,9 @@ namespace Snet.Iot.Daq.viewModel
             {
                 foreach (var item in PluginConfig)
                 {
-                    //�������
+                    //插件类型
                     PluginType plugin = item.Type;
-                    //�ӿ�����
+                    //接口名称
                     string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
                     item.Status = (await PluginHandlerCore.PluginOperate.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
                 }
@@ -507,7 +507,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �޸Ĳ������
+        /// 修改插件配置
         /// </summary>
         public IAsyncRelayCommand UpdatePluginConfig => updatePluginConfig ??= new AsyncRelayCommand(UpdatePluginConfigAsync);
         private IAsyncRelayCommand? updatePluginConfig;
@@ -515,7 +515,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             object? obj = PluginHandlerCore.PluginOperate.ConvertPluginJsonParam(PluginConfigSelectedItem.Name, PluginConfigSelectedItem.Param);
 
-            //��ȡ�ɵ�Ψһ��ʶ��
+            //获取旧的唯一标识符
             Type type = obj.GetType();
             PropertyInfo? prop = type.GetProperty(GlobalConfigModel.LibConfigSNKey);
             string oldSN = prop?.GetValue(obj).ToString();
@@ -523,9 +523,9 @@ namespace Snet.Iot.Daq.viewModel
             GlobalConfigModel.param.SetBasics(obj);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
             {
-                obj = GlobalConfigModel.param.GetBasics();  //�û��Ѿ��޸ĺõĲ���
+                obj = GlobalConfigModel.param.GetBasics();  //用户已经修改好的参数
 
-                //��ȡ�µ�Ψһ��ʶ��
+                //获取新的唯一标识符
                 type = obj.GetType();
                 prop = type.GetProperty(GlobalConfigModel.LibConfigSNKey);
                 string newSN = prop?.GetValue(obj).ToString();
@@ -540,7 +540,7 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 else
                 {
-                    await MessageBox.Show($"�޸�ʧ�ܣ���������ļ������Ѿ����ڣ����޸�SN��".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                    await MessageBox.Show($"修改失败，该插件配置文件已经存在，请修改SN值".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
             }
@@ -548,7 +548,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ����Ψһ��ʶ��
+        /// 复制唯一标识符
         /// </summary>
         public IAsyncRelayCommand CopySN => copySN ??= new AsyncRelayCommand(CopySNAsync);
         private IAsyncRelayCommand? copySN;
@@ -560,19 +560,19 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
-        /// �Ƴ��������
+        /// 移除插件配置
         /// </summary>
         public IAsyncRelayCommand RemovePluginConfig => removePluginConfig ??= new AsyncRelayCommand(RemovePluginConfigAsync);
         private IAsyncRelayCommand? removePluginConfig;
         private async Task RemovePluginConfigAsync()
         {
-            //��������Ŀ¼�Ƿ���ڸò���������ļ��������������Ƴ�
+            //检查项目目录是否存在该插件配置文件，如果存在则不能移除
             if (UseCheck(PluginConfigSelectedItem))
             {
-                await MessageBox.Show("�ò�������ļ�����Ŀ��������ʹ��".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
+                await MessageBox.Show("该插件配置文件在项目中正在使用".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
-            if (await MessageBox.Show($"ȷ���Ƴ���������".GetLanguageValue(App.LanguageOperate), "��ܰ��ʾ".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
+            if (await MessageBox.Show($"确定移除插件配置？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
                 string path = Path.Combine(GlobalConfigModel.ConfigPath, PluginConfigSelectedItem.Type.ToString().ToLower(), PluginConfigSelectedItem.SN);
                 if (File.Exists(path))
@@ -581,14 +581,14 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 GlobalConfigModel.PluginDict.Remove(PluginConfigSelectedItem.Guid, out _);
                 PluginConfig.Remove(PluginConfigSelectedItem);
-                PluginConfigSelectedItem = null;//�ÿ�
+                PluginConfigSelectedItem = null;//清空
             }
             SavePluginConfig();
         }
 
 
         /// <summary>
-        /// ��ȡ
+        /// 读取
         /// </summary>
         public IAsyncRelayCommand Read => read ??= new AsyncRelayCommand(ReadAsync);
         private IAsyncRelayCommand? read;
@@ -606,17 +606,17 @@ namespace Snet.Iot.Daq.viewModel
                 if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data))
                 {
                     AddressValue value = data[address.Address];
-                    await Windows.Controls.message.MessageBox.Show($"{"��ȡ�ɹ�".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}", "���".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
                 else
                 {
-                    await Windows.Controls.message.MessageBox.Show($"{"��ȡʧ��".GetLanguageValue(App.LanguageOperate)}:{msg}", "���".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                    await Windows.Controls.message.MessageBox.Show($"{"读取失败".GetLanguageValue(App.LanguageOperate)}:{msg}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                 }
             }
         }
 
         /// <summary>
-        /// д��
+        /// 写入
         /// </summary>
         public IAsyncRelayCommand Write => write ??= new AsyncRelayCommand(WriteAsync);
         private IAsyncRelayCommand? write;
@@ -631,12 +631,12 @@ namespace Snet.Iot.Daq.viewModel
                 OperateResult result = await address.TestWriteAddressAsync(daq, model);
                 if (result.Status)
                     PluginConfigSelectedItem.Status = result.Status;
-                await Windows.Controls.message.MessageBox.Show($"{"д��".GetLanguageValue(App.LanguageOperate)}{(result.Status ? "�ɹ�".GetLanguageValue(App.LanguageOperate) : "ʧ��".GetLanguageValue(App.LanguageOperate) + $":{result.Message}")}", "���".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, result.Status ? Windows.Controls.@enum.MessageBoxImage.Information : Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show($"{"写入".GetLanguageValue(App.LanguageOperate)}{(result.Status ? "成功".GetLanguageValue(App.LanguageOperate) : "失败".GetLanguageValue(App.LanguageOperate) + $":{result.Message}")}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, result.Status ? Windows.Controls.@enum.MessageBoxImage.Information : Windows.Controls.@enum.MessageBoxImage.Error);
             }
         }
 
         /// <summary>
-        /// ����
+        /// 生产
         /// </summary>
         public IAsyncRelayCommand Produce => produce ??= new AsyncRelayCommand(ProduceAsync);
         private IAsyncRelayCommand? produce;
@@ -649,15 +649,15 @@ namespace Snet.Iot.Daq.viewModel
                 OperateResult result = await PluginConfigSelectedItem.TestProduceAsync(model.Topic, model.Content.ToString());
                 if (result.Status)
                     PluginConfigSelectedItem.Status = result.Status;
-                await Windows.Controls.message.MessageBox.Show($"{"����".GetLanguageValue(App.LanguageOperate)}{(result.Status ? "�ɹ�".GetLanguageValue(App.LanguageOperate) : "ʧ��".GetLanguageValue(App.LanguageOperate) + $":{result.Message}")}", "���".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, result.Status ? Windows.Controls.@enum.MessageBoxImage.Information : Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show($"{"生产".GetLanguageValue(App.LanguageOperate)}{(result.Status ? "成功".GetLanguageValue(App.LanguageOperate) : "失败".GetLanguageValue(App.LanguageOperate) + $":{result.Message}")}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, result.Status ? Windows.Controls.@enum.MessageBoxImage.Information : Windows.Controls.@enum.MessageBoxImage.Error);
             }
         }
 
         #endregion
 
-        #region �����¼�
+        #region 界面事件
         /// <summary>
-        /// ���ݲ˵��򿪴���
+        /// 内容菜单打开触发
         /// </summary>
         public IAsyncRelayCommand DataGrid_ContextMenuOpening => dataGrid_ContextMenuOpening ??= new AsyncRelayCommand<ContextMenuEventArgs>(DataGrid_ContextMenuOpeningAsync);
         private IAsyncRelayCommand? dataGrid_ContextMenuOpening;
@@ -666,8 +666,8 @@ namespace Snet.Iot.Daq.viewModel
             if (e?.Source is not DataGrid dataGrid)
                 return Task.CompletedTask;
 
-            // ���ղþ���
-            // ֻҪ��ǰ���ǡ����Ҽ������ͽ�ֹ����
+            // 最终裁决：
+            // 只要当前不是"行右键"，就禁止弹出
             if (dataGrid.SelectedItem == null)
             {
                 e.Handled = true;
@@ -676,7 +676,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ����Ҽ��������
+        /// 鼠标右键点击触发
         /// </summary>
         public IAsyncRelayCommand DataGrid_PreviewMouseRightButtonDown => dataGrid_PreviewMouseRightButtonDown ??= new AsyncRelayCommand<MouseButtonEventArgs>(DataGrid_PreviewMouseRightButtonDownAsync);
         private IAsyncRelayCommand? dataGrid_PreviewMouseRightButtonDown;
@@ -692,36 +692,36 @@ namespace Snet.Iot.Daq.viewModel
 
             if (dep is DataGridRow row)
             {
-                // �Ҽ�������
+                // 右键在行上
                 dataGrid.SelectedItem = row.Item;
                 row.IsSelected = true;
                 row.Focus();
             }
             else
             {
-                // �Ҽ��հף����ѡ��
+                // 右键空白：清空选择
                 dataGrid.SelectedItem = null;
-                e.Handled = true; // ��ֹĬ���Ҽ�
+                e.Handled = true; // 阻止默认右键
             }
             return Task.CompletedTask;
         }
         #endregion
 
-        #region ����
+        #region 方法
         /// <summary>
-        /// ��ʼ��
+        /// 初始化
         /// </summary>
         /// <returns></returns>
         private Task InitAsync()
         {
-            //����Ĭ������
+            //设置默认选项
             ComboBoxItemsSource.Add(new(PluginType.Daq.ToString(), PluginType.Daq));
             ComboBoxItemsSource.Add(new(PluginType.Mq.ToString(), PluginType.Mq));
             ComboBoxSelectedItem = ComboBoxItemsSource[0];
 
-            //��ȡ��������
+            //读取插件列表
             PluginList = PluginHandlerCore.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
-            //�������
+            //读取配置
             if (GlobalConfigModel.PluginDict.Count > 0)
             {
                 PluginConfig = new ObservableCollection<PluginConfigModel>(GlobalConfigModel.PluginDict.Values);
@@ -734,12 +734,12 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ʹ�ü��
+        /// 使用检查
         /// </summary>
-        /// <returns>false:û�б�ʹ��  true:��ʹ����</returns>
+        /// <returns>false:没有被使用  true:正在使用中</returns>
         private bool UseCheck(PluginConfigModel model)
         {
-            //����Ƿ��б�ʹ��
+            //判断是否有被使用
             string checkFile = GlobalConfigModel.UI_ProjectConfigPath;
             if (File.Exists(checkFile))
             {
@@ -753,7 +753,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ��������������
+        /// 保存插件配置
         /// </summary>
         public void SavePluginConfig()
         {
@@ -765,7 +765,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ��������������
+        /// 保存插件列表配置
         /// </summary>
         public void SavePluginListConfig()
         {
