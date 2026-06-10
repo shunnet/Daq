@@ -52,6 +52,20 @@ namespace Snet.Iot.Daq.viewModel
         private string PluginPath;
 
         /// <summary>
+        /// 更新插件
+        /// </summary>
+        public IAsyncRelayCommand Update => p_Update ??= new AsyncRelayCommand(UpdateAsync);
+        private IAsyncRelayCommand? p_Update;
+        public async Task UpdateAsync()
+        {
+            await MessageBox.Show("正在更新插件，请耐心等待".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+            var data = await pluginBrowseHandler.GetPluginBrowseDataGridModelsAsync();
+            FileHandler.StringToFile(GlobalConfigModel.UI_PluginBrowseCachePath, data.ToJson(true));
+            await PageIndexChangedExecuteAsync(1);
+            await MessageBox.Show("插件更新完成".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        /// <summary>
         /// 停止下载插件
         /// </summary>
         public IAsyncRelayCommand StopDownloadPlugin => p_StopDownloadPlugin ??= new AsyncRelayCommand(StopDownloadPluginAsync);
@@ -81,7 +95,8 @@ namespace Snet.Iot.Daq.viewModel
                     bool zip = await MessageBox.Show("是否需要打包 ZIP？只有打包成 zip 文件后才能进行上传！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question);
                     if (download == null)
                     {
-                        download ??= PluginDownloadHandler.Instance(PluginPath);
+                        download = PluginDownloadHandler.Instance(PluginPath);
+                        download.OnInfoEventAsync -= Download_OnInfoEventAsync;
                         download.OnInfoEventAsync += Download_OnInfoEventAsync;
                     }
                     await uiMessage.ShowAsync("开始下载插件，请耐心等待".GetLanguageValue(App.LanguageOperate));
@@ -244,10 +259,10 @@ namespace Snet.Iot.Daq.viewModel
         /// 查询的内容
         /// </summary>
         /// <returns></returns>
-        public string QueryCntent
+        public string QueryContent
         {
-            get => GetProperty(() => QueryCntent);
-            set => SetProperty(() => QueryCntent, value);
+            get => GetProperty(() => QueryContent);
+            set => SetProperty(() => QueryContent, value);
         }
 
         /// <summary>
@@ -284,12 +299,13 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand AllSelect => allSelect ??= new AsyncRelayCommand(AllSelectAsync);
         private IAsyncRelayCommand? allSelect;
-        private async Task AllSelectAsync()
+        private Task AllSelectAsync()
         {
             foreach (var item in Plugins)
             {
                 item.IsSelected = true;
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -297,12 +313,13 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Inverse => inverse ??= new AsyncRelayCommand(InverseAsync);
         private IAsyncRelayCommand? inverse;
-        private async Task InverseAsync()
+        private Task InverseAsync()
         {
             foreach (var item in Plugins)
             {
                 item.IsSelected = !item.IsSelected;
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -325,17 +342,18 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand DataGrid_ContextMenuOpening => dataGrid_ContextMenuOpening ??= new AsyncRelayCommand<ContextMenuEventArgs>(DataGrid_ContextMenuOpeningAsync);
         private IAsyncRelayCommand? dataGrid_ContextMenuOpening;
-        private async Task DataGrid_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
+        private Task DataGrid_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
         {
             if (e?.Source is not DataGrid dataGrid)
-                return;
+                return Task.CompletedTask;
 
             // 最终裁决：
-            // 只要当前不是“行右键”，就禁止弹出
+            // 只要当前不是”行右键”，就禁止弹出
             if (dataGrid.SelectedItem == null)
             {
                 e.Handled = true;
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -343,10 +361,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand DataGrid_PreviewMouseRightButtonDown => dataGrid_PreviewMouseRightButtonDown ??= new AsyncRelayCommand<MouseButtonEventArgs>(DataGrid_PreviewMouseRightButtonDownAsync);
         private IAsyncRelayCommand? dataGrid_PreviewMouseRightButtonDown;
-        private async Task DataGrid_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
+        private Task DataGrid_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
         {
             if (e?.Source is not DataGrid dataGrid)
-                return;
+                return Task.CompletedTask;
 
             System.Windows.DependencyObject dep = (System.Windows.DependencyObject)e.OriginalSource;
 
@@ -366,6 +384,7 @@ namespace Snet.Iot.Daq.viewModel
                 dataGrid.SelectedItem = null;
                 e.Handled = true; // 阻止默认右键
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -375,7 +394,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? pageIndexChanged;
         private async Task PageIndexChangedExecuteAsync(int index)
         {
-            var table = allPlugin ??= await pluginBrowseHandler.GetPluginBrowseDataGridModelsAsync();
+            var table = allPlugin ??= await GetNugetPluginAsync();
             int total = table.Count();
             var page = table.OrderByDescending(x => x.UpdateTime)
                             .Skip((index - 1) * PageSize)
@@ -393,7 +412,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? query;
         private async Task QueryAsync()
         {
-            if (QueryCntent.IsNullOrWhiteSpace())
+            if (QueryContent.IsNullOrWhiteSpace())
             {
                 //查询所有
                 await PageIndexChangedExecuteAsync(1);
@@ -401,9 +420,9 @@ namespace Snet.Iot.Daq.viewModel
             else
             {
                 //模糊查询
-                List<PluginBrowseDataGridModel> models = (allPlugin ??= await pluginBrowseHandler.GetPluginBrowseDataGridModelsAsync()).Where(p =>
-                p.PackName.Contains(QueryCntent) ||
-                p.Describe.Contains(QueryCntent)).ToList();
+                List<PluginBrowseDataGridModel> models = (allPlugin ??= await GetNugetPluginAsync()).Where(p =>
+                p.PackName.Contains(QueryContent) ||
+                p.Describe.Contains(QueryContent)).ToList();
                 if (models.Count > 0)
                 {
                     await ResetUiAsync(models.Count, 1, models);
@@ -413,6 +432,25 @@ namespace Snet.Iot.Daq.viewModel
                     await uiMessage.ShowAsync("未查询到对应内容".GetLanguageValue(App.LanguageOperate));
                 }
             }
+        }
+
+        /// <summary>
+        /// 获取插件
+        /// </summary>
+        /// <returns></returns>
+        private async Task<List<PluginBrowseDataGridModel>> GetNugetPluginAsync()
+        {
+            List<PluginBrowseDataGridModel>? data = null;
+            if (File.Exists(GlobalConfigModel.UI_PluginBrowseCachePath))
+            {
+                data = FileHandler.FileToString(GlobalConfigModel.UI_PluginBrowseCachePath).ToJsonEntity<List<PluginBrowseDataGridModel>>();
+            }
+            if (data == null)
+            {
+                data = await pluginBrowseHandler.GetPluginBrowseDataGridModelsAsync();
+                FileHandler.StringToFile(GlobalConfigModel.UI_PluginBrowseCachePath, data.ToJson(true));
+            }
+            return data;
         }
     }
 }

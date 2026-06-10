@@ -733,4 +733,13 @@
   <data name="开始下载插件，请耐心等待" xml:space="preserve">
     <value>Start downloading the plugin, please be patient and wait</value>
   </data>
+  <data name="更新插件" xml:space="preserve">
+    <value>Update plugin</value>
+  </data>
+  <data name="正在更新插件，请耐心等待" xml:space="preserve">
+    <value>Updating plugin, please be patient</value>
+  </data>
+  <data name="插件更新完成" xml:space="preserve">
+    <value>Plugin update completed</value>
+  </data>
 </root>

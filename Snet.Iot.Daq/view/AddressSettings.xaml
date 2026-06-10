@@ -61,7 +61,7 @@
                     ClearButtonEnabled="True"
                     Icon="{uis:SymbolIcon Symbol=CalligraphyPen24}"
                     PlaceholderText="{snet:Loc 查询}"
-                    Text="{Binding QueryCntent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                    Text="{Binding QueryContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                     <uis:TextBox.InputBindings>
                         <KeyBinding Key="Enter" Command="{Binding QueryAddress}" />
                     </uis:TextBox.InputBindings>

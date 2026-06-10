@@ -22,10 +22,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand DataGrid_ContextMenuOpening => dataGrid_ContextMenuOpening ??= new AsyncRelayCommand<ContextMenuEventArgs>(DataGrid_ContextMenuOpeningAsync);
         private IAsyncRelayCommand? dataGrid_ContextMenuOpening;
-        private async Task DataGrid_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
+        private Task DataGrid_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
         {
             if (e?.Source is not DataGrid dataGrid)
-                return;
+                return Task.CompletedTask;
 
             // 最终裁决：
             // 只要当前不是“行右键”，就禁止弹出
@@ -33,6 +33,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 e.Handled = true;
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -40,10 +41,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand DataGrid_PreviewMouseRightButtonDown => dataGrid_PreviewMouseRightButtonDown ??= new AsyncRelayCommand<MouseButtonEventArgs>(DataGrid_PreviewMouseRightButtonDownAsync);
         private IAsyncRelayCommand? dataGrid_PreviewMouseRightButtonDown;
-        private async Task DataGrid_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
+        private Task DataGrid_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
         {
             if (e?.Source is not DataGrid dataGrid)
-                return;
+                return Task.CompletedTask;
 
             System.Windows.DependencyObject dep = (System.Windows.DependencyObject)e.OriginalSource;
 
@@ -63,6 +64,7 @@ namespace Snet.Iot.Daq.viewModel
                 dataGrid.SelectedItem = null;
                 e.Handled = true; // 阻止默认右键
             }
+            return Task.CompletedTask;
         }
         #endregion
 
@@ -93,10 +95,11 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand CopyJson => copyJson ??= new AsyncRelayCommand(CopyJsonAsync);
         private IAsyncRelayCommand? copyJson;
-        private async Task CopyJsonAsync()
+        private Task CopyJsonAsync()
         {
             string json = HandlerItemsSource.ToJson(true);
             System.Windows.Clipboard.SetDataObject(json);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -104,13 +107,14 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Import => import ??= new AsyncRelayCommand(ImportAsync);
         private IAsyncRelayCommand import;
-        private async Task ImportAsync()
+        private Task ImportAsync()
         {
             string file = GlobalConfigModel.SelectFiles("json");
             if (!string.IsNullOrEmpty(file))
             {
                 HandlerItemsSource = FileHandler.FileToString(file).ToJsonEntity<ObservableCollection<BytesBindNotifyModel>>();
             }
+            return Task.CompletedTask;
         }
 
 
@@ -119,7 +123,7 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Export => export ??= new AsyncRelayCommand(ExportAsync);
         private IAsyncRelayCommand export;
-        private async Task ExportAsync()
+        private Task ExportAsync()
         {
             if (HandlerItemsSource.Count > 0)
             {
@@ -129,6 +133,7 @@ namespace Snet.Iot.Daq.viewModel
                     FileHandler.StringToFile(Path.Combine(path, $"BytesHandler[{DateTime.Now.ToString("yyyyMMddHHmmss")}].json"), HandlerItemsSource.ToJson(true));
                 }
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -136,9 +141,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Add => add ??= new AsyncRelayCommand(AddAsync);
         private IAsyncRelayCommand add;
-        private async Task AddAsync()
+        private Task AddAsync()
         {
             HandlerItemsSource.Add(new());
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -146,12 +152,13 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Delete => delete ??= new AsyncRelayCommand(DeleteAsync);
         private IAsyncRelayCommand delete;
-        private async Task DeleteAsync()
+        private Task DeleteAsync()
         {
             if (HandlerConfigSelectedItem != null)
             {
                 HandlerItemsSource.Remove(HandlerConfigSelectedItem);
             }
+            return Task.CompletedTask;
         }
         #endregion
     }

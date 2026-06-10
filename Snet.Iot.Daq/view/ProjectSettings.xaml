@@ -93,7 +93,7 @@
                             Icon="{uis:SymbolIcon Symbol=Search24}"
                             OriginalItemsSource="{Binding SelectItems}"
                             PlaceholderText="{snet:Loc 查询}"
-                            Text="{Binding QueryCntent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                            Text="{Binding QueryContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                             <uis:AutoSuggestBox.Resources>
                                 <Style BasedOn="{StaticResource UiScrollBar}" TargetType="ScrollBar" />
                             </uis:AutoSuggestBox.Resources>

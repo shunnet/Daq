@@ -111,39 +111,43 @@ namespace Snet.Iot.Daq.chart
         /// 移除所有线条
         /// </summary>
         /// <param name="control">控件</param>
+        /// <param name="ex">异常信息</param>
         /// <returns>移除状态</returns>
-        public static bool RemoveAll(this WpfPlot control)
+        public static bool RemoveAll(this WpfPlot control, out Exception? ex)
         {
+            ex = null;
             try
             {
                 control.Plot.Clear();
+                return true;
             }
-            catch (Exception)
+            catch (Exception e)
             {
-                return false;
+                ex = e;
             }
-
-            return true;
+            return false;
         }
 
         /// <summary>
-        /// 调整
+        /// 调整坐标轴范围并刷新图表
         /// </summary>
-        /// <param name="control"></param>
-        /// <returns></returns>
-        public static bool Adjust(this WpfPlot control)
+        /// <param name="control">控件</param>
+        /// <param name="ex">异常信息</param>
+        /// <returns>调整状态</returns>
+        public static bool Adjust(this WpfPlot control, out Exception? ex)
         {
+            ex = null;
             try
             {
                 control.Plot.Axes.AutoScale();
                 control.Plot.PlotControl?.Refresh();
                 return true;
             }
-            catch (Exception)
+            catch (Exception e)
             {
+                ex = e;
                 return false;
             }
-
         }
     }
 }

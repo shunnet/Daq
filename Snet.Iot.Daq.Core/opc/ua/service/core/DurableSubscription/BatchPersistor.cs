@@ -234,7 +234,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 
                     foreach (FileInfo file in directory.GetFiles())
                     {
-                        if (!regex.IsMatch(file.Name))
+                        if (regex.IsMatch(file.Name))
                         {
                             file.Delete();
                             return;

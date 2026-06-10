@@ -733,4 +733,13 @@
   <data name="开始下载插件，请耐心等待" xml:space="preserve">
     <value>开始下载插件，请耐心等待</value>
   </data>
+  <data name="更新插件" xml:space="preserve">
+    <value>更新插件</value>
+  </data>
+  <data name="正在更新插件，请耐心等待" xml:space="preserve">
+    <value>正在更新插件，请耐心等待</value>
+  </data>
+  <data name="插件更新完成" xml:space="preserve">
+    <value>插件更新完成</value>
+  </data>
 </root>

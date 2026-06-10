@@ -41,10 +41,10 @@ namespace Snet.Iot.Daq.viewModel
         /// 查询的内容
         /// </summary>
         /// <returns></returns>
-        public string QueryCntent
+        public string QueryContent
         {
-            get => GetProperty(() => QueryCntent);
-            set => SetProperty(() => QueryCntent, value);
+            get => GetProperty(() => QueryContent);
+            set => SetProperty(() => QueryContent, value);
         }
 
         /// <summary>
@@ -94,7 +94,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? queryAddress;
         public async Task QueryAddressAsync()
         {
-            if (QueryCntent.IsNullOrWhiteSpace())
+            if (QueryContent.IsNullOrWhiteSpace())
             {
                 //查询所有
                 await PageIndexChangedExecuteAsync(1);
@@ -103,9 +103,9 @@ namespace Snet.Iot.Daq.viewModel
             {
                 //模糊查询
                 List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().Where(p =>
-                p.AnotherName.Contains(QueryCntent) ||
-                p.Address.Contains(QueryCntent) ||
-                p.Describe.Contains(QueryCntent)).ToList();
+                p.AnotherName.Contains(QueryContent) ||
+                p.Address.Contains(QueryContent) ||
+                p.Describe.Contains(QueryContent)).ToList();
                 if (models.Count > 0)
                 {
                     await ResetUiAsync(models.Count, 1, models);
@@ -123,12 +123,13 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand AllSelectAddress => allSelectAddress ??= new AsyncRelayCommand(AllSelectAddressAsync);
         private IAsyncRelayCommand? allSelectAddress;
-        private async Task AllSelectAddressAsync()
+        private Task AllSelectAddressAsync()
         {
             foreach (var item in AddressConfig)
             {
                 item.IsSelected = true;
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -136,12 +137,13 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand InverseAddress => inverseAddress ??= new AsyncRelayCommand(InverseAddressAsync);
         private IAsyncRelayCommand? inverseAddress;
-        private async Task InverseAddressAsync()
+        private Task InverseAddressAsync()
         {
             foreach (var item in AddressConfig)
             {
                 item.IsSelected = !item.IsSelected;
             }
+            return Task.CompletedTask;
         }
         #endregion
 
@@ -151,17 +153,18 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand DataGrid_ContextMenuOpening => dataGrid_ContextMenuOpening ??= new AsyncRelayCommand<ContextMenuEventArgs>(DataGrid_ContextMenuOpeningAsync);
         private IAsyncRelayCommand? dataGrid_ContextMenuOpening;
-        private async Task DataGrid_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
+        private Task DataGrid_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
         {
             if (e?.Source is not DataGrid dataGrid)
-                return;
+                return Task.CompletedTask;
 
             // 最终裁决：
-            // 只要当前不是“行右键”，就禁止弹出
+            // 只要当前不是”行右键”，就禁止弹出
             if (dataGrid.SelectedItem == null)
             {
                 e.Handled = true;
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -169,10 +172,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand DataGrid_PreviewMouseRightButtonDown => dataGrid_PreviewMouseRightButtonDown ??= new AsyncRelayCommand<MouseButtonEventArgs>(DataGrid_PreviewMouseRightButtonDownAsync);
         private IAsyncRelayCommand? dataGrid_PreviewMouseRightButtonDown;
-        private async Task DataGrid_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
+        private Task DataGrid_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
         {
             if (e?.Source is not DataGrid dataGrid)
-                return;
+                return Task.CompletedTask;
 
             System.Windows.DependencyObject dep = (System.Windows.DependencyObject)e.OriginalSource;
 
@@ -192,6 +195,7 @@ namespace Snet.Iot.Daq.viewModel
                 dataGrid.SelectedItem = null;
                 e.Handled = true; // 阻止默认右键
             }
+            return Task.CompletedTask;
         }
 
 
@@ -201,7 +205,7 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand PageIndexChanged => pageIndexChanged ??= new AsyncRelayCommand<int>(PageIndexChangedExecuteAsync);
         private IAsyncRelayCommand? pageIndexChanged;
-        private async Task PageIndexChangedExecuteAsync(int index)
+        private Task PageIndexChangedExecuteAsync(int index)
         {
             var table = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>();
             int total = table.Count();
@@ -212,6 +216,7 @@ namespace Snet.Iot.Daq.viewModel
             PageIndex = index;
             Total = total;
             AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(page);
+            return Task.CompletedTask;
         }
         #endregion
 

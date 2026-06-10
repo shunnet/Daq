@@ -916,6 +916,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 插件更新完成 的本地化字符串。
+        /// </summary>
+        public static string 插件更新完成 {
+            get {
+                return ResourceManager.GetString("插件更新完成", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 插件浏览 的本地化字符串。
         /// </summary>
         public static string 插件浏览 {
@@ -1020,6 +1029,15 @@ namespace Snet.Iot.Daq.Core {
         public static string 显示窗口 {
             get {
                 return ResourceManager.GetString("显示窗口", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 更新插件 的本地化字符串。
+        /// </summary>
+        public static string 更新插件 {
+            get {
+                return ResourceManager.GetString("更新插件", resourceCulture);
             }
         }
         

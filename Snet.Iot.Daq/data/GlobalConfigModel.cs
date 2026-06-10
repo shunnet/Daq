@@ -85,7 +85,7 @@ namespace Snet.Iot.Daq.data
         /// <summary>
         /// 刷新插件信息
         /// </summary>
-        public static async Task RefreshAsync() => RefreshAsyncFunc?.Invoke();
+        public static Task RefreshAsync() { RefreshAsyncFunc?.Invoke(); return Task.CompletedTask; }
 
         /// <summary>
         /// 接口名称
@@ -185,6 +185,11 @@ namespace Snet.Iot.Daq.data
         /// 界面项目配置路径
         /// </summary>
         public static readonly string UI_ProjectConfigPath = Path.Combine(UiConfigPath, "ProjectConfig.json");
+
+        /// <summary>
+        /// 插件浏览缓存目录
+        /// </summary>
+        public static readonly string UI_PluginBrowseCachePath = Path.Combine(UiConfigPath, "PluginBrowseCache.json");
 
         /// <summary>
         /// 打开文件选择对话框，根据指定扩展名过滤文件

@@ -88,10 +88,10 @@ namespace Snet.Iot.Daq.viewModel
         /// 查询的内容
         /// </summary>
         /// <returns></returns>
-        public string QueryCntent
+        public string QueryContent
         {
-            get => GetProperty(() => QueryCntent);
-            set => SetProperty(() => QueryCntent, value);
+            get => GetProperty(() => QueryContent);
+            set => SetProperty(() => QueryContent, value);
         }
 
         /// <summary>
@@ -111,9 +111,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand ExpandAllProject => expandAllProject ??= new AsyncRelayCommand(ExpandAllProjectAsync);
         private IAsyncRelayCommand? expandAllProject;
-        private async Task ExpandAllProjectAsync()
+        private Task ExpandAllProjectAsync()
         {
             ProjectNode.IsExpandedAll(true);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -121,9 +122,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand CollapseAllProject => collapseAllProject ??= new AsyncRelayCommand(CollapseAllProjectAsync);
         private IAsyncRelayCommand? collapseAllProject;
-        private async Task CollapseAllProjectAsync()
+        private Task CollapseAllProjectAsync()
         {
             ProjectNode.IsExpandedAll(false);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -131,9 +133,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand ExpandProject => expandProject ??= new AsyncRelayCommand(ExpandProjectAsync);
         private IAsyncRelayCommand? expandProject;
-        private async Task ExpandProjectAsync()
+        private Task ExpandProjectAsync()
         {
             ProjectNodeSelectedItem?.SetExpandedRecursive(true);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -141,9 +144,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand CollapseProject => collapseProject ??= new AsyncRelayCommand(CollapseProjectAsync);
         private IAsyncRelayCommand? collapseProject;
-        private async Task CollapseProjectAsync()
+        private Task CollapseProjectAsync()
         {
             ProjectNodeSelectedItem?.SetExpandedRecursive(false);
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -343,17 +347,18 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand TreeView_ContextMenuOpening => treeView_ContextMenuOpening ??= new AsyncRelayCommand<ContextMenuEventArgs>(TreeView_ContextMenuOpeningAsync);
         private IAsyncRelayCommand? treeView_ContextMenuOpening;
-        private async Task TreeView_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
+        private Task TreeView_ContextMenuOpeningAsync(ContextMenuEventArgs? e)
         {
             if (e?.Source is not TreeView treeView)
-                return;
+                return Task.CompletedTask;
 
             // 最终裁决：
-            // 只要当前不是“行右键”，就禁止弹出
+            // 只要当前不是”行右键”，就禁止弹出
             if (treeView.SelectedItem == null)
             {
                 e.Handled = true;
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -361,10 +366,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand TreeView_PreviewMouseRightButtonDown => treeView_PreviewMouseRightButtonDown ??= new AsyncRelayCommand<MouseButtonEventArgs>(TreeView_PreviewMouseRightButtonDownAsync);
         private IAsyncRelayCommand? treeView_PreviewMouseRightButtonDown;
-        private async Task TreeView_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
+        private Task TreeView_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
         {
             if (e?.OriginalSource is not DependencyObject source)
-                return;
+                return Task.CompletedTask;
 
             System.Windows.DependencyObject dep = (System.Windows.DependencyObject)e.OriginalSource;
 
@@ -388,6 +393,7 @@ namespace Snet.Iot.Daq.viewModel
                 ProjectNodeSelectedItem = null;
                 e.Handled = true; // 阻止默认右键
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -395,16 +401,17 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand TreeView_SelectedItemChanged => treeView_SelectedItemChanged ??= new AsyncRelayCommand<RoutedPropertyChangedEventArgs<object>>(TreeView_SelectedItemChangedAsync);
         private IAsyncRelayCommand? treeView_SelectedItemChanged;
-        private async Task TreeView_SelectedItemChangedAsync(RoutedPropertyChangedEventArgs<object>? e)
+        private Task TreeView_SelectedItemChangedAsync(RoutedPropertyChangedEventArgs<object>? e)
         {
             if (e?.NewValue is not IProjectTreeViewModel model)
-                return;
+                return Task.CompletedTask;
             _ = model?.SetAsync(ProjectNode).ConfigureAwait(false);
             if (model?.NodeType == ProjectNodeType.Device)
             {
                 ProjectNode.CreateDetails(model);
                 _ = AddSelectDeviceNodeAsync(model).ConfigureAwait(false);
             }
+            return Task.CompletedTask;
         }
 
 
@@ -414,9 +421,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand AutoSuggestBox_TextChanged => autoSuggestBox_TextChanged ??= new AsyncRelayCommand<object>(AutoSuggestBox_TextChangedAsync);
         private IAsyncRelayCommand? autoSuggestBox_TextChanged;
-        private async Task AutoSuggestBox_TextChangedAsync(object? sender)
+        private Task AutoSuggestBox_TextChangedAsync(object? sender)
         {
             SelectItems = ProjectNode.GetAllNames();
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -436,7 +444,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? autoSuggestBox_SuggestionChosen;
         private async Task AutoSuggestBox_SuggestionChosenAsync(object? sender)
         {
-            QueryCntent = sender.GetSource<Wpf.Ui.Controls.AutoSuggestBoxSuggestionChosenEventArgs>().SelectedItem.ToString();
+            QueryContent = sender.GetSource<Wpf.Ui.Controls.AutoSuggestBoxSuggestionChosenEventArgs>().SelectedItem.ToString();
             await QueryProjectAsync();
         }
 
@@ -445,7 +453,7 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand CloseTabCommand => closeTabCommand ??= new AsyncRelayCommand<ProjectDetailsTabControlModel>(CloseTabCommandAsync);
         private IAsyncRelayCommand? closeTabCommand;
-        private async Task CloseTabCommandAsync(ProjectDetailsTabControlModel? tab)
+        private Task CloseTabCommandAsync(ProjectDetailsTabControlModel? tab)
         {
             if (tab != null)
             {
@@ -455,6 +463,7 @@ namespace Snet.Iot.Daq.viewModel
                     TabControlVisibility = Visibility.Collapsed;
                 }
             }
+            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -462,17 +471,18 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand TabControl_SelectionChanged => tabControl_SelectionChanged ??= new AsyncRelayCommand<SelectionChangedEventArgs>(TabControl_SelectionChangedAsync);
         private IAsyncRelayCommand? tabControl_SelectionChanged;
-        private async Task TabControl_SelectionChangedAsync(SelectionChangedEventArgs? e)
+        private Task TabControl_SelectionChangedAsync(SelectionChangedEventArgs? e)
         {
             if (e?.OriginalSource is not TabControl tabControl)
-                return;
+                return Task.CompletedTask;
             ProjectDetailsTabControlModel selectedItem = tabControl.SelectedItem.GetSource<ProjectDetailsTabControlModel>();
             if (selectedItem is null)
-                return;
+                return Task.CompletedTask;
             var select = ProjectNode.FindByDaqGuid(selectedItem.DaqDetails);
             if (select is null)
-                return;
+                return Task.CompletedTask;
             ProjectNode.EnsureSingleSelection(select);
+            return Task.CompletedTask;
         }
 
 
@@ -551,9 +561,9 @@ namespace Snet.Iot.Daq.viewModel
         /// <returns></returns>
         private async Task QueryProjectAsync()
         {
-            if (!QueryCntent.IsNullOrWhiteSpace())
+            if (!QueryContent.IsNullOrWhiteSpace())
             {
-                IProjectTreeViewModel? project = ProjectNode.FindByName(QueryCntent);
+                IProjectTreeViewModel? project = ProjectNode.FindByName(QueryContent);
                 if (project is not null)
                 {
                     _ = project?.SetAsync(ProjectNode).ConfigureAwait(false);

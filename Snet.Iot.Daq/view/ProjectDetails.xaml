@@ -33,7 +33,7 @@
                 Icon="{uis:SymbolIcon Symbol=Search24}"
                 OriginalItemsSource="{Binding SelectItems}"
                 PlaceholderText="{snet:Loc 查询}"
-                Text="{Binding QueryCntent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                Text="{Binding QueryContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                 <i:Interaction.Triggers>
                     <!--  选中一个项触发  -->
                     <i:EventTrigger EventName="SuggestionChosen">

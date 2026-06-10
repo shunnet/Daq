@@ -24,12 +24,12 @@ namespace Snet.Iot.Daq.Core.data
             DataTypeComboBoxSelectedItem = DataTypeComboBoxItemsSource[1];
             foreach (var item in typeof(Snet.Model.@enum.EncodingType).EnumToList())
             {
-                EncodingTypeComboBoxItemsSource.Add(new ComboBoxModel(item.Name, (Snet.Model.@enum.DataType)item.Value));
+                EncodingTypeComboBoxItemsSource.Add(new ComboBoxModel(item.Name, (Snet.Model.@enum.EncodingType)item.Value));
             }
             EncodingTypeComboBoxSelectedItem = EncodingTypeComboBoxItemsSource[7];
             foreach (var item in typeof(DataFormat).EnumToList())
             {
-                DataFormatComboBoxItemsSource.Add(new ComboBoxModel(item.Name, (Snet.Model.@enum.DataType)item.Value));
+                DataFormatComboBoxItemsSource.Add(new ComboBoxModel(item.Name, (Snet.Model.@enum.DataFormat)item.Value));
             }
             DataFormatComboBoxSelectedItem = DataFormatComboBoxItemsSource[3];
         }

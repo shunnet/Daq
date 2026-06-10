@@ -57,7 +57,7 @@
                     ClearButtonEnabled="True"
                     Icon="{uis:SymbolIcon Symbol=CalligraphyPen24}"
                     PlaceholderText="{snet:Loc 查询}"
-                    Text="{Binding QueryCntent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                    Text="{Binding QueryContent, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
                     <uis:TextBox.InputBindings>
                         <KeyBinding Key="Enter" Command="{Binding Query}" />
                     </uis:TextBox.InputBindings>
@@ -69,6 +69,13 @@
                         Icon="{uis:SymbolIcon Symbol=Search24,
                                               Filled=False}"
                         ToolTip="{snet:Loc 查询}" />
+
+                    <uis:MenuItem
+                        Command="{Binding Update}"
+                        Header="{x:Null}"
+                        Icon="{uis:SymbolIcon Symbol=ArrowClockwise16,
+                                              Filled=False}"
+                        ToolTip="{snet:Loc 更新插件}" />
 
                     <Separator Width="1" Style="{StaticResource DefaultDragIndicatorStyleStyle}" />
 
@@ -112,7 +119,7 @@
             <Grid Grid.Row="1">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="500" />
+                    <ColumnDefinition Width="350" />
                 </Grid.ColumnDefinitions>
                 <GroupBox
                     Margin="5,0,5,5"

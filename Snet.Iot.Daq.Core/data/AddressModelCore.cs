@@ -124,7 +124,7 @@ namespace Snet.Iot.Daq.Core.data
         private IAsyncRelayCommand? update;
 
         /// <inheritdoc/>
-        public virtual async Task UpdateAsync() { }
+        public virtual Task UpdateAsync() => Task.CompletedTask;
 
         /// <inheritdoc/>
         public virtual void Revoke(int index) { }
