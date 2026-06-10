@@ -17,13 +17,13 @@ using System.Threading.Channels;
 namespace Snet.Iot.Daq.viewModel
 {
     /// <summary>
-    /// ����̨�豸��ͼģ�ͣ����𵥸��ɼ��豸�����п��ơ����ݶ�д�����Ĺ�����OPC UA ��ַ�ռ�ͬ���Լ� MQ ����ת����
+    /// 控制台设备视图模型，负责单个采集设备的运行控制、数据读写、字节处理、OPC UA 地址空间同步以及 MQ 消息转发。
     /// </summary>
     public class ConsoleDeviceModel : BindNotify, IDisposable, IAsyncDisposable
     {
-        #region ���캯��
+        #region 构造函数
         /// <summary>
-        /// �޲ι��캯��
+        /// 无参构造函数
         /// </summary>
         public ConsoleDeviceModel()
         {
@@ -32,85 +32,85 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        #region ����
+        #region 属性
         /// <summary>
-        /// �Զ��������
+        /// 自动组包处理
         /// </summary>
         AutoPackHandler autoPack;
 
         /// <summary>
-        /// �ֽڴ���
+        /// 字节处理
         /// </summary>
         private BytesHandler bytesHandler;
 
         /// <summary>
-        /// �ⲿ�ص���Ҫ��ʾ����Ϣ
+        /// 外部回调需要显示的消息
         /// </summary>
         private Func<string, Task> ShowAsync;
 
         /// <summary>
-        /// �ⲿ�ص���Ҫ��ʾ�Ľ����Ϣ
+        /// 外部回调需要显示的结果消息
         /// </summary>
         private Func<PluginConfigModel, BaseModel, Task> ResultAsync;
 
         /// <summary>
-        /// �ɼ�����
+        /// 采集驱动
         /// </summary>
         private DqaHandler daqHandler;
 
         /// <summary>
-        /// ���봦��
+        /// 消息处理
         /// </summary>
         private ConcurrentDictionary<string, MqHandler> mqHandlers = new();
 
         /// <summary>
-        /// �ֽڴ���ģ��
+        /// 字节处理模型
         /// </summary>
 
         private ConcurrentDictionary<string, List<BytesModel>> bytesModels = new();
 
         /// <summary>
-        /// ����ʱ���¼
+        /// 运行时间记录
         /// </summary>
         private RuntimeSecondsRecorderHandler runtime = new();
 
         /// <summary>
-        /// ԭʼ��ַ -> OPCUA��ʵ��ַӳ��
+        /// 原始地址 -> OPCUA 真实地址映射
         /// </summary>
         private readonly ConcurrentDictionary<string, string> _addressMap = new();
 
         /// <summary>
-        /// UAд�븴���ֵ䣨������·���������䣩
+        /// UA 写入复用字典（单线程路径，无需并发容器）
         /// </summary>
         private readonly ConcurrentDictionary<string, WriteModel> _singleWriteDict = new();
 
         /// <summary>
-        /// ����ռ�����
+        /// 地址空间名称
         /// </summary>
         private string uaServerAddressSpaceName;
 
         /// <summary>
-        /// opcua����㼶
+        /// opcua 父级层级
         /// </summary>
         private FolderState folderState;
 
         /// <summary>
-        /// �㼶����
+        /// 层级集合
         /// </summary>
         private List<FolderState> folderStates = new();
 
         /// <summary>
-        /// ��ַ�������棨������·��ÿ���ؽ���
+        /// 地址索引缓存（单线程路径，每次重建）
         /// </summary>
         private Dictionary<string, IAddressModel> _addressIndex = new();
 
         /// <summary>
-        /// MQ���ӳ�仺�棨������·��ÿ���ؽ���
+        /// MQ 配置映射缓存（单线程路径，每次重建）
         /// </summary>
         private Dictionary<string, List<PluginConfigModel>> _mqPluginMap = new();
 
         /// <summary>
-        /// DataType �� BuiltInType ӳ�仺��
+        /// DataType 与 BuiltInType 映射缓存
         /// </summary>
         private static readonly Dictionary<DataType, BuiltInType> _typeMap = new()
         {
@@ -136,7 +136,7 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
-        /// ͨ�����ã��ӳٴ�����
+        /// 通道配置，延迟创建
         /// </summary>
         private BoundedChannelOptions channel => p_Channel ??= new BoundedChannelOptions(ushort.MaxValue)
         {
@@ -147,27 +147,27 @@ namespace Snet.Iot.Daq.viewModel
         private BoundedChannelOptions? p_Channel;
 
         /// <summary>
-        /// Ua����ͬ��ͨ��
+        /// Ua 地址同步通道
         /// </summary>
         private Channel<AddressValue> UaSyncChannel;
 
         /// <summary>
-        /// �����¼�ͨ��
+        /// 数据事件通道
         /// </summary>
         private Channel<EventDataResult> DataSyncChannel;
 
         /// <summary>
-        /// ȫ����Ϣȡ��֪ͨ
+        /// 全局消息取消通知
         /// </summary>
         private CancellationTokenSource TokenSource;
 
         /// <summary>
-        /// �Ƿ������вɼ�
+        /// 是否正在运行采集
         /// </summary>
         public bool IsRun = false;
 
         /// <summary>
-        /// �ɼ�����
+        /// 采集配置
         /// </summary>
         private PluginConfigModel DaqData
         {
@@ -176,17 +176,17 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �ɼ����·��
+        /// 采集插件路径
         /// </summary>
         public string DaqPluginPath { get; set; }
 
         /// <summary>
-        /// ������·��
+        /// 消息插件路径
         /// </summary>
         public List<string> MqPluginPath { get; set; }
 
         /// <summary>
-        /// ��ַ����
+        /// 地址数量
         /// </summary>
         public int AddressCount
         {
@@ -195,7 +195,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ��ַ����
+        /// 地址数据
         /// </summary>
         private ConcurrentDictionary<IAddressModel, List<PluginConfigModel>> AddressDatas
         {
@@ -204,7 +204,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ��Ŀ����
+        /// 项目信息
         /// </summary>
         private IProjectTreeViewModel Project
         {
@@ -213,7 +213,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �豸ָʾ���Ƿ���˸
+        /// 设备指示灯是否闪烁
         /// </summary>
         public bool DeviceStatusFlashing
         {
@@ -222,7 +222,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �豸״̬���� �����ǰ�
+        /// 设备状态常亮 绿色代表正常
         /// </summary>
         public bool DeviceStatusChangLiang
         {
@@ -231,7 +231,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �豸����
+        /// 设备名称
         /// </summary>
         public string DeviceName
         {
@@ -240,7 +240,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �豸����
+        /// 设备类型
         /// </summary>
         public string DeviceType
         {
@@ -249,7 +249,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �豸�㼶
+        /// 设备层级
         /// </summary>
         public string DeviceHierarchy
         {
@@ -257,7 +257,7 @@ namespace Snet.Iot.Daq.viewModel
             set => SetProperty(() => DeviceHierarchy, value);
         }
         /// <summary>
-        /// �豸�㼶
+        /// 设备层级（完整路径）
         /// </summary>
         public string DeviceHierarchyToolTip
         {
@@ -267,7 +267,7 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
-        /// �ɼ�ʱ��
+        /// 采集时间
         /// </summary>
         public int CollectTime
         {
@@ -276,17 +276,17 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �ɼ�״̬
+        /// 采集状态
         /// </summary>
         public string CollectStatus
         {
             get => collectStatus;
             set => SetProperty(ref collectStatus, value);
         }
-        private string collectStatus = LanguageHandler.GetLanguageValue("δ֪", App.LanguageOperate);
+        private string collectStatus = LanguageHandler.GetLanguageValue("未知", App.LanguageOperate);
 
         /// <summary>
-        /// ����ʱ��
+        /// 更新时间
         /// </summary>
         public DateTime UpdateTime
         {
@@ -295,7 +295,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// LED��ɫ
+        /// LED 颜色
         /// </summary>
         public System.Windows.Media.Color LedColor
         {
@@ -305,18 +305,18 @@ namespace Snet.Iot.Daq.viewModel
         private System.Windows.Media.Color ledColor = System.Windows.Media.Colors.Green;
         #endregion
 
-        #region �¼�
+        #region 事件
         /// <summary>
-        /// ��Ϣ�¼�
+        /// 信息事件
         /// </summary>
         private async Task DqaHandler_OnInfoEventAsync(object? sender, EventInfoResult e)
         {
-            //��д�������
+            //写入结果回调
             await ResultMsgAsync(DaqData, new ResultModel(e.Status, e.Message) { Time = e.Time });
         }
 
         /// <summary>
-        /// �����¼�
+        /// 数据事件
         /// </summary>
         private async Task DqaHandler_OnDataEventAsync(object? sender, EventDataResult e)
         {
@@ -330,10 +330,10 @@ namespace Snet.Iot.Daq.viewModel
 
         #endregion
 
-        #region ����
+        #region 命令
 
         /// <summary>
-        /// webapi����
+        /// webapi 启动
         /// </summary>
         public IAsyncRelayCommand WASatrt => waStart ??= new AsyncRelayCommand(WASatrtAsync);
         private IAsyncRelayCommand? waStart;
@@ -345,7 +345,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             if (DaqData.WebApi == null)
             {
-                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "δ����WebApi����".GetLanguageValue(App.LanguageOperate));
+                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi配置".GetLanguageValue(App.LanguageOperate));
                 return;
             }
 
@@ -356,12 +356,12 @@ namespace Snet.Iot.Daq.viewModel
             }
 
             OperateResult result = await daqHandler.WAOnAsync(DaqData.Guid, DaqData.WebApi);
-            //��д�������
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + (result.Status ? "WebApi�����ɹ�".GetLanguageValue(App.LanguageOperate) : "WebApi����ʧ��".GetLanguageValue(App.LanguageOperate) + "," + result.Message));
+            //写入结果回调
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + (result.Status ? "WebApi启动成功".GetLanguageValue(App.LanguageOperate) : "WebApi启动失败".GetLanguageValue(App.LanguageOperate) + "," + result.Message));
         }
 
         /// <summary>
-        /// webapiֹͣ
+        /// webapi 停止
         /// </summary>
         public IAsyncRelayCommand WAStop => waStop ??= new AsyncRelayCommand(WAStopAsync);
         private IAsyncRelayCommand? waStop;
@@ -373,7 +373,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             if (DaqData.WebApi == null)
             {
-                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "δ����WebApi����".GetLanguageValue(App.LanguageOperate));
+                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi配置".GetLanguageValue(App.LanguageOperate));
                 return;
             }
 
@@ -384,12 +384,12 @@ namespace Snet.Iot.Daq.viewModel
             }
 
             OperateResult result = await daqHandler.WAOffAsync(DaqData.Guid);
-            //��д�������
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + (result.Status ? "WebApiֹͣ�ɹ�".GetLanguageValue(App.LanguageOperate) : "WebApiֹͣʧ��".GetLanguageValue(App.LanguageOperate) + "," + result.Message));
+            //写入结果回调
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + (result.Status ? "WebApi停止成功".GetLanguageValue(App.LanguageOperate) : "WebApi停止失败".GetLanguageValue(App.LanguageOperate) + "," + result.Message));
         }
 
         /// <summary>
-        /// webapiʾ������
+        /// webapi 示例请求
         /// </summary>
         public IAsyncRelayCommand WARequestExample => waRequestExample ??= new AsyncRelayCommand(WARequestExampleAsync);
         private IAsyncRelayCommand? waRequestExample;
@@ -401,16 +401,16 @@ namespace Snet.Iot.Daq.viewModel
             }
             if (DaqData.WebApi == null)
             {
-                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "δ����WebApi����".GetLanguageValue(App.LanguageOperate));
+                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi配置".GetLanguageValue(App.LanguageOperate));
                 return;
             }
             OperateResult result = await daqHandler.WARequestExampleAsync(DaqData.Guid);
-            //��д�������
+            //写入结果回调
             if (ShowAsync != null) await ShowAsync($"{DeviceHierarchyToolTip}\r\n" + result.ResultData.ToString());
         }
 
         /// <summary>
-        /// �ɼ�
+        /// 采集
         /// </summary>
         public IAsyncRelayCommand Collect => collect ??= new AsyncRelayCommand(CollectAsync);
         private IAsyncRelayCommand? collect;
@@ -427,10 +427,10 @@ namespace Snet.Iot.Daq.viewModel
                     daqHandler.OnInfoEventAsync += DqaHandler_OnInfoEventAsync;
                 }
 
-                //���Զ��������������PLCѹ��
+                //使用自动组包，可降低PLC压力
                 string[] keys = AutoPackHandler.GetSupportAutoPackDeviceTypes();
                 string? key = keys.FirstOrDefault(k => DaqData.Param.Contains(k));
-                OperateResult result = OperateResult.CreateFailureResult("�ɼ�ʧ��".GetLanguageValue(App.LanguageOperate));
+                OperateResult result = OperateResult.CreateFailureResult("采集失败".GetLanguageValue(App.LanguageOperate));
                 if (key != null && DaqData.AutoPack != null)
                 {
                     autoPack ??= AutoPackHandler.Instance(key);
@@ -459,9 +459,9 @@ namespace Snet.Iot.Daq.viewModel
 
                     _addressMap.Clear();
 
-                    if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "�����ɼ�".GetLanguageValue(App.LanguageOperate));
+                    if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "开始采集".GetLanguageValue(App.LanguageOperate));
 
-                    CollectStatus = LanguageHandler.GetLanguageValue("����", App.LanguageOperate);
+                    CollectStatus = LanguageHandler.GetLanguageValue("正常", App.LanguageOperate);
                     DeviceStatusFlashing = true;
                     DeviceStatusChangLiang = true;
                     runtime.Start();
@@ -495,13 +495,13 @@ namespace Snet.Iot.Daq.viewModel
                     DeviceStatusFlashing = false;
                     DeviceStatusChangLiang = false;
                 }
-                //��д�������
+                //写入结果回调
                 await ResultMsgAsync(DaqData, result);
             }
         }
 
         /// <summary>
-        /// ֹͣ
+        /// 停止
         /// </summary>
         public IAsyncRelayCommand Stop => stop ??= new AsyncRelayCommand(StopAsync);
         private IAsyncRelayCommand? stop;
@@ -512,7 +512,7 @@ namespace Snet.Iot.Daq.viewModel
                 return;
             }
 
-            // ȡ��
+            // 取消
             if (TokenSource != null)
             {
                 TokenSource.Cancel();
@@ -540,7 +540,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             mqHandlers.Clear();
 
-            CollectStatus = LanguageHandler.GetLanguageValue("ֹͣ", App.LanguageOperate);
+            CollectStatus = LanguageHandler.GetLanguageValue("停止", App.LanguageOperate);
             DeviceStatusFlashing = false;
             DeviceStatusChangLiang = false;
             IsRun = false;
@@ -548,30 +548,30 @@ namespace Snet.Iot.Daq.viewModel
 
             if (UaSyncChannel != null)
             {
-                //ֹͣ
+                //停止
                 UaSyncChannel.Writer.TryComplete();
-                //��������
+                //清空队列
                 while (UaSyncChannel.Reader.TryRead(out AddressValue? item)) { }
-                //�ÿ�
+                //置空
                 UaSyncChannel = null;
             }
 
             if (DataSyncChannel != null)
             {
-                //ֹͣ
+                //停止
                 DataSyncChannel.Writer.TryComplete();
-                //��������
+                //清空队列
                 while (DataSyncChannel.Reader.TryRead(out EventDataResult? item)) { }
-                //�ÿ�
+                //置空
                 DataSyncChannel = null;
             }
 
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "ֹͣ�ɼ�".GetLanguageValue(App.LanguageOperate));
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "停止采集".GetLanguageValue(App.LanguageOperate));
 
         }
 
         /// <summary>
-        /// ����
+        /// 重试
         /// </summary>
         public IAsyncRelayCommand Retry => retry ??= new AsyncRelayCommand(RetryAsync);
         private IAsyncRelayCommand? retry;
@@ -580,11 +580,11 @@ namespace Snet.Iot.Daq.viewModel
             runtime.Reset();
             await StopAsync();
             await CollectAsync();
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "����".GetLanguageValue(App.LanguageOperate));
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "重试".GetLanguageValue(App.LanguageOperate));
         }
 
         /// <summary>
-        /// �����ɼ�
+        /// 软启动采集
         /// </summary>
         public IAsyncRelayCommand OnSoftCollect => onSoftCollect ??= new AsyncRelayCommand(OnSoftCollectAsync);
         private IAsyncRelayCommand? onSoftCollect;
@@ -592,11 +592,11 @@ namespace Snet.Iot.Daq.viewModel
         {
             Project.IsSoftStart = true;
             await Project.SetAsync(GlobalConfigModel.ProjectDict);
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "���������ɼ��ɹ�".GetLanguageValue(App.LanguageOperate));
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "开启软启动采集成功".GetLanguageValue(App.LanguageOperate));
         }
 
         /// <summary>
-        /// ȡ�������ɼ�
+        /// 取消软启动采集
         /// </summary>
         public IAsyncRelayCommand OffSoftCollect => offSoftCollect ??= new AsyncRelayCommand(OffSoftCollectAsync);
         private IAsyncRelayCommand? offSoftCollect;
@@ -604,13 +604,13 @@ namespace Snet.Iot.Daq.viewModel
         {
             Project.IsSoftStart = false;
             await Project.SetAsync(GlobalConfigModel.ProjectDict);
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "ȡ�������ɼ��ɹ�".GetLanguageValue(App.LanguageOperate));
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "取消软启动采集成功".GetLanguageValue(App.LanguageOperate));
         }
         #endregion
 
-        #region ����
+        #region 功能方法
         /// <summary>
-        /// ͨ�������¼�����
+        /// 通道地址事件消费
         /// </summary>
         private async Task UaSyncChannelDataEventAsync(CancellationToken token)
         {
@@ -629,12 +629,12 @@ namespace Snet.Iot.Daq.viewModel
                             continue;
                         }
 
-                        //����Դ
+                        //数据源
                         string addressName = addressValue.AddressName;
                         DataType dataType = addressValue.AddressDataType;
                         object? value = addressValue.ResultValue;
 
-                        //����
+                        //校验
                         var service = GlobalConfigModel.uaService;
                         if (service is null || !service.GetStatus().Status)
                             continue;
@@ -647,7 +647,7 @@ namespace Snet.Iot.Daq.viewModel
                             if (builtInType == BuiltInType.String)
                                 value ??= string.Empty;
 
-                            //������ַ
+                            //创建地址
                             var createResult = service.CreateAddress(new()
                             {
                                 new()
@@ -666,7 +666,7 @@ namespace Snet.Iot.Daq.viewModel
                                 continue;
                             }
 
-                            // ֻ�ڴ����ɹ���ˢ��һ�ε�ַ�б�
+                            // 只在创建成功后刷新一次地址列表
                             var res = service.GetAddressArray().GetSource<List<string>>();
                             string format = $"s={uaServerAddressSpaceName}.{Project.GetHierarchyPath(".")}.{addressName}";
                             if (res != null)
@@ -682,7 +682,7 @@ namespace Snet.Iot.Daq.viewModel
                             }
                         }
 
-                        // д��
+                        // 写入
                         if (!_addressMap.TryGetValue(addressName, out var realAddress))
                             continue;
 
@@ -702,19 +702,19 @@ namespace Snet.Iot.Daq.viewModel
             }
             catch (ChannelClosedException ex2)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] ͨ���ѹرգ�" + ex2.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
             }
             catch (OperationCanceledException ex3)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] ����ȡ����" + ex3.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 操作已取消：" + ex3.Message));
             }
             catch (Exception ex4)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] �쳣��" + ex4.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 异常：" + ex4.Message));
             }
         }
         /// <summary>
-        /// ����UA�㼶
+        /// 创建UA层级
         /// </summary>
         /// <returns></returns>
         private async Task<FolderState?> UaCreateFolder()
@@ -729,7 +729,7 @@ namespace Snet.Iot.Daq.viewModel
                     return folderState;
                 }
 
-                //�ȶԲ㼶
+                //比对层级
                 if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
                 {
                     uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsData().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
@@ -738,7 +738,7 @@ namespace Snet.Iot.Daq.viewModel
                 if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)
                 {
                     FolderState folder = null;
-                    //�����㼶
+                    //创建层级
                     foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
                     {
                         OperateResult operateResult = GlobalConfigModel.uaService.CreateFolder(item, folder);
@@ -767,7 +767,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ͨ�������¼�����
+        /// 通道数据事件消费
         /// </summary>
         private async Task DataSyncChannelDataEventAsync(CancellationToken token)
         {
@@ -798,7 +798,7 @@ namespace Snet.Iot.Daq.viewModel
                                 !_mqPluginMap.TryGetValue(kv.Key, out var pluginConfigs))
                                 continue;
 
-                            // �����ֽڴ���ģ�ͣ����ȴ�JSON�ַ�����ȡ����δ��ļ���ȡ
+                            // 根据字节处理模型，优先从JSON字符串获取，否则从文件获取
                             List<BytesModel>? bm = null;
                             try
                             {
@@ -806,7 +806,7 @@ namespace Snet.Iot.Daq.viewModel
                             }
                             catch (System.Text.Json.JsonException)
                             {
-                                // AddressExtendParam ������Ч�� BytesModel JSON�����˵��ļ�ģʽ
+                                // AddressExtendParam 不是有效的 BytesModel JSON，可能是文件模式
                             }
 
                             if (bm != null)
@@ -817,7 +817,7 @@ namespace Snet.Iot.Daq.viewModel
                             {
                                 if (!File.Exists(addressModel.ExpandParam))
                                 {
-                                    ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "��չ�����ļ�������".GetLanguageValue(App.LanguageOperate));
+                                    ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展配置文件不存在".GetLanguageValue(App.LanguageOperate));
                                     continue;
                                 }
                                 if (!bytesModels.TryGetValue(addressModel.Address, out bm) || bm == null)
@@ -830,7 +830,7 @@ namespace Snet.Iot.Daq.viewModel
                                 }
                             }
 
-                            // ���ֽ�ģ�ͣ�ֱ��ת��
+                            // 无字节模型，直接转发
                             if (bm == null)
                             {
                                 if (TokenSource is null)
@@ -840,7 +840,7 @@ namespace Snet.Iot.Daq.viewModel
                                 continue;
                             }
 
-                            // �ֽ�ת����ת��
+                            // 字节转换与转发
                             await TransformAndForwardAsync(kv.Value, bm, addressModel, pluginConfigs);
                         }
                     }
@@ -848,24 +848,24 @@ namespace Snet.Iot.Daq.viewModel
             }
             catch (TaskCanceledException ex1)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] ����ȡ����" + ex1.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 操作已取消：" + ex1.Message));
             }
             catch (ChannelClosedException ex2)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] ͨ���ѹرգ�" + ex2.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
             }
             catch (OperationCanceledException ex3)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] ����ȡ����" + ex3.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 操作已取消：" + ex3.Message));
             }
             catch (Exception ex4)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] �쳣��" + ex4.Message));
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 异常：" + ex4.Message));
             }
         }
 
         /// <summary>
-        /// �ֽ�ת����ת������� UA ͨ���� MQ
+        /// 字节转换并转发到 UA 通道与 MQ
         /// </summary>
         private async Task TransformAndForwardAsync(AddressValue addressValue, List<BytesModel> bm, IAddressModel addressModel, List<PluginConfigModel> pluginConfigs)
         {
@@ -897,7 +897,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// MQ����
+        /// MQ 传输
         /// </summary>
         private async Task MqTransmissionAsync(Dictionary<IAddressModel, AddressValue> inParam, List<PluginConfigModel> pluginConfigs)
         {
@@ -914,7 +914,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �ؽ���ַ���һ���
+        /// 重建地址缓存
         /// </summary>
         private void RebuildAddressCache()
         {
@@ -927,7 +927,7 @@ namespace Snet.Iot.Daq.viewModel
                 .GroupBy(kv => kv.Key.Address!)
                 .ToDictionary(g => g.Key, g => g.SelectMany(x => x.Value).ToList());
 
-            //����MQ���·��
+            //循环MQ插件路径
             foreach (var item in _mqPluginMap)
             {
                 if (MqPluginPath is not null)
@@ -943,9 +943,9 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ����
+        /// 配置
         /// </summary>
-        /// <param name="model">��Ŀ��Ϣ</param>
+        /// <param name="model">项目信息</param>
         public async Task SettingsAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
             DaqPluginPath = PluginHandlerCore.PluginOperate.GetPluginPath(model.DaqDetails.Name);
@@ -972,26 +972,26 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// �����Ϣ�׳�
+        /// 结果消息抛出
         /// </summary>
         public async Task ResultMsgAsync(PluginConfigModel pcm, BaseModel bm)
         {
             if (bm.Status)
             {
                 LedColor = System.Windows.Media.Colors.Green;
-                CollectStatus = LanguageHandler.GetLanguageValue("����", App.LanguageOperate);
+                CollectStatus = LanguageHandler.GetLanguageValue("正常", App.LanguageOperate);
             }
             else
             {
                 LedColor = System.Windows.Media.Colors.Red;
-                CollectStatus = LanguageHandler.GetLanguageValue("�쳣", App.LanguageOperate);
+                CollectStatus = LanguageHandler.GetLanguageValue("异常", App.LanguageOperate);
                 DeviceStatusChangLiang = true;
             }
             await ResultAsync.Invoke(pcm, bm);
         }
 
         /// <summary>
-        /// ��ʼÿ���ȡ����ʱ��
+        /// 开始每秒读取运行时间
         /// </summary>
         public void StartPolling(RuntimeSecondsRecorderHandler recorder)
         {
@@ -1014,7 +1014,7 @@ namespace Snet.Iot.Daq.viewModel
         }
         private CancellationTokenSource _cts;
         /// <summary>
-        /// ֹͣ��ѯ
+        /// 停止轮询
         /// </summary>
         public void StopPolling()
         {
@@ -1030,7 +1030,7 @@ namespace Snet.Iot.Daq.viewModel
 
         public void Dispose()
         {
-            // ȡ�����ƣ���ֹ�����첽�������ִ��
+            // 取消令牌，防止后台异步任务继续执行
             if (TokenSource != null)
             {
                 TokenSource.Cancel();
@@ -1073,7 +1073,7 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        #region ״̬
+        #region 状态
         private Task LanguageHandler_OnLanguageEventAsync(object? sender, EventLanguageResult e)
         {
             string text = CollectStatus;
