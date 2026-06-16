@@ -1,5 +1,5 @@
-﻿using Snet.Model.@enum;
-using Snet.Iot.Daq.Core.mvvm;
+﻿using Snet.Iot.Daq.Core.mvvm;
+using Snet.Model.@enum;
 using SQLite;
 using System.ComponentModel;
 using System.Text.Json.Serialization;

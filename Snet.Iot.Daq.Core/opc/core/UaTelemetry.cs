@@ -6,7 +6,6 @@ using Serilog.Events;
 using Snet.Log;
 using System.Diagnostics;
 using System.Diagnostics.Metrics;
-using System.IO;
 using System.Reflection;
 
 namespace Snet.Iot.Daq.Core.opc.core

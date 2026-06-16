@@ -1,5 +1,4 @@
 ﻿using System.ComponentModel;
-using System.IO;
 using System.Text.Json.Serialization;
 
 namespace Snet.Iot.Daq.Core.opc.core

@@ -145,15 +145,12 @@ namespace Snet.Iot.Daq.Core.mqtt.service
         public OperateResult Off(bool hardClose = false) => Task.Run(() => OffAsync(hardClose)).GetAwaiter().GetResult();
 
         /// <inheritdoc/>
-        public OperateResult GetStatus()
-        {
-            return EndOperate(states == States.On, states == States.On ? "已启动" : "未启动", methodName: BegOperate());
-        }
+        public OperateResult GetStatus() => GetStatusAsync().GetAwaiter().GetResult();
 
         /// <inheritdoc/>
         public async Task<OperateResult> OnAsync(CancellationToken token = default)
         {
-            BegOperate();
+            await BegOperateAsync(token);
             try
             {
                 MqttServerOptionsBuilder mqttServerOptionsBuilder = new MqttServerOptionsBuilder();
@@ -169,43 +166,46 @@ namespace Snet.Iot.Daq.Core.mqtt.service
                 mqttServer.ClientUnsubscribedTopicAsync += MqttServer_ClientUnsubscribedTopicAsync;
                 mqttServer.StartedAsync += MqttServer_StartedAsync;
                 mqttServer.StoppedAsync += MqttServer_StoppedAsync;
-                await mqttServer.StartAsync().ConfigureAwait(false);
+                await mqttServer.StartAsync();
                 states = States.On;
-                return EndOperate(true);
+                return await EndOperateAsync(true, token: token);
             }
             catch (Exception ex)
             {
-                await OffAsync(true, token).ConfigureAwait(false);
-                return EndOperate(false, ex.Message, exception: ex);
+                await OffAsync(true, token);
+                return await EndOperateAsync(false, ex.Message, exception: ex, token: token);
             }
         }
 
         /// <inheritdoc/>
         public async Task<OperateResult> OffAsync(bool hardClose = false, CancellationToken token = default)
         {
-            BegOperate();
+            await BegOperateAsync(token);
             try
             {
                 if (!hardClose && mqttServer == null)
                 {
-                    return EndOperate(false, "未连接");
+                    return await EndOperateAsync(false, "未连接", token: token);
                 }
                 if (mqttServer != null)
                 {
-                    await mqttServer.StopAsync().ConfigureAwait(false);
+                    await mqttServer.StopAsync();
                     mqttServer.Dispose();
                     mqttServer = null;
                 }
                 states = States.Off;
-                return EndOperate(true);
+                return await EndOperateAsync(true, token: token);
             }
             catch (Exception ex)
             {
-                return EndOperate(false, ex.Message, exception: ex);
+                return await EndOperateAsync(false, ex.Message, exception: ex, token: token);
             }
         }
 
         /// <inheritdoc/>
-        public async Task<OperateResult> GetStatusAsync(CancellationToken token = default) => await Task.Run(GetStatus, token).ConfigureAwait(false);
+        public async Task<OperateResult> GetStatusAsync(CancellationToken token = default)
+        {
+            return await EndOperateAsync(states == States.On, states == States.On ? "已启动" : "未启动", methodName: await BegOperateAsync(token), token: token);
+        }
     }
 }

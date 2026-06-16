@@ -33,7 +33,6 @@ using Newtonsoft.Json.Linq;
 using Opc.Ua;
 using Opc.Ua.Server;
 using Snet.Utility;
-using System.IO;
 
 namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 {

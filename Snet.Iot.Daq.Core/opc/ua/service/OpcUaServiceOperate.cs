@@ -8,7 +8,6 @@ using Snet.Model.data;
 using Snet.Model.@interface;
 using Snet.Utility;
 using System.Collections.Concurrent;
-using System.IO;
 
 namespace Snet.Iot.Daq.Core.opc.ua.service
 {
@@ -350,15 +349,74 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         }
 
         /// <inheritdoc/>
-        public OperateResult On()
+        public OperateResult On() => OnAsync().GetAwaiter().GetResult();
+        /// <inheritdoc/>
+        public OperateResult Off(bool hardClose = false) => OffAsync(hardClose).GetAwaiter().GetResult();
+        /// <inheritdoc/>
+        public OperateResult Write(ConcurrentDictionary<string, (object value, Model.@enum.EncodingType? encodingType)> values) => WriteAsync(values).GetAwaiter().GetResult();
+        /// <inheritdoc/>
+        public OperateResult Write(ConcurrentDictionary<string, object> values) => WriteAsync(values).GetAwaiter().GetResult();
+        /// <inheritdoc/>
+        public OperateResult Write(ConcurrentDictionary<string, WriteModel> values) => WriteAsync(values).GetAwaiter().GetResult();
+        /// <inheritdoc/>
+        public OperateResult Read(Address address) => ReadAsync(address).GetAwaiter().GetResult();
+        /// <inheritdoc/>
+        public OperateResult GetStatus() => GetStatusAsync().GetAwaiter().GetResult();
+
+
+        /// <inheritdoc/>
+        public async Task<OperateResult> OffAsync(bool hardClose = false, CancellationToken token = default)
         {
             //开始记录运行时间
-            BegOperate();
+            await BegOperateAsync(token);
             try
             {
-                if (GetStatus().GetDetails(out string? message))
+                if (!hardClose)
                 {
-                    return EndOperate(false, message);
+                    if (!(await GetStatusAsync(token)).GetDetails(out string? message))
+                    {
+                        return await EndOperateAsync(false, message, token: token);
+                    }
+                }
+                // 取消并释放令牌，等待后台状态线程退出
+                if (tokenSource != null)
+                {
+                    tokenSource.Cancel();
+                    try { await _statusTask; } catch (OperationCanceledException) { }
+                    tokenSource.Dispose();
+                    tokenSource = null;
+                    _statusTask = null;
+                }
+                if (service != null)
+                {
+                    FolderInfo.Clear();
+                    // 先清理地址空间，再 Dispose（避免 use-after-dispose）
+                    service.NodeManage?.DeleteAddressSpace();
+                    service.NodeManage?.Dispose();
+                    // 停止服务并处理
+                    await service.StopAsync();
+                    service.Dispose();
+                    // 停止状态线程
+                    service = null;
+                }
+                IsStart = false;
+                return await EndOperateAsync(true, token: token);
+            }
+            catch (Exception ex)
+            {
+                return await EndOperateAsync(false, ex.Message, exception: ex, token: token);
+            }
+        }
+        /// <inheritdoc/>
+        public async Task<OperateResult> OnAsync(CancellationToken token = default)
+        {
+            //开始记录运行时间
+            await BegOperateAsync(token);
+            try
+            {
+                if ((await GetStatusAsync(token)).GetDetails(out string? message))
+                {
+                    return await EndOperateAsync(false, message, token: token);
                 }
                 string tag = basics.Tag;
                 //实例化对象
@@ -455,7 +513,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 serverConfig.SetMaxDurableSubscriptionLifetime(10);
 
                 var cerRoot = Data.CerPath;
-                ApplicationConfiguration config = serverConfig.AddSecurityConfiguration(new CertificateIdentifierCollection(new List<CertificateIdentifier>
+                ApplicationConfiguration config = await serverConfig.AddSecurityConfiguration(new CertificateIdentifierCollection(new List<CertificateIdentifier>
                 {
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="RsaSha256"},
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="NistP256"},
@@ -470,7 +528,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     .SetAddAppCertToTrustedStore(false)
                     .SetSendCertificateChain(true)
                     .SetOutputFilePath(Path.Combine("logs", $"{tag}.log"))
-                   .CreateAsync().ConfigureAwait(false).GetAwaiter().GetResult();
+                   .CreateAsync(ct: token);
                 //设置 Nonce 长度
                 config.SecurityConfiguration.NonceLength = 32;
                 //添加权限
@@ -482,36 +540,36 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     case Data.AuType.UserName:
                         if (string.IsNullOrWhiteSpace(basics.UserName) || string.IsNullOrWhiteSpace(basics.Password))
                         {
-                            Off(true);
-                            return EndOperate(false, "账号或密码不能为空");
+                            await OffAsync(true, token);
+                            return await EndOperateAsync(false, "账号或密码不能为空", token: token);
                         }
                         serverConfig.AddUserTokenPolicy(UserTokenType.UserName);
                         break;
                     case Data.AuType.Certificate:
-                        Off(true);
-                        return EndOperate(false, "当前库服务端不支持证书认证");
+                        await OffAsync(true, token);
+                        return await EndOperateAsync(false, "当前库服务端不支持证书认证", token: token);
                 }
 
                 //检查是否有有效的应用实例证书。
-                bool haveAppCertificate = AI.CheckApplicationInstanceCertificatesAsync(true).ConfigureAwait(false).GetAwaiter().GetResult();
+                bool haveAppCertificate = await AI.CheckApplicationInstanceCertificatesAsync(true, ct: token);
                 if (!haveAppCertificate)
                 {
-                    Off(true);
-                    return EndOperate(false, "应用实例证书无效");
+                    await OffAsync(true, token);
+                    return await EndOperateAsync(false, "应用实例证书无效", token: token);
                 }
 
                 //实例化
                 service = new ReferenceServer(basics.UserName, basics.Password, basics.AType, basics.AutoCreateAddress, basics.AddressSpaceName, OnDataEventHandler);
 
                 //启动服务
-                AI.StartAsync(service).ConfigureAwait(false).GetAwaiter().GetResult();
+                await AI.StartAsync(service);
 
                 //打印信息
                 var endpoints = AI.Server.GetEndpoints().Select(e => e.EndpointUrl).Distinct();
                 foreach (var endpoint in endpoints)
                 {
                     //事件抛出
-                    OnInfoEventHandler(this, new EventInfoResult(true, endpoint));
+                    await OnInfoEventHandlerAsync(this, new EventInfoResult(true, endpoint));
                 }
                 if (tokenSource == null)
                 {
@@ -533,105 +591,79 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 service.CurrentInstance.SubscriptionManager.SubscriptionDeleted += SubscriptionManager_Subscription;
 
                 IsStart = true;
-                return EndOperate(true);
+                return await EndOperateAsync(true, token: token);
             }
             catch (Exception ex)
             {
-                Off(true);
-                return EndOperate(false, ex.Message, exception: ex);
+                await OffAsync(true, token);
+                return await EndOperateAsync(false, ex.Message, exception: ex, token: token);
             }
         }
         /// <inheritdoc/>
-        public OperateResult Off(bool hardClose = false)
+        public async Task<OperateResult> ReadAsync(Address address, CancellationToken token = default)
         {
             //开始记录运行时间
-            BegOperate();
+            await BegOperateAsync(token);
             try
             {
-                if (!hardClose)
+                if (!(await GetStatusAsync(token)).GetDetails(out string? message))
                 {
-                    if (!GetStatus().GetDetails(out string? message))
-                    {
-                        return EndOperate(false, message);
-                    }
+                    return await EndOperateAsync(false, message, token: token);
                 }
-                // 取消并释放令牌，等待后台状态线程退出
-                if (tokenSource != null)
-                {
-                    tokenSource.Cancel();
-                    try { _statusTask?.GetAwaiter().GetResult(); } catch (OperationCanceledException) { }
-                    tokenSource.Dispose();
-                    tokenSource = null;
-                    _statusTask = null;
-                }
-                if (service != null)
-                {
-                    FolderInfo.Clear();
-                    // 先清理地址空间，再 Dispose（避免 use-after-dispose）
-                    service.NodeManage?.DeleteAddressSpace();
-                    service.NodeManage?.Dispose();
-                    // 停止服务并处理
-                    service.StopAsync().ConfigureAwait(false).GetAwaiter().GetResult();
-                    service.Dispose();
-                    // 停止状态线程
-                    service = null;
-                }
-                IsStart = false;
-                return EndOperate(true);
+                return await EndOperateAsync(service.NodeManage.ReadAddress(address), token: token);
             }
             catch (Exception ex)
             {
-                return EndOperate(false, ex.Message, exception: ex);
+                return await EndOperateAsync(false, ex.Message, exception: ex, token: token);
             }
         }
-
-        public OperateResult Write(ConcurrentDictionary<string, (object value, Model.@enum.EncodingType? encodingType)> values)
+        /// <inheritdoc/>
+        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, (object value, Snet.Model.@enum.EncodingType? encodingType)> values, CancellationToken token = default)
         {
             //开始记录运行时间
-            BegOperate();
+            await BegOperateAsync(token);
             try
             {
-                if (!GetStatus().GetDetails(out string? message))
+                if (!(await GetStatusAsync(token)).GetDetails(out string? message))
                 {
-                    return EndOperate(false, message);
+                    return await EndOperateAsync(false, message, token: token);
                 }
                 // 将元组值转换为 object 字典（单线程路径，无需并发容器）
                 var targetDict = new ConcurrentDictionary<string, object>();
                 foreach (var kvp in values)
                     targetDict[kvp.Key] = kvp.Value;
-                return Write(targetDict);
+                return await WriteAsync(targetDict, token);
             }
             catch (Exception ex)
             {
-                return EndOperate(false, ex.Message, exception: ex);
+                return await EndOperateAsync(false, ex.Message, exception: ex, token: token);
             }
         }
-
         /// <inheritdoc/>
-        public OperateResult Write(ConcurrentDictionary<string, object> values)
+        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, object> values, CancellationToken token = default)
         {
             //开始记录运行时间
-            BegOperate();
+            await BegOperateAsync(token);
             try
             {
-                if (!GetStatus().GetDetails(out string? message))
+                if (!(await GetStatusAsync(token)).GetDetails(out string? message))
                 {
-                    return EndOperate(false, message);
+                    return await EndOperateAsync(false, message, token: token);
                 }
-                return EndOperate(service.NodeManage.WriteAddress(values));
+                return await EndOperateAsync(service.NodeManage.WriteAddress(values), token: token);
             }
             catch (Exception ex)
             {
-                return EndOperate(false, ex.Message, exception: ex);
+                return await EndOperateAsync(false, ex.Message, exception: ex, token: token);
             }
         }
         /// <inheritdoc/>
-        public OperateResult Write(ConcurrentDictionary<string, WriteModel> values)
+        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, WriteModel> values, CancellationToken token = default)
         {
-            BegOperate();
+            await BegOperateAsync(token);
             if (values == null || values.Count <= 0)
             {
-                return EndOperate(false, "数据不能为空");
+                return await EndOperateAsync(false, "数据不能为空", token: token);
             }
             ConcurrentDictionary<string, object> param = new ConcurrentDictionary<string, object>();
             foreach (var item in values)
@@ -640,6 +672,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 {
                     switch (item.Value.AddressDataType)
                     {
+                        case Model.@enum.DataType.Byte:
+                            param.TryAdd(item.Key, Convert.ToByte(item.Value.Value));
+                            break;
                         case Model.@enum.DataType.Bool:
                             param.TryAdd(item.Key, Convert.ToBoolean(item.Value.Value));
                             break;
@@ -726,47 +761,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     return OperateResult.CreateFailureResult($"{item.Key} 地址数据类型转换异常:{ex.Message}");
                 }
             }
-            return Write(param);
+            return await WriteAsync(param, token);
         }
         /// <inheritdoc/>
-        public OperateResult Read(Address address)
+        public async Task<OperateResult> GetStatusAsync(CancellationToken token = default)
         {
-            //开始记录运行时间
-            BegOperate();
-            try
-            {
-                if (!GetStatus().GetDetails(out string? message))
-                {
-                    return EndOperate(false, message);
-                }
-                return EndOperate(service.NodeManage.ReadAddress(address));
-            }
-            catch (Exception ex)
-            {
-                return EndOperate(false, ex.Message, exception: ex);
-            }
+            return await EndOperateAsync(IsStart, IsStart ? "已启动" : "未启动", methodName: await BegOperateAsync(token), logOutput: false, token: token);
         }
-        /// <inheritdoc/>
-        public OperateResult GetStatus()
-        {
-            return EndOperate(IsStart, IsStart ? "已启动" : "未启动", methodName: BegOperate(), logOutput: false);
-        }
-
-
-        /// <inheritdoc/>
-        public async Task<OperateResult> OffAsync(bool hardClose = false, CancellationToken token = default) => await Task.Run(() => Off(hardClose), token);
-        /// <inheritdoc/>
-        public async Task<OperateResult> OnAsync(CancellationToken token = default) => await Task.Run(() => On(), token);
-        /// <inheritdoc/>
-        public async Task<OperateResult> ReadAsync(Address address, CancellationToken token = default) => await Task.Run(() => Read(address), token);
-        /// <inheritdoc/>
-        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, (object value, Snet.Model.@enum.EncodingType? encodingType)> values, CancellationToken token = default) => await Task.Run(() => Write(values), token);
-        /// <inheritdoc/>
-        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, object> values, CancellationToken token = default) => await Task.Run(() => Write(values), token);
-        /// <inheritdoc/>
-        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, WriteModel> values, CancellationToken token = default) => await Task.Run(() => Write(values), token);
-        /// <inheritdoc/>
-        public async Task<OperateResult> GetStatusAsync(CancellationToken token = default) => await Task.Run(() => GetStatus(), token);
         /// <inheritdoc/>
         public override void Dispose()
         {

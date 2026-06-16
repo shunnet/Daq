@@ -56,10 +56,14 @@
                     <!--  设备状态项将在代码中动态添加到此分隔符之前  -->
                     <Separator x:Name="TrayDeviceSeparator" Margin="0,3" />
                     <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         Command="{Binding ShowWindow}"
                         Header="{snet:Loc 显示窗口}"
                         Icon="{uis:SymbolIcon Symbol=Window20}" />
                     <uis:MenuItem
+                        snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
+                        snet:ResxLocalizationProvider.DefaultDictionary="Language"
                         Command="{Binding Close}"
                         Header="{snet:Loc 关闭}"
                         Icon="{uis:SymbolIcon Symbol=Dismiss24}" />
