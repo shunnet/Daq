@@ -263,7 +263,7 @@ namespace Snet.Iot.Daq.viewModel
                 PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.Path == libPath || p.Name == zipName);
                 if (PluginListSelectedItem != null || exists)
                 {
-                    if (!await MessageBox.Show("此插件已上传，是否覆盖更新？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
+                    if (!await MessageBox.Show("此插件已上传，是否进行热更新？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
                     {
                         return;
                     }
@@ -315,7 +315,7 @@ namespace Snet.Iot.Daq.viewModel
 
                     if (pluginStatus.Count > 0 || exists)
                     {
-                        await MessageBox.Show("插件更新成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                        await MessageBox.Show("插件热更新成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
 
                         //更新后，恢复之前的运行状态
                         switch (plugin)
@@ -349,7 +349,7 @@ namespace Snet.Iot.Daq.viewModel
                         Directory.Delete(libPath, true);
                     }
                     catch (Exception) { }
-                    await MessageBox.Show("插件上传失败，未查询到对应接口".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    await MessageBox.Show("插件上传失败，未检索到对应接口".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
 
                 }
             }
@@ -384,7 +384,7 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? removePlugin;
         private async Task RemovePluginAsync()
         {
-            if (await MessageBox.Show($"确定移除此插件？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
+            if (await MessageBox.Show($"确定移除此插件吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
                 await PrivateRemovalPlugin();
                 await MessageBox.Show($"插件移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
@@ -478,7 +478,7 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 else
                 {
-                    await MessageBox.Show($"添加失败，该插件配置文件已经存在！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                    await MessageBox.Show($"添加失败，插件配置文件已经存在！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
             }
@@ -540,7 +540,7 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 else
                 {
-                    await MessageBox.Show($"修改失败，该插件配置文件已经存在，请修改SN值".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                    await MessageBox.Show($"修改失败，插件配置文件名称已经存在，请修改SN！".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
                     return;
                 }
             }
@@ -569,7 +569,7 @@ namespace Snet.Iot.Daq.viewModel
             //检查项目目录是否存在该插件配置文件，如果存在则不能移除
             if (UseCheck(PluginConfigSelectedItem))
             {
-                await MessageBox.Show("该插件配置文件在项目中正在使用".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
+                await MessageBox.Show("该插件配置文件在项目设置中有使用".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             if (await MessageBox.Show($"确定移除插件配置？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))

@@ -742,4 +742,7 @@
   <data name="插件更新完成" xml:space="preserve">
     <value>插件更新完成</value>
   </data>
+  <data name="确定移除插件配置？" xml:space="preserve">
+    <value>确定移除插件配置？</value>
+  </data>
 </root>
