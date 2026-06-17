@@ -16,7 +16,7 @@
 	<ItemGroup>
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="NuGet.Versioning" Version="7.6.0" />
-		<PackageReference Include="Snet.Core" Version="26.167.1" />
+		<PackageReference Include="Snet.Core" Version="26.168.1" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.9.172" />
 		<PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="1.5.378.145" />
 		<PackageReference Include="Serilog.Expressions" Version="5.0.0" />
