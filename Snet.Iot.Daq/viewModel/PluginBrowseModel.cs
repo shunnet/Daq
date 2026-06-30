@@ -58,11 +58,14 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? p_Update;
         public async Task UpdateAsync()
         {
-            await MessageBox.Show("正在更新插件，请耐心等待".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+            await uiMessage.ShowAsync("正在更新插件，请耐心等待".GetLanguageValue(App.LanguageOperate));
+            Plugins.Clear();
+            allPlugin?.Clear();
+            allPlugin = null;
             var data = await pluginBrowseHandler.GetPluginBrowseDataGridModelsAsync();
             FileHandler.StringToFile(GlobalConfigModel.UI_PluginBrowseCachePath, data.ToJson(true));
             await PageIndexChangedExecuteAsync(1);
-            await MessageBox.Show("插件更新完成".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+            await uiMessage.ShowAsync("插件更新完成".GetLanguageValue(App.LanguageOperate));
         }
 
         /// <summary>

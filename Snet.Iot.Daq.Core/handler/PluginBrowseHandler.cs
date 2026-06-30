@@ -119,6 +119,9 @@ namespace Snet.Iot.Daq.Core.handler
             "Snet.RKC",
             "Snet.Turck",
             "Snet.Fanuc",
+            "Snet.OrientalMotor",
+            "Snet.Kossi",
+            "Snet.YuDian",
         };
 
         /// <summary>用于 HTTP 请求的客户端，生命周期由本类管理</summary>
