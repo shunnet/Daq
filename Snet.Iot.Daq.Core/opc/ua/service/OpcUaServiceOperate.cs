@@ -63,22 +63,25 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         /// <summary>
         /// 启动线程
         /// </summary>
-        private async Task StatusThread(CancellationToken token)
+        private async Task StatusThreadAsync(CancellationToken token)
         {
-            while (service != null)
+            await Task.Run(async () =>
             {
-                if (DateTime.UtcNow - LastEventTime > TimeSpan.FromMilliseconds(5000))
+                while (service != null)
                 {
-                    IList<ISession> sessions = service.CurrentInstance.SessionManager.GetSessions();
-                    for (int ii = 0; ii < sessions.Count; ii++)
+                    if (DateTime.UtcNow - LastEventTime > TimeSpan.FromMilliseconds(5000))
                     {
-                        ISession session = sessions[ii];
-                        PrintSessionStatus(session, "心跳包", true);
+                        IList<ISession> sessions = service.CurrentInstance.SessionManager.GetSessions();
+                        for (int ii = 0; ii < sessions.Count; ii++)
+                        {
+                            ISession session = sessions[ii];
+                            PrintSessionStatus(session, "心跳包", true);
+                        }
+                        LastEventTime = DateTime.UtcNow;
                     }
-                    LastEventTime = DateTime.UtcNow;
+                    await Task.Delay(1000, token).ConfigureAwait(false);
                 }
-                await Task.Delay(1000, token).ConfigureAwait(false);
-            }
+            }, token);
         }
 
         /// <summary>
@@ -577,7 +580,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 }
 
                 // 启动状态线程（保存 Task 引用，Off() 时可正确等待）
-                _statusTask = StatusThread(tokenSource.Token);
+                _statusTask = StatusThreadAsync(tokenSource.Token);
 
                 //激活
                 service.CurrentInstance.SessionManager.SessionActivated += SessionManager_Session;

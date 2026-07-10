@@ -139,10 +139,10 @@ namespace Snet.Iot.Daq.Core.mqtt.service
         }
 
         /// <inheritdoc/>
-        public OperateResult On() => Task.Run(() => OnAsync()).GetAwaiter().GetResult();
+        public OperateResult On() => OnAsync().GetAwaiter().GetResult();
 
         /// <inheritdoc/>
-        public OperateResult Off(bool hardClose = false) => Task.Run(() => OffAsync(hardClose)).GetAwaiter().GetResult();
+        public OperateResult Off(bool hardClose = false) => OffAsync(hardClose).GetAwaiter().GetResult();
 
         /// <inheritdoc/>
         public OperateResult GetStatus() => GetStatusAsync().GetAwaiter().GetResult();

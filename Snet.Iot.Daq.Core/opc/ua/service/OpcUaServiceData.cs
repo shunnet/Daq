@@ -57,14 +57,14 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
             /// </summary>
             [Description("用户名")]
             [Display(true, true, false, ParamModel.dataCate.text)]
-            public string? UserName { get; set; } = "samples";
+            public string? UserName { get; set; } = "shunnet";
 
             /// <summary>
             /// 密码
             /// </summary>
             [Description("密码")]
             [Display(true, true, false, ParamModel.dataCate.text)]
-            public string? Password { get; set; } = "samples";
+            public string? Password { get; set; } = "shunnet";
 
             /// <summary>
             /// 地址空间名称
