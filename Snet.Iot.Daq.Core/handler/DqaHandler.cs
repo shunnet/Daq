@@ -3,8 +3,8 @@ using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@interface;
 using Snet.Model.data;
+using Snet.Model.@event;
 using Snet.Model.@interface;
-using Snet.Utility;
 using System.Collections.Concurrent;
 
 namespace Snet.Iot.Daq.Core.handler

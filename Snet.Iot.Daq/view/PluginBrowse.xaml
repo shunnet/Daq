@@ -512,6 +512,7 @@
                             Margin="5"
                             AcceptsReturn="True"
                             BorderThickness="0,0,0,0"
+                            FontSize="13"
                             Foreground="{DynamicResource MaterialDesign.Brush.Secondary}"
                             IsReadOnly="True"
                             Style="{StaticResource MaterialDesignDataGridTextColumnEditingStyle}"

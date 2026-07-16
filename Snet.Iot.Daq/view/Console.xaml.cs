@@ -17,7 +17,7 @@ namespace Snet.Iot.Daq.view
         public Console()
         {
             InitializeComponent();
-            new EditHandler(edit, App.EditModels, color: ("#414141", "#FFFFFF"));
+            new EditHandler(edit, App.EditModels, color: ("#454545", "#FEFEFE"));
         }
 
         /// <summary>

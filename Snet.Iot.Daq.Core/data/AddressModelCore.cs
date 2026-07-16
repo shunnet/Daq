@@ -1,7 +1,7 @@
 ﻿using CommunityToolkit.Mvvm.Input;
 using Snet.Iot.Daq.Core.@interface;
 using Snet.Model.data;
-using Snet.Utility;
+using Snet.Model.@event;
 using SQLite;
 using System.ComponentModel;
 

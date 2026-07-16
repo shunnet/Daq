@@ -2,7 +2,7 @@
 using Snet.Iot.Daq.Core.converter;
 using Snet.Model.data;
 using Snet.Model.@enum;
-using Snet.Utility;
+using Snet.Model.@event;
 using System.Text.Json.Serialization;
 
 namespace Snet.Iot.Daq.Core.@interface

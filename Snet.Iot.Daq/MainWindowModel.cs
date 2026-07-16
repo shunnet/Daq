@@ -27,8 +27,9 @@ namespace Snet.Iot.Daq
             FooterMenuItemsSource = FooterMenuItemsOperate(App.LanguageOperate);
 
             this._settings = settings;
-            LanguageHandler.OnLanguageEvent += LanguageHandler_OnLanguageEvent;
-            LanguageHandler_OnLanguageEvent(this, new EventLanguageResult());
+            LanguageHandler.OnLanguageEventAsync += LanguageHandler_OnLanguageEventAsync;
+            LanguageHandler_OnLanguageEventAsync(this, new EventLanguageResult()).Wait();
+
         }
 
         /// <summary>
@@ -39,9 +40,9 @@ namespace Snet.Iot.Daq
         /// <summary>
         /// 语言切换事件
         /// </summary>
-        private void LanguageHandler_OnLanguageEvent(object? sender, EventLanguageResult e)
+        private async Task LanguageHandler_OnLanguageEventAsync(object? sender, EventLanguageResult e)
         {
-            SystemTitle = $"{LanguageHandler.GetLanguageValue("SystemTitle", App.LanguageOperate)}{(_settings.IsRunAsAdmin() ? " [ " + LanguageHandler.GetLanguageValue("管理员运行", App.LanguageOperate) + " ]" : string.Empty)}";
+            SystemTitle = $"{await LanguageHandler.GetLanguageValueAsync("SystemTitle", App.LanguageOperate)}{(_settings.IsRunAsAdmin() ? " [ " + await LanguageHandler.GetLanguageValueAsync("管理员运行", App.LanguageOperate) + " ]" : string.Empty)}";
         }
 
         /// <summary>

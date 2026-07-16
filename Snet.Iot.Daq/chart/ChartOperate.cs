@@ -618,6 +618,9 @@ namespace Snet.Iot.Daq.chart
                         {
                             light = new ScottPlot.PlotStyles.Light()
                             {
+                                FigureBackgroundColor = new("#FEFEFE"),
+                                DataBackgroundColor = new("#FEFEFE"),
+                                LegendBackgroundColor = new("#FEFEFE"),
                                 //LegendBackgroundColor = new("#454545"),
                                 //LegendOutlineColor = new(ToDrawingColor(System.Windows.Media.Color.FromArgb(0, 255, 0, 0))),
                             };

@@ -3,6 +3,7 @@ using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Model.data;
 using Snet.Model.@enum;
+using Snet.Model.@event;
 using Snet.Utility;
 
 namespace Snet.Iot.Daq.Core.data
