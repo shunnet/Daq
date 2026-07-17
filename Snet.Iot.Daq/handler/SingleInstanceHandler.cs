@@ -89,7 +89,6 @@ namespace Snet.Iot.Daq.Handler
                     if (_mainWindow.IsActive)
                         return;
 
-                    // ❗🔥 关键修复：不要随便 Show()
                     // 只在真正不可见时才调用
                     if (!_mainWindow.IsVisible)
                     {

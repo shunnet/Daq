@@ -424,8 +424,8 @@ namespace Snet.Iot.Daq.viewModel
             {
                 //模糊查询
                 List<PluginBrowseDataGridModel> models = (allPlugin ??= await GetNugetPluginAsync()).Where(p =>
-                p.PackName.Contains(QueryContent) ||
-                p.Describe.Contains(QueryContent)).ToList();
+                p.PackName.ToLower().Contains(QueryContent.ToLower()) ||
+                p.Describe.ToLower().Contains(QueryContent.ToLower())).ToList();
                 if (models.Count > 0)
                 {
                     await ResetUiAsync(models.Count, 1, models);

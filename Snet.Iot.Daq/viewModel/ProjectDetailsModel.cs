@@ -108,6 +108,7 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 ProjectTree.Details = DetailsNode;  //给父级赋值
                 _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                await GlobalConfigModel.RefreshAsync();
             }
         }
 
@@ -137,6 +138,7 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 ProjectTree.Details = DetailsNode;  //给父级赋值
                 _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                await GlobalConfigModel.RefreshAsync();
             }
         }
 
@@ -162,6 +164,7 @@ namespace Snet.Iot.Daq.viewModel
 
                     ProjectTree.Details = DetailsNode;  //给父级赋值
                     _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                    await GlobalConfigModel.RefreshAsync();
                 }
                 else
                 {
@@ -236,6 +239,7 @@ namespace Snet.Iot.Daq.viewModel
                     //保存配置
                     ProjectTree.Details = DetailsNode;  //给父级赋值
                     _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                    await GlobalConfigModel.RefreshAsync();
                     await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
@@ -259,6 +263,7 @@ namespace Snet.Iot.Daq.viewModel
                     //保存配置
                     ProjectTree.Details = DetailsNode;  //给父级赋值
                     _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                    await GlobalConfigModel.RefreshAsync();
                     await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }

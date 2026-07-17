@@ -114,6 +114,7 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         private static readonly Dictionary<DataType, BuiltInType> _typeMap = new()
         {
+            { Model.@enum.DataType.Byte, BuiltInType.Byte },
             { Model.@enum.DataType.Bool, BuiltInType.Boolean },
             { Model.@enum.DataType.Double, BuiltInType.Double },
             { Model.@enum.DataType.Float, BuiltInType.Float },

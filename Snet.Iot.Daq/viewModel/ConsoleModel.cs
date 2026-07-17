@@ -198,7 +198,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 间隔
         /// </summary>
-        private int _interval = 1000;
+        private int _interval = 500;
 
         /// <summary>
         /// 全局的任务取消控制
