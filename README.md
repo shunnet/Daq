@@ -255,8 +255,8 @@ cd Daq
 
 <a href="https://www.star-history.com/?repos=shunnet%2FDaq&type=date&legend=bottom-right">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&theme=dark&legend=bottom-right&sealed_token=omMRXh6I3NxpbICG8fYRj-fpoJQcU-Dyq0SrRJXbfwUrN8vs6VU5Mq9VLG2ptfCmu8O5MV6PFFeYBLQrdYP7ybWvagMsDFfulrmx0uvCLErq6o6Ji9YTsQ" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right&sealed_token=omMRXh6I3NxpbICG8fYRj-fpoJQcU-Dyq0SrRJXbfwUrN8vs6VU5Mq9VLG2ptfCmu8O5MV6PFFeYBLQrdYP7ybWvagMsDFfulrmx0uvCLErq6o6Ji9YTsQ" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right&sealed_token=omMRXh6I3NxpbICG8fYRj-fpoJQcU-Dyq0SrRJXbfwUrN8vs6VU5Mq9VLG2ptfCmu8O5MV6PFFeYBLQrdYP7ybWvagMsDFfulrmx0uvCLErq6o6Ji9YTsQ" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&theme=dark&legend=bottom-right&sealed_token=3Tft7-uvG5B6fob8INAvqe9armRuIkXlOveR3cnY2kXGwaJMMtYWOyq45srnSCO-Dq6_0dPyepq-b8O_4fMB87CqYCIZdawTTa_JHyS2oahHiDr0o_2NTA" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right&sealed_token=3Tft7-uvG5B6fob8INAvqe9armRuIkXlOveR3cnY2kXGwaJMMtYWOyq45srnSCO-Dq6_0dPyepq-b8O_4fMB87CqYCIZdawTTa_JHyS2oahHiDr0o_2NTA" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right&sealed_token=3Tft7-uvG5B6fob8INAvqe9armRuIkXlOveR3cnY2kXGwaJMMtYWOyq45srnSCO-Dq6_0dPyepq-b8O_4fMB87CqYCIZdawTTa_JHyS2oahHiDr0o_2NTA" />
  </picture>
 </a>
