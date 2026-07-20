@@ -255,8 +255,8 @@ cd Daq
 
 <a href="https://www.star-history.com/?repos=shunnet%2FDaq&type=date&legend=bottom-right">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&theme=dark&legend=bottom-right" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&theme=dark&legend=bottom-right&sealed_token=omMRXh6I3NxpbICG8fYRj-fpoJQcU-Dyq0SrRJXbfwUrN8vs6VU5Mq9VLG2ptfCmu8O5MV6PFFeYBLQrdYP7ybWvagMsDFfulrmx0uvCLErq6o6Ji9YTsQ" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right&sealed_token=omMRXh6I3NxpbICG8fYRj-fpoJQcU-Dyq0SrRJXbfwUrN8vs6VU5Mq9VLG2ptfCmu8O5MV6PFFeYBLQrdYP7ybWvagMsDFfulrmx0uvCLErq6o6Ji9YTsQ" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=shunnet/Daq&type=date&legend=bottom-right&sealed_token=omMRXh6I3NxpbICG8fYRj-fpoJQcU-Dyq0SrRJXbfwUrN8vs6VU5Mq9VLG2ptfCmu8O5MV6PFFeYBLQrdYP7ybWvagMsDFfulrmx0uvCLErq6o6Ji9YTsQ" />
  </picture>
 </a>
