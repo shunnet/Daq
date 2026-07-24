@@ -745,4 +745,10 @@
   <data name="确定移除插件配置？" xml:space="preserve">
     <value>确定移除插件配置？</value>
   </data>
+  <data name="全局异常捕获" xml:space="preserve">
+    <value>全局异常捕获</value>
+  </data>
+  <data name="导入取消" xml:space="preserve">
+    <value>导入取消</value>
+  </data>
 </root>

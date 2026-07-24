@@ -131,7 +131,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.AutoPack is null)
             {
-                await Windows.Controls.message.MessageBox.Show("修改失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("修改失败，尚未添加".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
@@ -155,7 +155,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.AutoPack is null)
             {
-                await Windows.Controls.message.MessageBox.Show("移除失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("移除失败，尚未添加".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
@@ -200,7 +200,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.WebApi is null)
             {
-                await Windows.Controls.message.MessageBox.Show("修改失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("修改失败，尚未添加".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {
@@ -224,7 +224,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (PluginConfigSelectedItem?.WebApi is null)
             {
-                await Windows.Controls.message.MessageBox.Show("移除失败，当前未设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                await Windows.Controls.message.MessageBox.Show("移除失败，尚未添加".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
             else
             {

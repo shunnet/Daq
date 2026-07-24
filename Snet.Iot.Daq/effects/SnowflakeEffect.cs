@@ -1,4 +1,5 @@
-﻿using Snet.Windows.Core.handler;
+﻿using Snet.Windows.Core.data;
+using Snet.Windows.Core.handler;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
@@ -28,6 +29,8 @@ namespace Snet.Iot.Daq.effects
         /// <param name="flakeCount">The number of snowflakes.</param>
         public SnowflakeEffect(Canvas canvas, int flakeCount = 188)
         {
+            SkinHandler.OnSkinEvent -= SkinHandler_OnSkinEvent;
+            SkinHandler.OnSkinEvent += SkinHandler_OnSkinEvent;
             _canvas = canvas;
             _flakeCount = flakeCount;
             InitSnowFlakes();
@@ -38,10 +41,8 @@ namespace Snet.Iot.Daq.effects
                 parentElement.SizeChanged += OnSizeChanged;
             }
 
-            SkinHandler.OnSkinEvent -= SkinHandler_OnSkinEvent;
-            SkinHandler.OnSkinEvent += SkinHandler_OnSkinEvent;
+            SkinHandler_OnSkinEvent(null, new EventSkinResult { Skin = SkinHandler.GetSkin() });
         }
-
 
         private void SkinHandler_OnSkinEvent(object? sender, Windows.Core.data.EventSkinResult e)
         {

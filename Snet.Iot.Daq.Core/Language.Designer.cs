@@ -331,6 +331,15 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
+        ///   查找类似 全局异常捕获 的本地化字符串。
+        /// </summary>
+        public static string 全局异常捕获 {
+            get {
+                return ResourceManager.GetString("全局异常捕获", resourceCulture);
+            }
+        }
+        
+        /// <summary>
         ///   查找类似 全选 的本地化字符串。
         /// </summary>
         public static string 全选 {
@@ -660,6 +669,15 @@ namespace Snet.Iot.Daq.Core {
         public static string 导入 {
             get {
                 return ResourceManager.GetString("导入", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 导入取消 的本地化字符串。
+        /// </summary>
+        public static string 导入取消 {
+            get {
+                return ResourceManager.GetString("导入取消", resourceCulture);
             }
         }
         

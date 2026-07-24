@@ -346,7 +346,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             if (DaqData.WebApi == null)
             {
-                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi配置".GetLanguageValue(App.LanguageOperate));
+                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi参数".GetLanguageValue(App.LanguageOperate));
                 return;
             }
 
@@ -374,7 +374,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             if (DaqData.WebApi == null)
             {
-                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi配置".GetLanguageValue(App.LanguageOperate));
+                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi参数".GetLanguageValue(App.LanguageOperate));
                 return;
             }
 
@@ -402,7 +402,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             if (DaqData.WebApi == null)
             {
-                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi配置".GetLanguageValue(App.LanguageOperate));
+                if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "未设置WebApi参数".GetLanguageValue(App.LanguageOperate));
                 return;
             }
             OperateResult result = await daqHandler.WARequestExampleAsync(DaqData.Guid);
@@ -460,7 +460,7 @@ namespace Snet.Iot.Daq.viewModel
 
                     _addressMap.Clear();
 
-                    if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "开始采集".GetLanguageValue(App.LanguageOperate));
+                    if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "启动采集".GetLanguageValue(App.LanguageOperate));
 
                     CollectStatus = LanguageHandler.GetLanguageValue("正常", App.LanguageOperate);
                     DeviceStatusFlashing = true;
@@ -593,7 +593,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             Project.IsSoftStart = true;
             await Project.SetAsync(GlobalConfigModel.ProjectDict);
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "开启软启动采集成功".GetLanguageValue(App.LanguageOperate));
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "添加软启采集成功".GetLanguageValue(App.LanguageOperate));
         }
 
         /// <summary>
@@ -605,7 +605,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             Project.IsSoftStart = false;
             await Project.SetAsync(GlobalConfigModel.ProjectDict);
-            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "取消软启动采集成功".GetLanguageValue(App.LanguageOperate));
+            if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "取消软启采集成功".GetLanguageValue(App.LanguageOperate));
         }
         #endregion
 
@@ -818,7 +818,7 @@ namespace Snet.Iot.Daq.viewModel
                             {
                                 if (!File.Exists(addressModel.ExpandParam))
                                 {
-                                    ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展配置文件不存在".GetLanguageValue(App.LanguageOperate));
+                                    ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展参数文件不存在".GetLanguageValue(App.LanguageOperate));
                                     continue;
                                 }
                                 if (!bytesModels.TryGetValue(addressModel.Address, out bm) || bm == null)

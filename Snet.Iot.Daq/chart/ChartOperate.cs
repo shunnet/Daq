@@ -196,8 +196,8 @@ namespace Snet.Iot.Daq.chart
                 case Snet.Model.@enum.LanguageType.zh:
                     wpfPlot.Plot.XLabel(basics.XTitle ?? string.Empty, 13);
                     wpfPlot.Plot.YLabel(basics.YTitle ?? string.Empty, 13);
-                    wpfPlot.Plot.Legend.FontName = ScottPlot.Fonts.Detect("微软雅黑");
-                    wpfPlot.Plot.Font.Set(ScottPlot.Fonts.Detect("微软雅黑"));
+                    wpfPlot.Plot.Legend.FontName = DetectCjkFont();
+                    wpfPlot.Plot.Font.Set(DetectCjkFont());
                     break;
                 case Snet.Model.@enum.LanguageType.en:
                     wpfPlot.Plot.XLabel(basics.XTitleEN ?? string.Empty, 13);
@@ -662,8 +662,8 @@ namespace Snet.Iot.Daq.chart
                     case Snet.Model.@enum.LanguageType.zh:
                         wpfPlot.Plot.XLabel(basics.XTitle ?? string.Empty, 13);
                         wpfPlot.Plot.YLabel(basics.YTitle ?? string.Empty, 13);
-                        wpfPlot.Plot.Legend.FontName = ScottPlot.Fonts.Detect("微软雅黑");
-                        wpfPlot.Plot.Font.Set(ScottPlot.Fonts.Detect("微软雅黑"));
+                        wpfPlot.Plot.Legend.FontName = DetectCjkFont();
+                        wpfPlot.Plot.Font.Set(DetectCjkFont());
                         break;
                     case Snet.Model.@enum.LanguageType.en:
                         wpfPlot.Plot.XLabel(basics.XTitleEN ?? string.Empty, 13);
@@ -981,6 +981,34 @@ namespace Snet.Iot.Daq.chart
 
 
         #endregion
+
+        /// <summary>
+        /// 检测系统中支持 CJK（中日韩）字符渲染的字体。
+        /// 使用 SkiaSharp 基于字符的匹配，比字体名称匹配更可靠，
+        /// 避免 Debug/Publish 环境下字体名称不一致导致中文乱码。
+        /// </summary>
+        private static string DetectCjkFont()
+        {
+            // 方案1：使用 SkiaSharp 字符匹配 — 最可靠，不依赖字体名称
+            try
+            {
+                using var typeface = SKFontManager.Default.MatchCharacter('中');
+                if (typeface != null && !string.IsNullOrEmpty(typeface.FamilyName))
+                    return typeface.FamilyName;
+            }
+            catch { }
+
+            // 方案2：逐个尝试已知的 CJK 字体名称（英文名优先，跨环境最稳定）
+            string[] fallbackNames = ["Microsoft YaHei UI", "Microsoft YaHei", "SimHei", "Noto Sans SC", "微软雅黑"];
+            foreach (var name in fallbackNames)
+            {
+                string result = ScottPlot.Fonts.Detect(name);
+                if (!string.IsNullOrEmpty(result))
+                    return result;
+            }
+
+            return ScottPlot.Fonts.Default;
+        }
 
     }
 }

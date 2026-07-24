@@ -745,4 +745,10 @@
   <data name="确定移除插件配置？" xml:space="preserve">
     <value>Are you sure to remove the plugin configuration?</value>
   </data>
+  <data name="全局异常捕获" xml:space="preserve">
+    <value>Global Exception Catch</value>
+  </data>
+  <data name="导入取消" xml:space="preserve">
+    <value>Import cancelled</value>
+  </data>
 </root>
