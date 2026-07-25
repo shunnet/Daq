@@ -22,31 +22,31 @@ namespace Snet.Iot.Daq
     public partial class App : Application
     {
         /// <summary>
-        /// ÓïÑÔ²Ù×÷
+        /// è¯­è¨€æ“ä½œ
         /// </summary>
         public readonly static LanguageModel LanguageOperate = Snet.Iot.Daq.Core.Core.LanguageOperate;
 
         /// <summary>
-        /// ĞÅÏ¢¿òÄ£ĞÍ¼¯ºÏ
+        /// ä¿¡æ¯æ¡†æ¨¡å‹é›†åˆ
         /// </summary>
         public readonly static List<EditModel> EditModels = GetEditModels();
 
         /// <summary>
-        /// µ¥ÊµÀı¹ÜÀíÆ÷ÊµÀı
-        /// ĞèÒªÔÚÕû¸öÓ¦ÓÃ³ÌĞòÉúÃüÖÜÆÚÄÚ±£³Ö´æ»î
-        /// £¨³ÖÓĞ Mutex µÄËùÓĞÈ¨£¬ÊÍ·ÅºóÆäËûÊµÀı¾ÍÄÜ³ÉÎªÊ×ÊµÀı£©
+        /// å•å®ä¾‹ç®¡ç†å™¨å®ä¾‹
+        /// éœ€è¦åœ¨æ•´ä¸ªåº”ç”¨ç¨‹åºç”Ÿå‘½å‘¨æœŸå†…ä¿æŒå­˜æ´»
+        /// ï¼ˆæŒæœ‰ Mutex çš„æ‰€æœ‰æƒï¼Œé‡Šæ”¾åå…¶ä»–å®ä¾‹å°±èƒ½æˆä¸ºé¦–å®ä¾‹ï¼‰
         /// </summary>
         private SingleInstanceHandler _singleInstance;
 
         /// <summary>
-        /// »ñÈ¡ĞÅÏ¢¿òÄ£ĞÍ¼¯ºÏ£¬¶¨ÒåÈÕÖ¾Êä³öÎÄ±¾µÄÑÕÉ«¸ßÁÁ¹æÔò
+        /// è·å–ä¿¡æ¯æ¡†æ¨¡å‹é›†åˆï¼Œå®šä¹‰æ—¥å¿—è¾“å‡ºæ–‡æœ¬çš„é¢œè‰²é«˜äº®è§„åˆ™
         /// </summary>
-        /// <returns>±à¼­Ä£ĞÍ¼¯ºÏ£¬°üº¬¸÷ÀàÈÕÖ¾±êÇ©¶ÔÓ¦µÄ¸ßÁÁÑÕÉ«</returns>
+        /// <returns>ç¼–è¾‘æ¨¡å‹é›†åˆï¼ŒåŒ…å«å„ç±»æ—¥å¿—æ ‡ç­¾å¯¹åº”çš„é«˜äº®é¢œè‰²</returns>
         private static List<EditModel> GetEditModels() =>
         [
             new() { Name = "[ Info ]",                Color = "#4CAF50" },
             new() { Name = "[ Error ]",               Color = "#F44336" },
-            new() { Name = "Òì³£",                    Color = "#F44336" },
+            new() { Name = "å¼‚å¸¸",                    Color = "#F44336" },
             new() { Name = "Exception",               Color = "#F44336" },
             new() { Name = "[ Mq ]",                  Color = "#2196F3" },
             new() { Name = "[ Daq ]",                 Color = "#2196F3" },
@@ -61,12 +61,12 @@ namespace Snet.Iot.Daq
         ];
 
         /// <summary>
-        /// Î¨Ò»ÊµÀı´¦ÀíÁ÷³Ì
+        /// å”¯ä¸€å®ä¾‹å¤„ç†æµç¨‹
         /// </summary>
         /// <param name="e"></param>
         private void SingleInstance(StartupEventArgs e)
         {
-            _singleInstance = new SingleInstanceHandler("Snet.Iot.Daq", out bool isFirst);      // Êä³ö£ºÊÇ·ñÊÇÊ×ÊµÀı
+            _singleInstance = new SingleInstanceHandler("Snet.Iot.Daq", out bool isFirst);      // è¾“å‡ºï¼šæ˜¯å¦æ˜¯é¦–å®ä¾‹
 
             if (!isFirst)
             {
@@ -79,7 +79,7 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// ±»ĞÂÊµÀı»½ĞÑÊ±µÄ»Øµ÷
+        /// è¢«æ–°å®ä¾‹å”¤é†’æ—¶çš„å›è°ƒ
         /// </summary>
         private void OnWakeup(string[] args)
         {
@@ -87,7 +87,7 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// ÔÚÓ¦ÓÃ³ÌĞò¹Ø±ÕÊ±·¢Éú£¬ÊÍ·ÅÈ«¾Ö×¢ÈëµÄ·şÎñ×ÊÔ´
+        /// åœ¨åº”ç”¨ç¨‹åºå…³é—­æ—¶å‘ç”Ÿï¼Œé‡Šæ”¾å…¨å±€æ³¨å…¥çš„æœåŠ¡èµ„æº
         /// </summary>
         private void OnExit(object sender, ExitEventArgs e)
         {
@@ -96,37 +96,37 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// ÔÚ¼ÓÔØÓ¦ÓÃ³ÌĞòÊ±·¢Éú£¬Ö´ĞĞ³õÊ¼»¯ºÍÈ«¾ÖÒì³£×¢²áºó´ò¿ªÖ÷´°¿Ú
+        /// åœ¨åŠ è½½åº”ç”¨ç¨‹åºæ—¶å‘ç”Ÿï¼Œæ‰§è¡Œåˆå§‹åŒ–å’Œå…¨å±€å¼‚å¸¸æ³¨å†Œåæ‰“å¼€ä¸»çª—å£
         /// </summary>
         private void OnStartup(object sender, StartupEventArgs e)
         {
-            //ÅĞ¶ÏÊÇ²»ÊÇÎ¨Ò»´ò¿ª
+            //åˆ¤æ–­æ˜¯ä¸æ˜¯å”¯ä¸€æ‰“å¼€
             SingleInstance(e);
 
-            // ³õÊ¼»¯ÒÀÀµ×¢Èë¡¢Êı¾İ¿â¡¢²å¼şµÈ
+            // åˆå§‹åŒ–ä¾èµ–æ³¨å…¥ã€æ•°æ®åº“ã€æ’ä»¶ç­‰
             Init();
 
-            // Æô¶¯È«¾ÖÒì³£²¶×½
+            // å¯åŠ¨å…¨å±€å¼‚å¸¸æ•æ‰
             RegisterEvents();
 
-            // ¼ÓÔØ±¾µØ×Ô¶¨ÒåÍ¼±ê×ÊÔ´
+            // åŠ è½½æœ¬åœ°è‡ªå®šä¹‰å›¾æ ‡èµ„æº
             IconsHandler.Loading("pack://application:,,,/Snet.Iot.Daq;component/resources/icons.xaml");
 
-            // ´ò¿ªÖ÷´°¿Ú
+            // æ‰“å¼€ä¸»çª—å£
             MainWindow window = InjectionWpf.Window<MainWindow, MainWindowModel>(true);
             window.Show();
 
-            // Show() Ö®ºó´°¿ÚµÄ HWND ²ÅÕæÕı´´½¨
-            // ´ËÊ±Á¢¼´»º´æ¾ä±ú£¬ºóĞø¼´Ê¹´°¿Ú Hide µ½ÍĞÅÌÒ²ÄÜ»½ĞÑ
+            // Show() ä¹‹åçª—å£çš„ HWND æ‰çœŸæ­£åˆ›å»º
+            // æ­¤æ—¶ç«‹å³ç¼“å­˜å¥æŸ„ï¼Œåç»­å³ä½¿çª—å£ Hide åˆ°æ‰˜ç›˜ä¹Ÿèƒ½å”¤é†’
             _singleInstance.RegisterMainWindow(window);
         }
 
         /// <summary>
-        /// ³õÊ¼»¯Ó¦ÓÃ³ÌĞòºËĞÄ×ÊÔ´£ºÒÀÀµ×¢Èë¡¢ÓÃ»§¿Ø¼ş×¢²á¡¢ÈÎÎñÖ´ĞĞ¡¢Êı¾İ¿â½¨±í¡¢²å¼ş¼ÓÔØ
+        /// åˆå§‹åŒ–åº”ç”¨ç¨‹åºæ ¸å¿ƒèµ„æºï¼šä¾èµ–æ³¨å…¥ã€ç”¨æˆ·æ§ä»¶æ³¨å†Œã€ä»»åŠ¡æ‰§è¡Œã€æ•°æ®åº“å»ºè¡¨ã€æ’ä»¶åŠ è½½
         /// </summary>
         private void Init()
         {
-            // ×¢Èë²ÎÊıÉèÖÃ¿Ø¼ş
+            // æ³¨å…¥å‚æ•°è®¾ç½®æ§ä»¶
             PropertyControl control = new PropertyControl();
             control.ButtonVisibility = Visibility.Visible;
             InjectionWpf.AddService(s =>
@@ -134,61 +134,61 @@ namespace Snet.Iot.Daq
                 s.AddSingleton(control);
             });
 
-            // ×¢ÈëÉè±¸Ñ¡Ôñ¿Ø¼ş
+            // æ³¨å…¥è®¾å¤‡é€‰æ‹©æ§ä»¶
             InjectionWpf.UserControl<SelectDevice, Snet.Iot.Daq.viewModel.SelectDeviceModel>(true);
 
-            // ×¢ÈëµØÖ·Ñ¡Ôñ¿Ø¼ş
+            // æ³¨å…¥åœ°å€é€‰æ‹©æ§ä»¶
             SelectAddress selectAddress = InjectionWpf.UserControl<SelectAddress, Snet.Iot.Daq.viewModel.SelectAddressModel>(true);
 
-            // ×¢Èë´¦ÀíÆ÷¿Ø¼ş
+            // æ³¨å…¥å¤„ç†å™¨æ§ä»¶
             InjectionWpf.UserControl<view.Handler, Snet.Iot.Daq.viewModel.HandlerModel>(true);
 
-            // ³õÊ¼»¯ SQLite Êı¾İ¿â±í
+            // åˆå§‹åŒ– SQLite æ•°æ®åº“è¡¨
             GlobalConfigModel.sqliteOperate.CreateTable<AddressModel>();
 
-            // ¼ÓÔØ²¢³õÊ¼»¯ËùÓĞÒÑÅäÖÃµÄ²å¼ş
+            // åŠ è½½å¹¶åˆå§‹åŒ–æ‰€æœ‰å·²é…ç½®çš„æ’ä»¶
             ObservableCollection<PluginListModel> plugins = PluginHandlerCore.GetPluginUIConfig<ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath) ?? new();
-            //³õÊ¼»¯²å¼ş
+            //åˆå§‹åŒ–æ’ä»¶
             foreach (var item in plugins)
             {
                 PluginHandlerCore.PluginOperate.InitPlugin(item.PluginDetails.Path, string.Format(GlobalConfigModel.InterfaceFullName, item.Type));
             }
 
-            //»ñÈ¡ËùÓĞÒÑ´æÔÚµÄ²å¼ş
+            //è·å–æ‰€æœ‰å·²å­˜åœ¨çš„æ’ä»¶
             Snet.Iot.Daq.handler.PluginHandler.GetAllPlugin();
 
-            //»ñÈ¡ËùÓĞµØÖ·
+            //è·å–æ‰€æœ‰åœ°å€
             Snet.Iot.Daq.handler.AddressHandler.GetAllAddress();
 
-            //»ñÈ¡ËùÓĞÏîÄ¿
+            //è·å–æ‰€æœ‰é¡¹ç›®
             Snet.Iot.Daq.handler.ProjectHandler.GetAllProject();
 
-            //×¢ÈëÏµÍ³²Ù×÷
+            //æ³¨å…¥ç³»ç»Ÿæ“ä½œ
             InjectionWpf.AddService(s =>
             {
                 s.AddSingleton(new SettingsHandler());
             });
         }
 
-        #region È«¾ÖÒì³£²¶×½
+        #region å…¨å±€å¼‚å¸¸æ•æ‰
 
         /// <summary>
-        /// ×¢²áÈ«¾ÖÒì³£²¶»ñÊÂ¼ş£¬¸²¸Ç Task Ïß³Ì¡¢UI Ïß³ÌºÍ·Ç UI Ïß³ÌµÄÎ´´¦ÀíÒì³£
+        /// æ³¨å†Œå…¨å±€å¼‚å¸¸æ•è·äº‹ä»¶ï¼Œè¦†ç›– Task çº¿ç¨‹ã€UI çº¿ç¨‹å’Œé UI çº¿ç¨‹çš„æœªå¤„ç†å¼‚å¸¸
         /// </summary>
         private void RegisterEvents()
         {
-            //TaskÏß³ÌÄÚÎ´²¶»ñÒì³£´¦ÀíÊÂ¼ş
+            //Taskçº¿ç¨‹å†…æœªæ•è·å¼‚å¸¸å¤„ç†äº‹ä»¶
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
-            //UIÏß³ÌÎ´²¶»ñÒì³£´¦ÀíÊÂ¼ş£¨UIÖ÷Ïß³Ì£©
+            //UIçº¿ç¨‹æœªæ•è·å¼‚å¸¸å¤„ç†äº‹ä»¶ï¼ˆUIä¸»çº¿ç¨‹ï¼‰
             this.DispatcherUnhandledException += App_DispatcherUnhandledException;
 
-            //·ÇUIÏß³ÌÎ´²¶»ñÒì³£´¦ÀíÊÂ¼ş(ÀıÈç×Ô¼º´´½¨µÄÒ»¸ö×ÓÏß³Ì)
+            //éUIçº¿ç¨‹æœªæ•è·å¼‚å¸¸å¤„ç†äº‹ä»¶(ä¾‹å¦‚è‡ªå·±åˆ›å»ºçš„ä¸€ä¸ªå­çº¿ç¨‹)
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
         }
 
         /// <summary>
-        /// Task Ïß³ÌÄÚÎ´²¶»ñÒì³£´¦ÀíÊÂ¼ş£¬ÏÈ½øĞĞ¿ÕÅĞ¶ÏÔÙ·ÃÎÊ HResult ÊôĞÔÒÔ±ÜÃâ¿ÕÒıÓÃÒì³£¡£
+        /// Task çº¿ç¨‹å†…æœªæ•è·å¼‚å¸¸å¤„ç†äº‹ä»¶ï¼Œå…ˆè¿›è¡Œç©ºåˆ¤æ–­å†è®¿é—® HResult å±æ€§ä»¥é¿å…ç©ºå¼•ç”¨å¼‚å¸¸ã€‚
         /// </summary>
         private async void TaskScheduler_UnobservedTaskException(object? sender, UnobservedTaskExceptionEventArgs e)
         {
@@ -198,8 +198,8 @@ namespace Snet.Iot.Daq
                 if (exception == null)
                     return;
 
-                // HResult = -2146233088 (0x80131500) ¶ÔÓ¦ ExternalException »ùÀà£¬
-                // Í¨³£ÎªÕı³£È¡Ïû»ò¿ÉºöÂÔµÄÏµÍ³¼¶Òì³££¬²»µ¯´°´¦Àí¡£
+                // HResult = -2146233088 (0x80131500) å¯¹åº” ExternalException åŸºç±»ï¼Œ
+                // é€šå¸¸ä¸ºæ­£å¸¸å–æ¶ˆæˆ–å¯å¿½ç•¥çš„ç³»ç»Ÿçº§å¼‚å¸¸ï¼Œä¸å¼¹çª—å¤„ç†ã€‚
                 if (exception.HResult == -2146233088)
                     return;
 
@@ -216,7 +216,7 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// ·ÇUIÏß³ÌÎ´²¶»ñÒì³£´¦ÀíÊÂ¼ş£¨ÀıÈç×Ô¼º´´½¨µÄ×ÓÏß³Ì£©
+        /// éUIçº¿ç¨‹æœªæ•è·å¼‚å¸¸å¤„ç†äº‹ä»¶ï¼ˆä¾‹å¦‚è‡ªå·±åˆ›å»ºçš„å­çº¿ç¨‹ï¼‰
         /// </summary>
         private async void CurrentDomain_UnhandledException(object sender, UnhandledExceptionEventArgs e)
         {
@@ -235,11 +235,11 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// UIÏß³ÌÎ´²¶»ñÒì³£´¦ÀíÊÂ¼ş£¨UIÖ÷Ïß³Ì£©
+        /// UIçº¿ç¨‹æœªæ•è·å¼‚å¸¸å¤„ç†äº‹ä»¶ï¼ˆUIä¸»çº¿ç¨‹ï¼‰
         /// </summary>
         private async void App_DispatcherUnhandledException(object sender, System.Windows.Threading.DispatcherUnhandledExceptionEventArgs e)
         {
-            // ÏÈ±ê¼ÇÒÑ´¦Àí£¬±ÜÃâ WPF ÔÚ await ºóÖØ¸´´¥·¢
+            // å…ˆæ ‡è®°å·²å¤„ç†ï¼Œé¿å… WPF åœ¨ await åé‡å¤è§¦å‘
             e.Handled = true;
             try
             {
@@ -252,7 +252,7 @@ namespace Snet.Iot.Daq
         }
 
         /// <summary>
-        /// ´¦ÀíÒì³£µ½½çÃæÏÔÊ¾Óë±¾µØÈÕÖ¾¼ÇÂ¼
+        /// å¤„ç†å¼‚å¸¸åˆ°ç•Œé¢æ˜¾ç¤ºä¸æœ¬åœ°æ—¥å¿—è®°å½•
         /// </summary>
         /// <param name="e"></param>
         /// <returns></returns>
@@ -279,12 +279,12 @@ namespace Snet.Iot.Daq
             else if (!string.IsNullOrEmpty(stackTrace))
                 msg = stackTrace;
             else
-                msg = "Î´ÖªÒì³£";
+                msg = "æœªçŸ¥å¼‚å¸¸";
             if (Application.Current == null)
                 return;
             await Application.Current.Dispatcher.InvokeAsync(async () =>
             {
-                await Snet.Windows.Controls.message.MessageBox.Show(msg, LanguageOperate.GetLanguageValue("È«¾ÖÒì³£²¶»ñ"), Snet.Windows.Controls.@enum.MessageBoxButton.OK, Snet.Windows.Controls.@enum.MessageBoxImage.Exclamation);
+                await Snet.Windows.Controls.message.MessageBox.Show(msg, LanguageOperate.GetLanguageValue("å…¨å±€å¼‚å¸¸æ•è·"), Snet.Windows.Controls.@enum.MessageBoxButton.OK, Snet.Windows.Controls.@enum.MessageBoxImage.Exclamation);
             }
             , System.Windows.Threading.DispatcherPriority.Loaded);
 

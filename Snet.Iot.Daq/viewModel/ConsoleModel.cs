@@ -24,13 +24,13 @@ using static Snet.Iot.Daq.utility.SystemMonitoring;
 namespace Snet.Iot.Daq.viewModel
 {
     /// <summary>
-    /// ¿ØÖÆÌ¨ÊÓÍ¼Ä£ĞÍ£¬¸ºÔğÏµÍ³¼à¿ØĞÅÏ¢ÏÔÊ¾¡¢OPC UA/MQTT ·şÎñ¶Ë¹ÜÀí¡¢ÈÕÖ¾Êä³öÒÔ¼°²É¼¯Éè±¸ÔËĞĞ×´Ì¬µÄ×ÛºÏ¹ÜÀí¡£
+    /// æ§åˆ¶å°è§†å›¾æ¨¡å‹ï¼Œè´Ÿè´£ç³»ç»Ÿç›‘æ§ä¿¡æ¯æ˜¾ç¤ºã€OPC UA/MQTT æœåŠ¡ç«¯ç®¡ç†ã€æ—¥å¿—è¾“å‡ºä»¥åŠé‡‡é›†è®¾å¤‡è¿è¡ŒçŠ¶æ€çš„ç»¼åˆç®¡ç†ã€‚
     /// </summary>
     public class ConsoleModel : BindNotify
     {
-        #region ¹¹Ôìº¯Êı
+        #region æ„é€ å‡½æ•°
         /// <summary>
-        /// ¹¹Ôìº¯Êı
+        /// æ„é€ å‡½æ•°
         /// </summary>
         public ConsoleModel()
         {
@@ -38,7 +38,7 @@ namespace Snet.Iot.Daq.viewModel
         }
         #endregion
 
-        #region ¼à¿ØĞÅÏ¢
+        #region ç›‘æ§ä¿¡æ¯
 
         private static readonly System.Windows.Media.SolidColorBrush s_cpuBrush = CreateFrozenBrush("#4CAF50");
         private static readonly System.Windows.Media.SolidColorBrush s_gpuBrush = CreateFrozenBrush("#F44336");
@@ -87,7 +87,7 @@ namespace Snet.Iot.Daq.viewModel
         private System.Windows.Media.Brush ram_Foreground = s_ramBrush;
 
         /// <summary>
-        /// ¸üĞÂÏµÍ³¼ì²âÖµ
+        /// æ›´æ–°ç³»ç»Ÿæ£€æµ‹å€¼
         /// </summary>
         private async Task UpdateSystemMonitoringValueAsync(CancellationToken token = default)
         {
@@ -95,7 +95,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 await Task.Run(async () =>
                 {
-                    // ÔÚÑ­»·Íâ·ÖÅä×Öµä£¬±ÜÃâÃ¿´Îµü´ú²úÉú GC Ñ¹Á¦
+                    // åœ¨å¾ªç¯å¤–åˆ†é…å­—å…¸ï¼Œé¿å…æ¯æ¬¡è¿­ä»£äº§ç”Ÿ GC å‹åŠ›
                     Dictionary<string, double> values = new Dictionary<string, double>(4);
 
                     using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_interval));
@@ -105,34 +105,34 @@ namespace Snet.Iot.Daq.viewModel
 
                         foreach (var iteminfolist in hardwareData.Info)
                         {
-                            if (iteminfolist.Key.Equals("ÄÚ´æ"))
+                            if (iteminfolist.Key.Equals("å†…å­˜"))
                             {
                                 foreach (var item in iteminfolist.Values)
                                 {
                                     if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
-                                        && item.Key.Equals("¸ºÔØ,Memory") && value > 0)
+                                        && item.Key.Equals("è´Ÿè½½,Memory") && value > 0)
                                     {
                                         values["RAM"] = value;
                                     }
                                 }
                             }
-                            if (iteminfolist.Key.Equals("Ó¢Î°´ïÏÔ¿¨") || iteminfolist.Key.Equals("Ó¢ÌØ¶ûÏÔ¿¨") || iteminfolist.Key.Equals("AMDÏÔ¿¨"))
+                            if (iteminfolist.Key.Equals("è‹±ä¼Ÿè¾¾æ˜¾å¡") || iteminfolist.Key.Equals("è‹±ç‰¹å°”æ˜¾å¡") || iteminfolist.Key.Equals("AMDæ˜¾å¡"))
                             {
                                 foreach (var item in iteminfolist.Values)
                                 {
                                     if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
-                                        && item.Key.Equals("¸ºÔØ,GPU Core") && value > 0)
+                                        && item.Key.Equals("è´Ÿè½½,GPU Core") && value > 0)
                                     {
                                         values["Gpu"] = value;
                                     }
                                 }
                             }
-                            if (iteminfolist.Key.Equals("´¦ÀíÆ÷"))
+                            if (iteminfolist.Key.Equals("å¤„ç†å™¨"))
                             {
                                 foreach (var item in iteminfolist.Values)
                                 {
                                     if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
-                                        && item.Key.Equals("¸ºÔØ,CPU Total") && value > 0)
+                                        && item.Key.Equals("è´Ÿè½½,CPU Total") && value > 0)
                                     {
                                         values["Cpu"] = value;
                                     }
@@ -169,44 +169,44 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ¸üĞÂÖ¸¶¨Ãû³ÆµÄÍ¼±íÏßÌõÊı¾İ£¬½«×îĞÂÊıÖµÍÆËÍµ½Í¼±í×é¼ş½øĞĞÊµÊ±»æÖÆ¡£
+        /// æ›´æ–°æŒ‡å®šåç§°çš„å›¾è¡¨çº¿æ¡æ•°æ®ï¼Œå°†æœ€æ–°æ•°å€¼æ¨é€åˆ°å›¾è¡¨ç»„ä»¶è¿›è¡Œå®æ—¶ç»˜åˆ¶ã€‚
         /// </summary>
-        /// <param name="name">ÏßÌõÃû³Æ£¨Èç "Cpu"¡¢"Gpu"¡¢"RAM"£©</param>
-        /// <param name="value">×îĞÂÊıÖµ</param>
+        /// <param name="name">çº¿æ¡åç§°ï¼ˆå¦‚ "Cpu"ã€"Gpu"ã€"RAM"ï¼‰</param>
+        /// <param name="value">æœ€æ–°æ•°å€¼</param>
         private void UpdateLineSeriesData(string name, double value)
         {
             chartOperate.Update(name, value);
         }
         #endregion
 
-        #region ÊôĞÔ
+        #region å±æ€§
         /// <summary>
-        /// uiĞÅÏ¢´¦ÀíÆ÷
+        /// uiä¿¡æ¯å¤„ç†å™¨
         /// </summary>
         private UiMessageHandler uiMessage = UiMessageHandler.Instance("Info");
 
         /// <summary>
-        /// Í¼±í²Ù×÷
+        /// å›¾è¡¨æ“ä½œ
         /// </summary>
         private ChartOperate chartOperate;
 
         /// <summary>
-        /// ÏµÍ³ĞÅÏ¢¼à¿Ø
+        /// ç³»ç»Ÿä¿¡æ¯ç›‘æ§
         /// </summary>
         private SystemMonitoring systemMonitoring;
 
         /// <summary>
-        /// ¼ä¸ô
+        /// é—´éš”
         /// </summary>
         private int _interval = 500;
 
         /// <summary>
-        /// È«¾ÖµÄÈÎÎñÈ¡Ïû¿ØÖÆ
+        /// å…¨å±€çš„ä»»åŠ¡å–æ¶ˆæ§åˆ¶
         /// </summary>
         private CancellationTokenSource globalToken = new CancellationTokenSource();
 
         /// <summary>
-        /// ¿Ø¼ş
+        /// æ§ä»¶
         /// </summary>
         public WpfPlot ChartControl
         {
@@ -216,7 +216,7 @@ namespace Snet.Iot.Daq.viewModel
         private WpfPlot chartControl = new WpfPlot();
 
         /// <summary>
-        /// ĞÅÏ¢ÊÂ¼ş
+        /// ä¿¡æ¯äº‹ä»¶
         /// </summary>
         public string Info
         {
@@ -225,7 +225,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// Éè±¸¼¯ºÏ
+        /// è®¾å¤‡é›†åˆ
         /// </summary>
         public ObservableCollection<ConsoleDevice> Devices
         {
@@ -235,14 +235,14 @@ namespace Snet.Iot.Daq.viewModel
         private ObservableCollection<ConsoleDevice> _Devices = new ObservableCollection<ConsoleDevice>();
         #endregion
 
-        #region ÃüÁîÓë·½·¨
+        #region å‘½ä»¤ä¸æ–¹æ³•
         /// <summary>
-        /// Êı¾İÇå¿Õ
+        /// æ•°æ®æ¸…ç©º
         /// </summary>
         public IAsyncRelayCommand Clear => p_Clear ??= new AsyncRelayCommand(ClearAsync);
         IAsyncRelayCommand p_Clear;
         /// <summary>
-        /// Çå¿ÕÏûÏ¢
+        /// æ¸…ç©ºæ¶ˆæ¯
         /// </summary>
         /// <returns></returns>
         public async Task ClearAsync()
@@ -251,7 +251,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// Mqtt·şÎñÊı¾İĞŞ¸Ä
+        /// MqttæœåŠ¡æ•°æ®ä¿®æ”¹
         /// </summary>
         public IAsyncRelayCommand MqttServerUpdate => p_MqttServerUpdate ??= new AsyncRelayCommand(MqttServerUpdateAsync);
         IAsyncRelayCommand p_MqttServerUpdate;
@@ -264,14 +264,14 @@ namespace Snet.Iot.Daq.viewModel
                 if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
                 {
                     basics = GlobalConfigModel.param.GetBasics().GetSource<MqttServiceData.Basics>();
-                    //Ğ´ÈëÅäÖÃ
+                    //å†™å…¥é…ç½®
                     FileHandler.StringToFile(GlobalConfigModel.MqttServerConfigPath, basics.ToJson(true));
                 }
             }
         }
 
         /// <summary>
-        /// Æô¶¯Mqtt·şÎñ
+        /// å¯åŠ¨MqttæœåŠ¡
         /// </summary>
         public IAsyncRelayCommand MqttServerStart => p_MqttServerStart ??= new AsyncRelayCommand(MqttServerStartAsync);
         IAsyncRelayCommand p_MqttServerStart;
@@ -284,7 +284,7 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     MqttServiceData.Basics basics = GlobalConfigModel.param.GetBasics().GetSource<MqttServiceData.Basics>();
                     GlobalConfigModel.mqttService = await MqttServiceOperate.InstanceAsync(basics);
-                    //´´½¨±¾µØÅäÖÃ
+                    //åˆ›å»ºæœ¬åœ°é…ç½®
                     if (!Directory.Exists(GlobalConfigModel.ServerConfigPath))
                     {
                         Directory.CreateDirectory(GlobalConfigModel.ServerConfigPath);
@@ -297,21 +297,21 @@ namespace Snet.Iot.Daq.viewModel
             }
             else
             {
-                await MessageBox.Show("ÒÑÆô¶¯".GetLanguageValue(App.LanguageOperate), "Mqtt");
+                await MessageBox.Show("å·²å¯åŠ¨".GetLanguageValue(App.LanguageOperate), "Mqtt");
             }
         }
 
         /// <summary>
-        /// Mqtt·şÎñ¶Ë³õÊ¼»¯
+        /// MqttæœåŠ¡ç«¯åˆå§‹åŒ–
         /// </summary>
         /// <returns></returns>
         private async Task MqttServerInitAsync()
         {
             if (File.Exists(GlobalConfigModel.MqttServerConfigPath))
             {
-                //ÊµÀı»¯²ÎÊı
+                //å®ä¾‹åŒ–å‚æ•°
                 MqttServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.MqttServerConfigPath).ToJsonEntity<MqttServiceData.Basics>();
-                //ÊµÀı»¯
+                //å®ä¾‹åŒ–
                 GlobalConfigModel.mqttService = MqttServiceOperate.Instance(basics ??= new());
             }
 
@@ -335,7 +335,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// Í£Ö¹Mqtt·şÎñ
+        /// åœæ­¢MqttæœåŠ¡
         /// </summary>
         public IAsyncRelayCommand MqttServerStop => p_MqttServerStop ??= new AsyncRelayCommand(MqttServerStopAsync);
         IAsyncRelayCommand p_MqttServerStop;
@@ -352,12 +352,12 @@ namespace Snet.Iot.Daq.viewModel
             }
             else
             {
-                await MessageBox.Show("Î´Æô¶¯".GetLanguageValue(App.LanguageOperate), "Mqtt");
+                await MessageBox.Show("æœªå¯åŠ¨".GetLanguageValue(App.LanguageOperate), "Mqtt");
             }
         }
 
         /// <summary>
-        /// OPCUA·şÎñÊı¾İĞŞ¸Ä
+        /// OPCUAæœåŠ¡æ•°æ®ä¿®æ”¹
         /// </summary>
         public IAsyncRelayCommand OpcUaServerUpdate => p_OpcUaServerUpdate ??= new AsyncRelayCommand(OpcUaServerUpdateAsync);
         IAsyncRelayCommand p_OpcUaServerUpdate;
@@ -370,14 +370,14 @@ namespace Snet.Iot.Daq.viewModel
                 if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
                 {
                     basics = GlobalConfigModel.param.GetBasics().GetSource<OpcUaServiceData.Basics>();
-                    //Ğ´ÈëÅäÖÃ
+                    //å†™å…¥é…ç½®
                     FileHandler.StringToFile(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
                 }
             }
         }
 
         /// <summary>
-        /// Æô¶¯OPCUA·şÎñ
+        /// å¯åŠ¨OPCUAæœåŠ¡
         /// </summary>
         public IAsyncRelayCommand OpcUaServerStart => p_OpcUaServerStart ??= new AsyncRelayCommand(OpcUaServerStartAsync);
         IAsyncRelayCommand p_OpcUaServerStart;
@@ -390,7 +390,7 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     OpcUaServiceData.Basics basics = GlobalConfigModel.param.GetBasics().GetSource<OpcUaServiceData.Basics>();
                     GlobalConfigModel.uaService = await OpcUaServiceOperate.InstanceAsync(basics);
-                    //´´½¨±¾µØÅäÖÃ
+                    //åˆ›å»ºæœ¬åœ°é…ç½®
                     if (!Directory.Exists(GlobalConfigModel.ServerConfigPath))
                     {
                         Directory.CreateDirectory(GlobalConfigModel.ServerConfigPath);
@@ -403,21 +403,21 @@ namespace Snet.Iot.Daq.viewModel
             }
             else
             {
-                await MessageBox.Show("ÒÑÆô¶¯".GetLanguageValue(App.LanguageOperate), "OpcUa");
+                await MessageBox.Show("å·²å¯åŠ¨".GetLanguageValue(App.LanguageOperate), "OpcUa");
             }
         }
 
         /// <summary>
-        /// OPCUA·şÎñ¶Ë³õÊ¼»¯
+        /// OPCUAæœåŠ¡ç«¯åˆå§‹åŒ–
         /// </summary>
         /// <returns></returns>
         private async Task OpcUaServerInitAsync()
         {
             if (File.Exists(GlobalConfigModel.UaServerConfigPath))
             {
-                //ÊµÀı»¯²ÎÊı
+                //å®ä¾‹åŒ–å‚æ•°
                 OpcUaServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.UaServerConfigPath).ToJsonEntity<OpcUaServiceData.Basics>();
-                //ÊµÀı»¯
+                //å®ä¾‹åŒ–
                 GlobalConfigModel.uaService = OpcUaServiceOperate.Instance(basics ??= new());
             }
 
@@ -441,7 +441,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// Í£Ö¹OPCUA·şÎñ
+        /// åœæ­¢OPCUAæœåŠ¡
         /// </summary>
         public IAsyncRelayCommand OpcUaServerStop => p_OpcUaServerStop ??= new AsyncRelayCommand(OpcUaServerStopAsync);
         IAsyncRelayCommand p_OpcUaServerStop;
@@ -458,29 +458,29 @@ namespace Snet.Iot.Daq.viewModel
             }
             else
             {
-                await MessageBox.Show("Î´Æô¶¯".GetLanguageValue(App.LanguageOperate), "OpcUa");
+                await MessageBox.Show("æœªå¯åŠ¨".GetLanguageValue(App.LanguageOperate), "OpcUa");
             }
         }
 
         /// <summary>
-        /// Ë¢ĞÂ
+        /// åˆ·æ–°
         /// </summary>
         public IAsyncRelayCommand Refresh => refresh ??= new AsyncRelayCommand(GlobalConfigModel.RefreshAsyncFunc ??= RefreshAsync);
         private IAsyncRelayCommand refresh;
         public async Task RefreshAsync()
         {
             List<IProjectTreeViewModel> devices = GlobalConfigModel.ProjectDict.GetAllDeviceNodes();
-            await ShowAsync(devices.Count + " " + "Ì¨Éè±¸ÒÑ³É¹¦¼ÓÔØ".GetLanguageValue(App.LanguageOperate));
+            await ShowAsync(devices.Count + " " + "å°è®¾å¤‡å·²æˆåŠŸåŠ è½½".GetLanguageValue(App.LanguageOperate));
             await SyncDevicesAsync(devices, Devices, ResultAsync, ShowAsync);
         }
 
         /// <summary>
-        /// Í¬²½Éè±¸¼¯ºÏ£¨ÕıÏò´´½¨ / ¸üĞÂ + ·´ÏòÒÆ³ı£©
+        /// åŒæ­¥è®¾å¤‡é›†åˆï¼ˆæ­£å‘åˆ›å»º / æ›´æ–° + åå‘ç§»é™¤ï¼‰
         /// </summary>
-        /// <param name="sourceDevices">ÏîÄ¿Ê÷ÖĞµÄÉè±¸½Úµã</param>
-        /// <param name="uiDevices">UI ÏÔÊ¾µÄÉè±¸¼¯ºÏ</param>
-        /// <param name="resultAsync">½á¹û»Øµ÷</param>
-        /// <param name="showAsync">ÌáÊ¾»Øµ÷</param>
+        /// <param name="sourceDevices">é¡¹ç›®æ ‘ä¸­çš„è®¾å¤‡èŠ‚ç‚¹</param>
+        /// <param name="uiDevices">UI æ˜¾ç¤ºçš„è®¾å¤‡é›†åˆ</param>
+        /// <param name="resultAsync">ç»“æœå›è°ƒ</param>
+        /// <param name="showAsync">æç¤ºå›è°ƒ</param>
         private async Task SyncDevicesAsync(
             List<IProjectTreeViewModel> sourceDevices,
             ObservableCollection<ConsoleDevice> uiDevices,
@@ -490,19 +490,19 @@ namespace Snet.Iot.Daq.viewModel
             if (sourceDevices == null || uiDevices == null)
                 return;
 
-            //¹¹½¨ guid ¡ú device Ë÷Òı£¬±ÜÃâ O(n2) ²éÕÒ
+            //æ„å»º guid â†’ device ç´¢å¼•ï¼Œé¿å… O(n2) æŸ¥æ‰¾
             var deviceMap = new Dictionary<string, ConsoleDevice>(uiDevices.Count);
             foreach (var d in uiDevices)
                 deviceMap[d.DataContext.GetSource<ConsoleDeviceModel>().ToString()] = d;
 
-            //ÕıÏòÍ¬²½£º´´½¨ / ¸üĞÂ
+            //æ­£å‘åŒæ­¥ï¼šåˆ›å»º / æ›´æ–°
             foreach (var item in sourceDevices)
             {
                 string guid = item.DaqDetails.Guid;
 
                 if (!deviceMap.TryGetValue(guid, out var existedDevice))
                 {
-                    // ĞÂ½¨Éè±¸
+                    // æ–°å»ºè®¾å¤‡
                     ConsoleDevice device = new ConsoleDevice();
                     ConsoleDeviceModel model = device.DataContext.GetSource<ConsoleDeviceModel>();
 
@@ -511,11 +511,11 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 else
                 {
-                    // ¸üĞÂÒÑÓĞÉè±¸
+                    // æ›´æ–°å·²æœ‰è®¾å¤‡
                     await existedDevice.DataContext.GetSource<ConsoleDeviceModel>().SettingsAsync(item, resultAsync, showAsync);
                 }
             }
-            //·´ÏòÍ¬²½£ºÒÆ³ı²»´æÔÚµÄÉè±¸
+            //åå‘åŒæ­¥ï¼šç§»é™¤ä¸å­˜åœ¨çš„è®¾å¤‡
             var validGuidSet = sourceDevices
                 .Select(d => d.DaqDetails.Guid)
                 .ToHashSet();
@@ -534,7 +534,7 @@ namespace Snet.Iot.Daq.viewModel
                 uiDevices.Remove(device);
             }
 
-            // Í¬²½ÍĞÅÌÉè±¸×´Ì¬¼¯ºÏ£¬¹©ÏµÍ³ÍĞÅÌÓÒ¼ü²Ëµ¥Ê¹ÓÃ
+            // åŒæ­¥æ‰˜ç›˜è®¾å¤‡çŠ¶æ€é›†åˆï¼Œä¾›ç³»ç»Ÿæ‰˜ç›˜å³é”®èœå•ä½¿ç”¨
             GlobalConfigModel.TrayDevices.Clear();
             foreach (var device in uiDevices)
             {
@@ -544,9 +544,9 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
-        /// Éè±¸½á¹ûĞÅÏ¢
+        /// è®¾å¤‡ç»“æœä¿¡æ¯
         /// </summary>
-        /// <param name="result">½á¹û</param>
+        /// <param name="result">ç»“æœ</param>
         private async Task ResultAsync(PluginConfigModel model, BaseModel result)
         {
             if (!result.Status)
@@ -558,7 +558,7 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// ½çÃæÏÔÊ¾ĞÅÏ¢
+        /// ç•Œé¢æ˜¾ç¤ºä¿¡æ¯
         /// </summary>
         /// <param name="message"></param>
         /// <returns></returns>
@@ -571,16 +571,16 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
-        /// ³õÊ¼»¯
+        /// åˆå§‹åŒ–
         /// </summary>
         /// <returns></returns>
         private async Task InitAsync()
         {
-            // ½çÃæÏûÏ¢´¦Àí
+            // ç•Œé¢æ¶ˆæ¯å¤„ç†
             uiMessage.OnInfoEventAsync += async (object? sender, Model.data.EventInfoResult e) => Info = e.Message;
             await uiMessage.StartAsync();
 
-            // Í¼±í²Ù×÷
+            // å›¾è¡¨æ“ä½œ
             chartOperate = ChartOperate.Instance(new()
             {
                 ChartControl = ChartControl,
@@ -589,26 +589,26 @@ namespace Snet.Iot.Daq.viewModel
                 RefreshTime = _interval
             });
             chartOperate.On();
-            chartOperate.Create(new() { SN = "Cpu", Title = "´¦ÀíÆ÷", TitleEN = "Cpu", Color = "#4CAF50" });
-            chartOperate.Create(new() { SN = "Gpu", Title = "ÏÔ¿¨", TitleEN = "Gpu", Color = "#F44336" });
-            chartOperate.Create(new() { SN = "RAM", Title = "ÄÚ´æ", TitleEN = "RAM", Color = "#2196F3" });
+            chartOperate.Create(new() { SN = "Cpu", Title = "å¤„ç†å™¨", TitleEN = "Cpu", Color = "#4CAF50" });
+            chartOperate.Create(new() { SN = "Gpu", Title = "æ˜¾å¡", TitleEN = "Gpu", Color = "#F44336" });
+            chartOperate.Create(new() { SN = "RAM", Title = "å†…å­˜", TitleEN = "RAM", Color = "#2196F3" });
 
-            // ÏµÍ³¼à¿Ø
+            // ç³»ç»Ÿç›‘æ§
             systemMonitoring = SystemMonitoring.Instance();
 
-            // ¸üĞÂÏµÍ³¼ì²âÖµ
+            // æ›´æ–°ç³»ç»Ÿæ£€æµ‹å€¼
             _ = UpdateSystemMonitoringValueAsync(globalToken.Token).ConfigureAwait(false);
 
-            //OPCUA·şÎñ¶ËÆô¶¯
+            //OPCUAæœåŠ¡ç«¯å¯åŠ¨
             await OpcUaServerInitAsync();
 
-            //Mqtt·şÎñ¶ËÆô¶¯
+            //MqttæœåŠ¡ç«¯å¯åŠ¨
             await MqttServerInitAsync();
 
-            //¸³Öµ²å¼şĞÅÏ¢
+            //èµ‹å€¼æ’ä»¶ä¿¡æ¯
             GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;
 
-            //Ë¢ĞÂ
+            //åˆ·æ–°
             await RefreshAsync();
         }
         #endregion

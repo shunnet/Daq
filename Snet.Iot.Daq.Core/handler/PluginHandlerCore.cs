@@ -11,44 +11,44 @@ using System.Collections.ObjectModel;
 namespace Snet.Iot.Daq.Core.handler
 {
     /// <summary>
-    /// ²å¼ş²ÎÊı´¦ÀíÀà<br/>
-    /// ¸ºÔğ²å¼şµÄ¼ÓÔØ¡¢ÒÆ³ı¡¢ÊµÀı»¯¡¢²ÎÊı×ª»»¡¢×´Ì¬ÑéÖ¤¡¢ÅäÖÃ¶ÁĞ´µÈºËĞÄ²Ù×÷¡£
-    /// ÄÚ²¿Ê¹ÓÃ ConcurrentDictionary »º´æ³ÌĞò¼¯ÀàĞÍºÍÊµÀı£¬Ö§³ÖÏß³Ì°²È«µÄ²¢·¢·ÃÎÊ¡£
+    /// æ’ä»¶å‚æ•°å¤„ç†ç±»<br/>
+    /// è´Ÿè´£æ’ä»¶çš„åŠ è½½ã€ç§»é™¤ã€å®ä¾‹åŒ–ã€å‚æ•°è½¬æ¢ã€çŠ¶æ€éªŒè¯ã€é…ç½®è¯»å†™ç­‰æ ¸å¿ƒæ“ä½œã€‚
+    /// å†…éƒ¨ä½¿ç”¨ ConcurrentDictionary ç¼“å­˜ç¨‹åºé›†ç±»å‹å’Œå®ä¾‹ï¼Œæ”¯æŒçº¿ç¨‹å®‰å…¨çš„å¹¶å‘è®¿é—®ã€‚
     /// </summary>
     public static class PluginHandlerCore
     {
         /// <summary>
-        /// ²å¼ş²Ù×÷ºËĞÄÊµÀı
+        /// æ’ä»¶æ“ä½œæ ¸å¿ƒå®ä¾‹
         /// </summary>
         public static readonly PluginOperate PluginOperate = PluginOperate.Instance(typeof(PluginHandlerCore).Name);
 
         /// <summary>
-        /// ±£´æ²å¼şÅäÖÃÁĞ±íµ½±¾µØ JSON ÎÄ¼ş
+        /// ä¿å­˜æ’ä»¶é…ç½®åˆ—è¡¨åˆ°æœ¬åœ° JSON æ–‡ä»¶
         /// </summary>
-        /// <param name="data">²å¼şÅäÖÃ¼¯ºÏ</param>
-        /// <param name="path">±£´æÂ·¾¶</param>
+        /// <param name="data">æ’ä»¶é…ç½®é›†åˆ</param>
+        /// <param name="path">ä¿å­˜è·¯å¾„</param>
         public static void SavePluginUIConfig(ObservableCollection<PluginConfigModel> data, string path)
         {
             FileHandler.StringToFile(path, data.ToJson(true));
         }
 
         /// <summary>
-        /// ±£´æ²å¼şÁĞ±íÅäÖÃµ½±¾µØ JSON ÎÄ¼ş
+        /// ä¿å­˜æ’ä»¶åˆ—è¡¨é…ç½®åˆ°æœ¬åœ° JSON æ–‡ä»¶
         /// </summary>
-        /// <param name="data">²å¼şÁĞ±í¼¯ºÏ</param>
-        /// <param name="path">±£´æÂ·¾¶</param>
+        /// <param name="data">æ’ä»¶åˆ—è¡¨é›†åˆ</param>
+        /// <param name="path">ä¿å­˜è·¯å¾„</param>
         public static void SavePluginUIConfig(ObservableCollection<PluginListModel> data, string path)
         {
             FileHandler.StringToFile(path, data.ToJson(true));
         }
 
         /// <summary>
-        /// ´Ó±¾µØ JSON ÎÄ¼ş¼ÓÔØ²å¼ş½çÃæÅäÖÃ<br/>
-        /// ÎÄ¼ş²»´æÔÚÊ±·µ»ØÄ¬ÈÏÖµ
+        /// ä»æœ¬åœ° JSON æ–‡ä»¶åŠ è½½æ’ä»¶ç•Œé¢é…ç½®<br/>
+        /// æ–‡ä»¶ä¸å­˜åœ¨æ—¶è¿”å›é»˜è®¤å€¼
         /// </summary>
-        /// <typeparam name="T">·´ĞòÁĞ»¯Ä¿±êÀàĞÍ</typeparam>
-        /// <param name="filePath">ÅäÖÃÎÄ¼şÂ·¾¶</param>
-        /// <returns>·´ĞòÁĞ»¯ºóµÄ¶ÔÏó£¬ÎÄ¼ş²»´æÔÚ»ò·´ĞòÁĞ»¯Ê§°ÜÊ±·µ»Ø default</returns>
+        /// <typeparam name="T">ååºåˆ—åŒ–ç›®æ ‡ç±»å‹</typeparam>
+        /// <param name="filePath">é…ç½®æ–‡ä»¶è·¯å¾„</param>
+        /// <returns>ååºåˆ—åŒ–åçš„å¯¹è±¡ï¼Œæ–‡ä»¶ä¸å­˜åœ¨æˆ–ååºåˆ—åŒ–å¤±è´¥æ—¶è¿”å› default</returns>
         public static T? GetPluginUIConfig<T>(string filePath)
         {
             if (!File.Exists(filePath))
@@ -60,12 +60,12 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// ´Ó²å¼şÎÄ¼şÃûÌáÈ¡Éè±¸ SN Âë<br/>
-        /// ÀıÈç "Namespace.ClassName.MySN.Daq.Config.json" ¡ú "MySN"
+        /// ä»æ’ä»¶æ–‡ä»¶åæå–è®¾å¤‡ SN ç <br/>
+        /// ä¾‹å¦‚ "Namespace.ClassName.MySN.Daq.Config.json" â†’ "MySN"
         /// </summary>
-        /// <param name="fileName">²å¼şÅäÖÃÎÄ¼şÃû</param>
-        /// <param name="type">²å¼şÀàĞÍ£¨Daq/Mq£©</param>
-        /// <returns>ÌáÈ¡µÄ SN Âë×Ö·û´®</returns>
+        /// <param name="fileName">æ’ä»¶é…ç½®æ–‡ä»¶å</param>
+        /// <param name="type">æ’ä»¶ç±»å‹ï¼ˆDaq/Mqï¼‰</param>
+        /// <returns>æå–çš„ SN ç å­—ç¬¦ä¸²</returns>
         public static string PluginFileNameToSN(string fileName, PluginType type)
         {
             string newData = fileName.Replace($".{type.ToString()}.Config.json", string.Empty);
@@ -73,24 +73,24 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// Í¨¹ı²å¼şÅäÖÃ´´½¨ĞÂµÄÉè±¸ÊµÀı<br/>
-        /// ´Ó IOC ÈİÆ÷ÖĞ»ñÈ¡»º´æµÄ»ù´¡ÊµÀı£¬µ÷ÓÃÆä CreateInstanceAsync ·½·¨´´½¨ĞÂÁ¬½Ó
+        /// é€šè¿‡æ’ä»¶é…ç½®åˆ›å»ºæ–°çš„è®¾å¤‡å®ä¾‹<br/>
+        /// ä» IOC å®¹å™¨ä¸­è·å–ç¼“å­˜çš„åŸºç¡€å®ä¾‹ï¼Œè°ƒç”¨å…¶ CreateInstanceAsync æ–¹æ³•åˆ›å»ºæ–°è¿æ¥
         /// </summary>
-        /// <typeparam name="T">Ä¿±ê½Ó¿ÚÀàĞÍ£¨IDaq »ò IMq£©</typeparam>
-        /// <param name="plugin">²å¼şÅäÖÃĞÅÏ¢£¬°üº¬ÀàÃûºÍÁ¬½Ó²ÎÊı</param>
-        /// <returns>ĞÂ´´½¨µÄÊµÀı£¬Ê§°ÜÊ±·µ»Ø default</returns>
+        /// <typeparam name="T">ç›®æ ‡æ¥å£ç±»å‹ï¼ˆIDaq æˆ– IMqï¼‰</typeparam>
+        /// <param name="plugin">æ’ä»¶é…ç½®ä¿¡æ¯ï¼ŒåŒ…å«ç±»åå’Œè¿æ¥å‚æ•°</param>
+        /// <returns>æ–°åˆ›å»ºçš„å®ä¾‹ï¼Œå¤±è´¥æ—¶è¿”å› default</returns>
         public static async Task<T?> CreateNewObjectAsync<T>(this PluginConfigModel plugin)
             => await PluginOperate.CreateAsync<T>(plugin.Name, plugin.Param, plugin.Type);
 
         /// <summary>
-        /// ²âÊÔÉú²úÏûÏ¢<br/>
-        /// ´´½¨ÁÙÊ± MQ ÊµÀı½øĞĞµ¥´ÎÏûÏ¢Éú²ú²âÊÔ£¬Íê³ÉºóÊÍ·Å×ÊÔ´¡£
-        /// Ê¹ÓÃ try/finally È·±£×ÊÔ´¿É¿¿ÊÍ·Å£¬¼´Ê¹·¢ÉúÒì³£Ò²²»»áĞ¹Â©Á¬½Ó¡£
+        /// æµ‹è¯•ç”Ÿäº§æ¶ˆæ¯<br/>
+        /// åˆ›å»ºä¸´æ—¶ MQ å®ä¾‹è¿›è¡Œå•æ¬¡æ¶ˆæ¯ç”Ÿäº§æµ‹è¯•ï¼Œå®Œæˆåé‡Šæ”¾èµ„æºã€‚
+        /// ä½¿ç”¨ try/finally ç¡®ä¿èµ„æºå¯é é‡Šæ”¾ï¼Œå³ä½¿å‘ç”Ÿå¼‚å¸¸ä¹Ÿä¸ä¼šæ³„æ¼è¿æ¥ã€‚
         /// </summary>
-        /// <param name="plugin">´«Êä²å¼şÅäÖÃĞÅÏ¢</param>
-        /// <param name="topic">ÏûÏ¢Ö÷Ìâ</param>
-        /// <param name="content">ÏûÏ¢ÄÚÈİ</param>
-        /// <returns>²Ù×÷½á¹û£¬°üº¬Éú²ú³É¹¦/Ê§°Ü×´Ì¬</returns>
+        /// <param name="plugin">ä¼ è¾“æ’ä»¶é…ç½®ä¿¡æ¯</param>
+        /// <param name="topic">æ¶ˆæ¯ä¸»é¢˜</param>
+        /// <param name="content">æ¶ˆæ¯å†…å®¹</param>
+        /// <returns>æ“ä½œç»“æœï¼ŒåŒ…å«ç”Ÿäº§æˆåŠŸ/å¤±è´¥çŠ¶æ€</returns>
         public static async Task<OperateResult> TestProduceAsync(this PluginConfigModel plugin, string topic, string content)
         {
             IMq? mqNew = await plugin.CreateNewObjectAsync<IMq>();
@@ -106,14 +106,14 @@ namespace Snet.Iot.Daq.Core.handler
                 }
                 if (operateResult.Status)
                 {
-                    // Éú²úÏûÏ¢
+                    // ç”Ÿäº§æ¶ˆæ¯
                     operateResult = await mqNew.ProduceAsync(topic, content);
                 }
                 return operateResult;
             }
             finally
             {
-                // È·±£×ÊÔ´¿É¿¿ÊÍ·Å
+                // ç¡®ä¿èµ„æºå¯é é‡Šæ”¾
                 await mqNew.OffAsync();
                 await mqNew.DisposeAsync();
             }
@@ -121,13 +121,13 @@ namespace Snet.Iot.Daq.Core.handler
 
 
         /// <summary>
-        /// ²âÊÔ¶ÁÈ¡µØÖ·Êı¾İ<br/>
-        /// ´´½¨ÁÙÊ± DAQ ÊµÀı½øĞĞµ¥´ÎµØÖ·¶ÁÈ¡²âÊÔ£¬Íê³ÉºóÊÍ·Å×ÊÔ´¡£
-        /// Ê¹ÓÃ try/finally È·±£×ÊÔ´¿É¿¿ÊÍ·Å¡£
+        /// æµ‹è¯•è¯»å–åœ°å€æ•°æ®<br/>
+        /// åˆ›å»ºä¸´æ—¶ DAQ å®ä¾‹è¿›è¡Œå•æ¬¡åœ°å€è¯»å–æµ‹è¯•ï¼Œå®Œæˆåé‡Šæ”¾èµ„æºã€‚
+        /// ä½¿ç”¨ try/finally ç¡®ä¿èµ„æºå¯é é‡Šæ”¾ã€‚
         /// </summary>
-        /// <param name="model">µØÖ·Ä£ĞÍ£¬°üº¬µØÖ·ĞÅÏ¢ºÍÊı¾İÀàĞÍ</param>
-        /// <param name="plugin">²É¼¯²å¼şÅäÖÃĞÅÏ¢</param>
-        /// <returns>²Ù×÷½á¹û£¬³É¹¦Ê± ResultData °üº¬¶ÁÈ¡µ½µÄÊı¾İ</returns>
+        /// <param name="model">åœ°å€æ¨¡å‹ï¼ŒåŒ…å«åœ°å€ä¿¡æ¯å’Œæ•°æ®ç±»å‹</param>
+        /// <param name="plugin">é‡‡é›†æ’ä»¶é…ç½®ä¿¡æ¯</param>
+        /// <returns>æ“ä½œç»“æœï¼ŒæˆåŠŸæ—¶ ResultData åŒ…å«è¯»å–åˆ°çš„æ•°æ®</returns>
         public static async Task<OperateResult> TestReadAddressAsync(this IAddressModel model, PluginConfigModel plugin)
         {
             IDaq? daqNew = await plugin.CreateNewObjectAsync<IDaq>();
@@ -146,30 +146,30 @@ namespace Snet.Iot.Daq.Core.handler
                     AddressDetails? address = model.Convert();
                     if (address is not null)
                     {
-                        // Ö´ĞĞ¶ÁÈ¡²Ù×÷
+                        // æ‰§è¡Œè¯»å–æ“ä½œ
                         return await daqNew.ReadAsync(new Address() { AddressArray = [address] });
                     }
-                    return OperateResult.CreateFailureResult("µØÖ·×ª»»Ê§°Ü");
+                    return OperateResult.CreateFailureResult("åœ°å€è½¬æ¢å¤±è´¥");
                 }
                 return operateResult;
             }
             finally
             {
-                // È·±£×ÊÔ´¿É¿¿ÊÍ·Å
+                // ç¡®ä¿èµ„æºå¯é é‡Šæ”¾
                 await daqNew.OffAsync();
                 await daqNew.DisposeAsync();
             }
         }
 
         /// <summary>
-        /// ²âÊÔĞ´ÈëµØÖ·Êı¾İ<br/>
-        /// ´´½¨ÁÙÊ± DAQ ÊµÀı½øĞĞµ¥´ÎµØÖ·Ğ´Èë²âÊÔ£¬Íê³ÉºóÊÍ·Å×ÊÔ´¡£
-        /// Ê¹ÓÃ try/finally È·±£×ÊÔ´¿É¿¿ÊÍ·Å¡£
+        /// æµ‹è¯•å†™å…¥åœ°å€æ•°æ®<br/>
+        /// åˆ›å»ºä¸´æ—¶ DAQ å®ä¾‹è¿›è¡Œå•æ¬¡åœ°å€å†™å…¥æµ‹è¯•ï¼Œå®Œæˆåé‡Šæ”¾èµ„æºã€‚
+        /// ä½¿ç”¨ try/finally ç¡®ä¿èµ„æºå¯é é‡Šæ”¾ã€‚
         /// </summary>
-        /// <param name="model">µØÖ·Ä£ĞÍ£¬°üº¬Ä¿±êµØÖ·ĞÅÏ¢</param>
-        /// <param name="plugin">²É¼¯²å¼şÅäÖÃĞÅÏ¢</param>
-        /// <param name="write">´ıĞ´ÈëµÄÊı¾İÄ£ĞÍ</param>
-        /// <returns>²Ù×÷½á¹û£¬°üº¬Ğ´Èë³É¹¦/Ê§°Ü×´Ì¬</returns>
+        /// <param name="model">åœ°å€æ¨¡å‹ï¼ŒåŒ…å«ç›®æ ‡åœ°å€ä¿¡æ¯</param>
+        /// <param name="plugin">é‡‡é›†æ’ä»¶é…ç½®ä¿¡æ¯</param>
+        /// <param name="write">å¾…å†™å…¥çš„æ•°æ®æ¨¡å‹</param>
+        /// <returns>æ“ä½œç»“æœï¼ŒåŒ…å«å†™å…¥æˆåŠŸ/å¤±è´¥çŠ¶æ€</returns>
         public static async Task<OperateResult> TestWriteAddressAsync(this IAddressModel model, PluginConfigModel plugin, WriteModel write)
         {
             IDaq? daqNew = await plugin.CreateNewObjectAsync<IDaq>();
@@ -185,30 +185,30 @@ namespace Snet.Iot.Daq.Core.handler
                 }
                 if (operateResult.Status)
                 {
-                    // ×éÖ¯Ğ´ÈëÊı¾İ
+                    // ç»„ç»‡å†™å…¥æ•°æ®
                     var keys = new ConcurrentDictionary<string, WriteModel> { [model.Address] = write };
-                    // Ö´ĞĞĞ´Èë²Ù×÷
+                    // æ‰§è¡Œå†™å…¥æ“ä½œ
                     operateResult = await daqNew.WriteAsync(keys);
                 }
                 return operateResult;
             }
             finally
             {
-                // È·±£×ÊÔ´¿É¿¿ÊÍ·Å
+                // ç¡®ä¿èµ„æºå¯é é‡Šæ”¾
                 await daqNew.OffAsync();
                 await daqNew.DisposeAsync();
             }
         }
 
         /// <summary>
-        /// ²âÊÔÊı¾İ´«Êä<br/>
-        /// ´´½¨ÁÙÊ± MQ ÊµÀı½øĞĞµ¥´ÎÊı¾İ´«Êä²âÊÔ£¬Íê³ÉºóÊÍ·Å×ÊÔ´¡£
-        /// Ê¹ÓÃ try/finally È·±£×ÊÔ´¿É¿¿ÊÍ·Å¡£
+        /// æµ‹è¯•æ•°æ®ä¼ è¾“<br/>
+        /// åˆ›å»ºä¸´æ—¶ MQ å®ä¾‹è¿›è¡Œå•æ¬¡æ•°æ®ä¼ è¾“æµ‹è¯•ï¼Œå®Œæˆåé‡Šæ”¾èµ„æºã€‚
+        /// ä½¿ç”¨ try/finally ç¡®ä¿èµ„æºå¯é é‡Šæ”¾ã€‚
         /// </summary>
-        /// <param name="address">µØÖ·Ä£ĞÍ£¬°üº¬Ö÷Ìâ¡¢¾«¼òÖµÉèÖÃµÈ</param>
-        /// <param name="plugin">´«Êä²å¼şÅäÖÃĞÅÏ¢</param>
-        /// <param name="data">´ı´«ÊäµÄµØÖ·ÖµÊı¾İ</param>
-        /// <returns>²Ù×÷½á¹û£¬°üº¬´«Êä³É¹¦/Ê§°Ü×´Ì¬</returns>
+        /// <param name="address">åœ°å€æ¨¡å‹ï¼ŒåŒ…å«ä¸»é¢˜ã€ç²¾ç®€å€¼è®¾ç½®ç­‰</param>
+        /// <param name="plugin">ä¼ è¾“æ’ä»¶é…ç½®ä¿¡æ¯</param>
+        /// <param name="data">å¾…ä¼ è¾“çš„åœ°å€å€¼æ•°æ®</param>
+        /// <returns>æ“ä½œç»“æœï¼ŒåŒ…å«ä¼ è¾“æˆåŠŸ/å¤±è´¥çŠ¶æ€</returns>
         public static async Task<OperateResult> TestTransmitDataAsync(this IAddressModel address, PluginConfigModel plugin, AddressValue data)
         {
             IMq? mqNew = await plugin.CreateNewObjectAsync<IMq>();
@@ -224,27 +224,27 @@ namespace Snet.Iot.Daq.Core.handler
                 }
                 if (operateResult.Status)
                 {
-                    // ¸ù¾İ¾«¼òÖµÉèÖÃ¾ö¶¨ĞòÁĞ»¯·½Ê½
+                    // æ ¹æ®ç²¾ç®€å€¼è®¾ç½®å†³å®šåºåˆ—åŒ–æ–¹å¼
                     string content = address.SimplifyValue ? data.GetSimplify().ToJson(true) : data.ToJson(true);
-                    // Ö´ĞĞÏûÏ¢Éú²ú
+                    // æ‰§è¡Œæ¶ˆæ¯ç”Ÿäº§
                     operateResult = await mqNew.ProduceAsync(address.Topic, content);
                 }
                 return operateResult;
             }
             finally
             {
-                // È·±£×ÊÔ´¿É¿¿ÊÍ·Å
+                // ç¡®ä¿èµ„æºå¯é é‡Šæ”¾
                 await mqNew.OffAsync();
                 await mqNew.DisposeAsync();
             }
         }
 
         /// <summary>
-        /// ½« AddressModel ÁĞ±íÅúÁ¿×ª»»Îªµ×²ã Address ¶ÔÏó<br/>
-        /// Ô¤·ÖÅä AddressArray ÈİÁ¿ÒÔ¼õÉÙÀ©Èİ¿ªÏú
+        /// å°† AddressModel åˆ—è¡¨æ‰¹é‡è½¬æ¢ä¸ºåº•å±‚ Address å¯¹è±¡<br/>
+        /// é¢„åˆ†é… AddressArray å®¹é‡ä»¥å‡å°‘æ‰©å®¹å¼€é”€
         /// </summary>
-        /// <param name="models">µØÖ·Ä£ĞÍ¼¯ºÏ</param>
-        /// <returns>×ª»»ºóµÄ Address ¶ÔÏó£¬°üº¬ËùÓĞµØÖ·ÏêÇé</returns>
+        /// <param name="models">åœ°å€æ¨¡å‹é›†åˆ</param>
+        /// <returns>è½¬æ¢åçš„ Address å¯¹è±¡ï¼ŒåŒ…å«æ‰€æœ‰åœ°å€è¯¦æƒ…</returns>
         public static Address AddressConvert(this List<IAddressModel> models)
         {
             Address address = new();
@@ -257,10 +257,10 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// ½«µ¥¸ö AddressModel ×ª»»Îªµ×²ã Address ¶ÔÏó
+        /// å°†å•ä¸ª AddressModel è½¬æ¢ä¸ºåº•å±‚ Address å¯¹è±¡
         /// </summary>
-        /// <param name="models">µØÖ·Ä£ĞÍ</param>
-        /// <returns>×ª»»ºóµÄ Address ¶ÔÏó£¬°üº¬µ¥¸öµØÖ·ÏêÇé</returns>
+        /// <param name="models">åœ°å€æ¨¡å‹</param>
+        /// <returns>è½¬æ¢åçš„ Address å¯¹è±¡ï¼ŒåŒ…å«å•ä¸ªåœ°å€è¯¦æƒ…</returns>
         public static Address AddressConvert(this IAddressModel models)
         {
             Address address = new();

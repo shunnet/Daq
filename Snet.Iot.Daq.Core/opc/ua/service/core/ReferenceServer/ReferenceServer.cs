@@ -1,4 +1,4 @@
-/* ========================================================================
+ï»¿/* ========================================================================
  * Copyright (c) 2005-2020 The OPC Foundation, Inc. All rights reserved.
  *
  * OPC Foundation MIT License 1.00
@@ -52,13 +52,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
     public partial class ReferenceServer : ReverseConnectServer
     {
         /// <summary>
-        /// ¹¹Ôìº¯Êı
+        /// æ„é€ å‡½æ•°
         /// </summary>
-        /// <param name="User">ÓÃ»§Ãû</param>
-        /// <param name="Password">ÃÜÂë</param>
-        /// <param name="AType">ÑéÖ¤ÀàĞÍ</param>
-        /// <param name="AutoCreateAddress">×Ô¶¯´´½¨µØÖ·</param>
-        /// <param name="AddressSpaceName">µØÖ·¿Õ¼äÃû³Æ</param>
+        /// <param name="User">ç”¨æˆ·å</param>
+        /// <param name="Password">å¯†ç </param>
+        /// <param name="AType">éªŒè¯ç±»å‹</param>
+        /// <param name="AutoCreateAddress">è‡ªåŠ¨åˆ›å»ºåœ°å€</param>
+        /// <param name="AddressSpaceName">åœ°å€ç©ºé—´åç§°</param>
         public ReferenceServer(string User, string Password, AuType AType, bool AutoCreateAddress, string AddressSpaceName, Action<object?, EventDataResult> actionEvent)
         {
 
@@ -72,7 +72,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 
         public override Task<WriteResponse> WriteAsync(SecureChannelContext secureChannelContext, RequestHeader requestHeader, WriteValueCollection nodesToWrite, CancellationToken ct)
         {
-            ActionEvent?.Invoke(this, new EventDataResult(true, "¿Í»§¶ËĞ´Èë²Ù×÷", nodesToWrite));
+            ActionEvent?.Invoke(this, new EventDataResult(true, "å®¢æˆ·ç«¯å†™å…¥æ“ä½œ", nodesToWrite));
             return base.WriteAsync(secureChannelContext, requestHeader, nodesToWrite, ct);
         }
 
@@ -82,29 +82,29 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 
 
         /// <summary>
-        /// ¿Í»§¶ËĞ´ÈëÊÂ¼şÅ×³ö
+        /// å®¢æˆ·ç«¯å†™å…¥äº‹ä»¶æŠ›å‡º
         /// </summary>
         private Action<object?, EventDataResult> ActionEvent;
 
         /// <summary>
-        /// ÕËºÅÃÜÂë
+        /// è´¦å·å¯†ç 
         /// </summary>
         private string User, Password;
         /// <summary>
-        /// ÈÏÖ¤ÀàĞÍ
+        /// è®¤è¯ç±»å‹
         /// </summary>
         private AuType AType;
 
         /// <summary>
-        /// µØÖ·¹ÜÀí
+        /// åœ°å€ç®¡ç†
         /// </summary>
         public ReferenceNodeManager NodeManage;
         /// <summary>
-        /// ×Ô¶¯´´½¨µØÖ·
+        /// è‡ªåŠ¨åˆ›å»ºåœ°å€
         /// </summary>
         public bool AutoCreateAddress;
         /// <summary>
-        /// µØÖ·¿Õ¼äÃû³Æ
+        /// åœ°å€ç©ºé—´åç§°
         /// </summary>
         public string AddressSpaceName;
 
@@ -125,7 +125,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 Utils.TraceMasks.StartStop,
                 "Creating the Reference Server Node Manager.");
 
-            //Èç¹ûµØÖ·¹ÜÀíÎª¿ÕÔòÊµÀı»¯
+            //å¦‚æœåœ°å€ç®¡ç†ä¸ºç©ºåˆ™å®ä¾‹åŒ–
             if (NodeManage == null)
             {
                 NodeManage = new ReferenceNodeManager(server, configuration, AutoCreateAddress, AddressSpaceName);
@@ -313,14 +313,14 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         }
 
         /// <summary>
-        /// µ±¿Í»§¶ËÊÔÍ¼¸ü¸ÄÉí·İÊ±µ÷ÓÃ
+        /// å½“å®¢æˆ·ç«¯è¯•å›¾æ›´æ”¹èº«ä»½æ—¶è°ƒç”¨
         /// </summary>
         private void SessionManager_ImpersonateUser(ISession session, ImpersonateEventArgs args)
         {
             switch (AType)
             {
                 case AuType.Anonymous:
-                    //ÄäÃû
+                    //åŒ¿å
                     if (args.NewIdentity is AnonymousIdentityToken)
                     {
                         args.Identity = new RoleBasedIdentity(new UserIdentity(), new List<Role>() { Role.Anonymous });
@@ -328,7 +328,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     }
                     break;
                 case AuType.UserName:
-                    // ÕËºÅÃÜÂë
+                    // è´¦å·å¯†ç 
                     UserNameIdentityToken userNameToken = args.NewIdentity as UserNameIdentityToken;
                     if (userNameToken != null)
                     {
@@ -337,7 +337,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     }
                     break;
                 case AuType.Certificate:
-                    //Ö¤Êé
+                    //è¯ä¹¦
                     X509IdentityToken x509Token = args.NewIdentity as X509IdentityToken;
                     if (x509Token != null)
                     {
@@ -347,11 +347,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     }
                     break;
             }
-            throw ServiceResultException.Create(StatusCodes.BadIdentityTokenInvalid, "²»Ö§³ÖÓÃ»§ÁîÅÆÀàĞÍ: {0}.", args.NewIdentity);
+            throw ServiceResultException.Create(StatusCodes.BadIdentityTokenInvalid, "ä¸æ”¯æŒç”¨æˆ·ä»¤ç‰Œç±»å‹: {0}.", args.NewIdentity);
         }
 
         /// <summary>
-        /// ÑéÖ¤Ö¤Êé
+        /// éªŒè¯è¯ä¹¦
         /// </summary>
         /// <param name="certificate"></param>
         /// <exception cref="ServiceResultException"></exception>
@@ -378,7 +378,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     info = new TranslationInfo(
                         "InvalidCertificate",
                         "en-US",
-                        "'{0}' ÊÇÎŞĞ§µÄÓÃ»§Ö¤Êé",
+                        "'{0}' æ˜¯æ— æ•ˆçš„ç”¨æˆ·è¯ä¹¦",
                         certificate.Subject);
 
                     result = StatusCodes.BadIdentityTokenInvalid;
@@ -388,7 +388,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     info = new TranslationInfo(
                         "UntrustedCertificate",
                         "en-US",
-                        "'{0}' ²»ÊÇÊÜĞÅÈÎÓÃ»§Ö¤Êé",
+                        "'{0}' ä¸æ˜¯å—ä¿¡ä»»ç”¨æˆ·è¯ä¹¦",
                         certificate.Subject);
                 }
 
@@ -402,7 +402,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         }
 
         /// <summary>
-        /// ÑéÖ¤ÕËºÅÃÜÂë
+        /// éªŒè¯è´¦å·å¯†ç 
         /// </summary>
         private IUserIdentity VerifyPassword(UserNameIdentityToken userNameToken)
         {
@@ -411,28 +411,28 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             if (string.IsNullOrEmpty(userName))
             {
                 throw ServiceResultException.Create(StatusCodes.BadIdentityTokenInvalid,
-                    "°²È«ÁîÅÆ²»ÊÇÓĞĞ§µÄÓÃ»§ÃûÁîÅÆ¡£²»½ÓÊÜ¿ÕµÄÓÃ»§Ãû");
+                    "å®‰å…¨ä»¤ç‰Œä¸æ˜¯æœ‰æ•ˆçš„ç”¨æˆ·åä»¤ç‰Œã€‚ä¸æ¥å—ç©ºçš„ç”¨æˆ·å");
             }
 
             if (Utils.Utf8IsNullOrEmpty(password))
             {
                 throw ServiceResultException.Create(StatusCodes.BadIdentityTokenRejected,
-                    "°²È«ÁîÅÆ²»ÊÇÓĞĞ§µÄÓÃ»§ÃûÁîÅÆ¡£²»½ÓÊÜ¿ÕÃÜÂë");
+                    "å®‰å…¨ä»¤ç‰Œä¸æ˜¯æœ‰æ•ˆçš„ç”¨æˆ·åä»¤ç‰Œã€‚ä¸æ¥å—ç©ºå¯†ç ");
             }
             if (userName != User || !Utils.IsEqual(password, Encoding.UTF8.GetBytes(Password)))
             {
-                // Ê¹ÓÃÄ¬ÈÏÎÄ±¾¹¹Ôì·­Òë¶ÔÏó¡£
+                // ä½¿ç”¨é»˜è®¤æ–‡æœ¬æ„é€ ç¿»è¯‘å¯¹è±¡ã€‚
                 TranslationInfo info = new TranslationInfo(
                     "InvalidPassword",
                     "en-US",
-                    "ÎŞĞ§µÄÓÃ»§Ãû»òÃÜÂë",
+                    "æ— æ•ˆçš„ç”¨æˆ·åæˆ–å¯†ç ",
                     userName);
 
-                // Ê¹ÓÃ¹©Ó¦ÉÌ¶¨ÒåµÄ×Ó´úÂë´´½¨Òì³£¡£
+                // ä½¿ç”¨ä¾›åº”å•†å®šä¹‰çš„å­ä»£ç åˆ›å»ºå¼‚å¸¸ã€‚
                 throw new ServiceResultException(
                     new ServiceResult(
                         LoadServerProperties().ProductUri,
-                        new StatusCode(StatusCodes.BadUserAccessDenied, "ÕËºÅ»òÃÜÂë´íÎó"),
+                        new StatusCode(StatusCodes.BadUserAccessDenied, "è´¦å·æˆ–å¯†ç é”™è¯¯"),
                         new LocalizedText(info)));
             }
             return new RoleBasedIdentity(
