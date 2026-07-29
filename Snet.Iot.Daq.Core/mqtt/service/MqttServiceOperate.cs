@@ -11,7 +11,7 @@ namespace Snet.Iot.Daq.Core.mqtt.service
     /// MQTT 服务端操作类，基于 MQTTnet 实现 MQTT Broker 服务。
     /// <para>支持客户端连接/断开监听、主题订阅/取消订阅、消息接收等功能。</para>
     /// </summary>
-    public class MqttServiceOperate : CoreUnify<MqttServiceOperate, Basics>, IOn, IOff, IGetStatus, IDisposable, IAsyncDisposable
+    public class MqttServiceOperate : CoreUnify<MqttServiceOperate, Basics>, IOn, IOff, IStatus, IDisposable, IAsyncDisposable
     {
         /// <summary>
         /// 有参构造函数

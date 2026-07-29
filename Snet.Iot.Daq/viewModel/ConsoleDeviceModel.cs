@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Mvvm.Input;
 using Opc.Ua;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
@@ -733,7 +733,7 @@ namespace Snet.Iot.Daq.viewModel
                 //比对层级
                 if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
                 {
-                    uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsData().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
+                    uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsArgs().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
                 }
 
                 if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)

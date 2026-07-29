@@ -11,7 +11,7 @@ using System.Collections.Concurrent;
 
 namespace Snet.Iot.Daq.Core.opc.ua.service
 {
-    public class OpcUaServiceOperate : CoreUnify<OpcUaServiceOperate, OpcUaServiceData.Basics>, IOn, IOff, IRead, IWrite, IGetStatus, IDisposable, IAsyncDisposable
+    public class OpcUaServiceOperate : CoreUnify<OpcUaServiceOperate, OpcUaServiceData.Basics>, IOn, IOff, IRead, IWrite, IStatus, IDisposable, IAsyncDisposable
     {
         /// <summary>
         /// 无参构造函数
