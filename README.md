@@ -1,4 +1,4 @@
-<h1 align="center">🔌 Daq</h1>
+﻿<h1 align="center">🔌 Daq</h1>
 
 <p align="center">
   <img width="120" height="120" src="https://api.shunnet.top/pic/nuget.png" alt="Snet Logo"/>
@@ -25,6 +25,7 @@
   <a href="https://shunnet.top"><b>🌐 官方网站</b></a> ·
   <a href="https://github.com/shunnet/Daq"><b>📦 GitHub</b></a> ·
   <a href="https://github.com/shunnet/Daq/releases"><b>📥 下载</b></a> ·
+  <a href="https://github.com/shunnet/Debug"><b>🛠️ 调试工具</b></a> ·
   <a href="https://Shunnet.top/YJybu"><b>🎬 演示视频</b></a>
 </p>
 
