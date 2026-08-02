@@ -16,7 +16,7 @@ namespace Snet.Iot.Daq.view
         public About()
         {
             InitializeComponent();
-            _ = InitWebViewAsync(webView, "cache", "https://shunnet.top").ConfigureAwait(false);
+            _ = InitWebViewAsync(webView, "cache", "https://snet.cn").ConfigureAwait(false);
         }
 
         /// <summary>

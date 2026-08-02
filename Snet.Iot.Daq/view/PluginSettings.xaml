@@ -7,7 +7,7 @@
     xmlns:local="clr-namespace:Snet.Iot.Daq.view"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:model="clr-namespace:Snet.Iot.Daq.viewModel"
-    xmlns:snet="https://shunnet.top"
+    xmlns:snet="https://snet.cn"
     xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
     xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"

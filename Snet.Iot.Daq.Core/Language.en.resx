@@ -98,7 +98,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.3500.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="SystemTitle" xml:space="preserve">
-    <value>[ Shunnet.top ] Iot Lightweight DAQ</value>
+    <value>[ Snet.cn ] Iot Lightweight DAQ</value>
   </data>
   <data name="关于" xml:space="preserve">
     <value>About</value>
@@ -750,5 +750,8 @@
   </data>
   <data name="导入取消" xml:space="preserve">
     <value>Import cancelled</value>
+  </data>
+  <data name="此驱动目前不支持地址自动组包" xml:space="preserve">
+    <value>This driver currently does not support automatic address grouping</value>
   </data>
 </root>

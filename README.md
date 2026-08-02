@@ -1,7 +1,7 @@
 ﻿<h1 align="center">🔌 Daq</h1>
 
 <p align="center">
-  <img width="120" height="120" src="https://api.shunnet.top/pic/nuget.png" alt="Snet Logo"/>
+  <img width="120" height="120" src="https://api.snet.cn/pic/nuget.png" alt="Snet Logo"/>
 </p>
 
 <p align="center">
@@ -22,16 +22,16 @@
 </p>
 
 <p align="center">
-  <a href="https://shunnet.top"><b>🌐 官方网站</b></a> ·
+  <a href="https://snet.cn"><b>🌐 官方网站</b></a> ·
   <a href="https://github.com/shunnet/Daq"><b>📦 GitHub</b></a> ·
   <a href="https://github.com/shunnet/Daq/releases"><b>📥 下载</b></a> ·
   <a href="https://github.com/shunnet/Debug"><b>🛠️ 调试工具</b></a> ·
-  <a href="https://Shunnet.top/YJybu"><b>🎬 演示视频</b></a>
+  <a href="https://Snet.cn/YJybu"><b>🎬 演示视频</b></a>
 </p>
 
 ## ✨ 项目介绍
 
-Snet.Iot.Daq 是依托 **Shunnet.top 工业通信库** 开发的插件化数采工具，专为工业设备数据采集场景设计。
+Snet.Iot.Daq 是依托 **Snet.cn 工业通信库** 开发的插件化数采工具，专为工业设备数据采集场景设计。
 
 ### 🏗️ 项目架构
 
@@ -41,7 +41,7 @@ Snet.Iot.Daq 是依托 **Shunnet.top 工业通信库** 开发的插件化数采�
 ├─────────────────────────────────┤
 │   Snet.Iot.Daq.Core (类库)       │  ← 核心层：业务逻辑 / 数据模型 / 服务
 ├─────────────────────────────────┤
-│   Shunnet.top 工业通信库          │  ← 底层：插件框架 / 通信协议 / 工具
+│   Snet.cn 工业通信库          │  ← 底层：插件框架 / 通信协议 / 工具
 └─────────────────────────────────┘
 ```
 
@@ -53,7 +53,7 @@ Snet.Iot.Daq 是依托 **Shunnet.top 工业通信库** 开发的插件化数采�
 |------|-----------|
 | 🖼️ **UI 框架** | WPF + MVVM + Material Design |
 | 🔌 **插件引擎** | .NET `AssemblyLoadContext`（可回收上下文） |
-| 📡 **工业协议** | OPC UA Server、MQTT Broker（Shunnet.top 通信库） |
+| 📡 **工业协议** | OPC UA Server、MQTT Broker（Snet.cn 通信库） |
 | 💾 **数据存储** | SQLite（sqlite-net） |
 | 📊 **图表可视化** | ScottPlot |
 | 🖥️ **系统监控** | LibreHardwareMonitor |
@@ -70,7 +70,7 @@ Snet.Iot.Daq 是依托 **Shunnet.top 工业通信库** 开发的插件化数采�
 | 📊 **实时图表** | 基于 ScottPlot 的多曲线实时图表，支持皮肤切换、历史数据 |
 | 🖥️ **系统监控** | CPU / GPU / RAM 实时仪表盘，基于 LibreHardwareMonitor |
 | 🎯 **字节级解析** | 可视化的字节/位/编码/数据格式配置器，支持自定义协议解析（字节/位/编码自由组合） |
-| 📦 **NuGet 插件市场** | 在线浏览、下载、一键安装 Shunnet 生态插件 |
+| 📦 **NuGet 插件市场** | 在线浏览、下载、一键安装 Snet 生态插件 |
 | 🌐 **多语言国际化** | 中英文双语界面，通过资源文件统一管理 |
 | 🌓 **主题切换** | 暗色 / 亮色主题一键切换，图表跟随变色 |
 | 🔢 **自动组包** | 离散地址智能合并批量读取，降低通信开销 |
@@ -220,7 +220,7 @@ cd Daq
 
 ## 🙏 致谢
 
-- [Shunnet.top](https://shunnet.top)
+- [Snet.cn](https://snet.cn)
 - [Snet.Windows.Controls](https://github.com/shunnet/WpfMUI)（WPF 控件库）
 - [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor)
 - [ScottPlot](https://scottplot.net)（科学图表库）
@@ -230,8 +230,8 @@ cd Daq
 
 | 资源 | 链接 |
 |------|------|
-| 🎬 **演示视频** | [点击观看](https://Shunnet.top/YJybu) |
-| 🌐 **官方网站** | [shunnet.top](https://shunnet.top) |
+| 🎬 **演示视频** | [点击观看](https://Snet.cn/YJybu) |
+| 🌐 **官方网站** | [snet.cn](https://snet.cn) |
 | 📦 **NuGet 插件市场** | 应用内「插件设置」页面浏览 |
 
 ## 💬 社区与支持

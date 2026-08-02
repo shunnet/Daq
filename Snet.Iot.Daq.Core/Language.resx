@@ -98,7 +98,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=2.0.3500.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="SystemTitle" xml:space="preserve">
-    <value>[ Shunnet.top ] Iot 轻量级数采</value>
+    <value>[ Snet.cn ] Iot 轻量级数采</value>
   </data>
   <data name="关于" xml:space="preserve">
     <value>关于</value>
@@ -750,5 +750,8 @@
   </data>
   <data name="导入取消" xml:space="preserve">
     <value>导入取消</value>
+  </data>
+  <data name="此驱动目前不支持地址自动组包" xml:space="preserve">
+    <value>此驱动目前不支持地址自动组包</value>
   </data>
 </root>

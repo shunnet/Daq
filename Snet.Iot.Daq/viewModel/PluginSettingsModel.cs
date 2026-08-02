@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Mvvm.Input;
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
@@ -8,6 +8,7 @@ using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Model.@enum;
+using Snet.Temporary.Core.handler;
 using Snet.Utility;
 using Snet.Windows.Controls.@enum;
 using Snet.Windows.Controls.handler;
@@ -111,13 +112,22 @@ namespace Snet.Iot.Daq.viewModel
             }
             else
             {
-                GlobalConfigModel.param.SetBasics(new AddressAutoPackModel());
-                if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                string[] keys = AutoPackHandler.GetSupportAutoPackDeviceTypes();
+                string? key = keys.FirstOrDefault(k => PluginConfigSelectedItem.Param.Contains(k));
+                if (key != null)
                 {
-                    PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
-                    PluginConfigSelectedItem?.SetPlugin();
-                    SavePluginConfig();
-                    await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    GlobalConfigModel.param.SetBasics(new AddressAutoPackModel());
+                    if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                    {
+                        PluginConfigSelectedItem?.AutoPack = GlobalConfigModel.param.GetBasics().GetSource<AddressAutoPackModel>();
+                        PluginConfigSelectedItem?.SetPlugin();
+                        SavePluginConfig();
+                        await Windows.Controls.message.MessageBox.Show("设置成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    }
+                }
+                else
+                {
+                    await Windows.Controls.message.MessageBox.Show("此驱动目前不支持地址自动组包".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                 }
             }
         }

@@ -97,7 +97,7 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
-        ///   查找类似 [ Shunnet.top ] Iot 轻量级数采 的本地化字符串。
+        ///   查找类似 [ Snet.cn ] Iot 轻量级数采 的本地化字符串。
         /// </summary>
         public static string SystemTitle {
             get {
@@ -1164,6 +1164,15 @@ namespace Snet.Iot.Daq.Core {
         public static string 正常 {
             get {
                 return ResourceManager.GetString("正常", resourceCulture);
+            }
+        }
+        
+        /// <summary>
+        ///   查找类似 此驱动目前不支持地址自动组包 的本地化字符串。
+        /// </summary>
+        public static string 此驱动目前不支持地址自动组包 {
+            get {
+                return ResourceManager.GetString("此驱动目前不支持地址自动组包", resourceCulture);
             }
         }
         

@@ -1,6 +1,7 @@
 ﻿using NuGet.Versioning;
 using Snet.Core.extend;
 using Snet.Iot.Daq.Core.data;
+using Snet.Log;
 using System.Collections.Concurrent;
 using System.Net;
 using System.Text.Json;
@@ -280,7 +281,7 @@ namespace Snet.Iot.Daq.Core.handler
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"获取 {pkg} 数据失败: {ex.Message}");
+                    await LogHelper.ErrorAsync($"获取 {pkg} 数据失败: {ex.Message}", exception: ex);
                     return null;
                 }
                 finally

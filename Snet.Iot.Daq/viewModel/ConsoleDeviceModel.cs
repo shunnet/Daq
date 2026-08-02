@@ -9,6 +9,7 @@ using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
 using Snet.Model.data;
 using Snet.Model.@enum;
+using Snet.Temporary.Core.handler;
 using Snet.Utility;
 using System.Collections.Concurrent;
 using System.IO;
@@ -36,7 +37,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 自动组包处理
         /// </summary>
-        AutoPackHandler autoPack;
+        private AutoPackHandler autoPack;
 
         /// <summary>
         /// 字节处理
@@ -435,7 +436,7 @@ namespace Snet.Iot.Daq.viewModel
                 if (key != null && DaqData.AutoPack != null)
                 {
                     autoPack ??= AutoPackHandler.Instance(key);
-                    List<IAddressModel>? models = autoPack.AddressAutoPack(AddressDatas.Keys.ToList(), key, DaqData.AutoPack.MaxByteLength, DaqData.AutoPack.Format);
+                    List<IAddressModel>? models = AddressAutoPack(AddressDatas.Keys.ToList(), key, DaqData.AutoPack.MaxByteLength, DaqData.AutoPack.Format);
                     if (models != null)
                     {
                         result = await daqHandler.SubscribeAsync(DaqData.Guid, models);
@@ -610,6 +611,41 @@ namespace Snet.Iot.Daq.viewModel
         #endregion
 
         #region 功能方法
+        /// <summary>
+        /// 地址自动组包入口方法(插件工具自动组包入口)
+        /// 根据设备类型将离散地址集合合并为批量读取结构，减少通信轮次
+        /// </summary>
+        /// <param name="addressModels">插件工具地址，包含待组包的地址列表</param>
+        /// <param name="deviceType">设备类型标识（目前支持 "SiemensS7"）</param>
+        /// <param name="maxByteLength">单次批量读取的最大字节数（西门子S7默认240/400）</param>
+        /// <param name="format">数据字节序格式</param>
+        /// <returns>组包后的地址对象，失败返回null</returns>
+        public List<IAddressModel>? AddressAutoPack(List<IAddressModel> addressModels, string deviceType = "SiemensS7Net", int maxByteLength = 200, DataFormat format = DataFormat.ABCD)
+        {
+            Address address = new Address();
+            address.AddressArray = addressModels.Where(m => string.IsNullOrEmpty(m.ExpandParam)).Select(m => new AddressDetails
+            {
+                AddressName = m.Address,
+                AddressDataType = m.Type,
+                AddressDescribe = m.Describe
+            }).ToList();
+            Address? result = autoPack.AddressAutoPack(address, deviceType, maxByteLength, format);
+            if (result == null) return null;
+            List<IAddressModel> models = new List<IAddressModel>();
+            foreach (var model in result.AddressArray)
+            {
+                models.Add(new AddressModelCore
+                {
+                    Length = model.Length,
+                    EncodingType = model.EncodingType,
+                    Address = model.AddressName,
+                    Type = model.AddressDataType,
+                    Describe = model.AddressDescribe,
+                    ExpandParam = model.AddressExtendParam.ToJson()
+                });
+            }
+            return models;
+        }
         /// <summary>
         /// 通道地址事件消费
         /// </summary>
