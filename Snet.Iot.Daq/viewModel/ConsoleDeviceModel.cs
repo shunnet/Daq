@@ -37,7 +37,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 自动组包处理
         /// </summary>
-        private AutoPackHandler autoPack;
+        private PackerHandler autoPack;
 
         /// <summary>
         /// 字节处理
@@ -430,12 +430,12 @@ namespace Snet.Iot.Daq.viewModel
                 }
 
                 //使用自动组包，可降低PLC压力
-                string[] keys = AutoPackHandler.GetSupportAutoPackDeviceTypes();
+                string[] keys = PackerHandler.GetSupportAutoPackDeviceTypes();
                 string? key = keys.FirstOrDefault(k => DaqData.Param.Contains(k));
                 OperateResult result = OperateResult.CreateFailureResult("采集失败".GetLanguageValue(App.LanguageOperate));
                 if (key != null && DaqData.AutoPack != null)
                 {
-                    autoPack ??= AutoPackHandler.Instance(key);
+                    autoPack ??= PackerHandler.Instance(key);
                     List<IAddressModel>? models = AddressAutoPack(AddressDatas.Keys.ToList(), key, DaqData.AutoPack.MaxByteLength, DaqData.AutoPack.Format);
                     if (models != null)
                     {
