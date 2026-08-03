@@ -112,7 +112,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             else
             {
-                string[] keys = AutoPackHandler.GetSupportAutoPackDeviceTypes();
+                string[] keys = PackerHandler.GetSupportAutoPackDeviceTypes();
                 string? key = keys.FirstOrDefault(k => PluginConfigSelectedItem.Param.Contains(k));
                 if (key != null)
                 {
