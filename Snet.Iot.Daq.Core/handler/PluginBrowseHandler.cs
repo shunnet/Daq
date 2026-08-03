@@ -128,7 +128,10 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>用于 HTTP 请求的客户端，生命周期由本类管理</summary>
         private readonly HttpClient _httpClient;
 
-        /// <summary>版本发布时间缓存，避免同一包的注册索引被重复请求</summary>
+        /// <summary>版本列表缓存（flatcontainer 索引），避免重复请求</summary>
+        private readonly ConcurrentDictionary<string, List<string>> _versionsCache = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>版本发布时间缓存（registration leaf，按需获取）</summary>
         private readonly ConcurrentDictionary<string, Dictionary<string, DateTime>> _versionTimesCache = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
@@ -205,14 +208,14 @@ namespace Snet.Iot.Daq.Core.handler
 
             string lowerName = packageName.ToLowerInvariant();
 
-            // 1. 若未指定版本，获取版本列表并选择最新版（同时获取所有版本的发布时间，供后续使用）
+            // 1. 若未指定版本，获取版本列表并选择最新版
             if (string.IsNullOrWhiteSpace(version))
             {
-                var versionTimes = await GetVersionPublishedTimesAsync(lowerName);
-                if (versionTimes == null || versionTimes.Count == 0)
+                var versions = await GetVersionsAsync(lowerName);
+                if (versions == null || versions.Count == 0)
                     throw new InvalidOperationException($"未找到包 '{packageName}' 的任何版本。");
 
-                var candidates = versionTimes.Keys
+                var candidates = versions
                     .Select(v => NuGetVersion.TryParse(v, out var nv) ? nv : null)
                     .Where(v => v != null);
 
@@ -304,10 +307,27 @@ namespace Snet.Iot.Daq.Core.handler
         {
             try
             {
-                // 优化：直接利用 GetVersionPublishedTimesAsync 获取所有版本时间，避免重复请求
-                var allTimes = await GetVersionPublishedTimesAsync(packageName.ToLowerInvariant());
-                if (allTimes != null && allTimes.TryGetValue(version, out var time))
-                    return time;
+                string lowerName = packageName.ToLowerInvariant();
+                if (_versionTimesCache.TryGetValue(lowerName, out var cached) && cached.TryGetValue(version, out var cachedTime))
+                    return cachedTime;
+
+                // 单版本 registration leaf，轻量且不依赖注册索引的分页结构
+                string leafUrl = $"https://api.nuget.org/v3/registration5-gz-semver2/{lowerName}/{version}.json";
+                var response = await _httpClient.GetAsync(leafUrl);
+                if (!response.IsSuccessStatusCode)
+                    return DateTime.MinValue;
+
+                using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+                if (jsonDoc.RootElement.TryGetProperty("published", out var pubProp))
+                {
+                    string pubStr = pubProp.GetString();
+                    if (DateTime.TryParse(pubStr, out var pubTime))
+                    {
+                        var times = _versionTimesCache.GetOrAdd(lowerName, _ => new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase));
+                        times[version] = pubTime;
+                        return pubTime;
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -317,44 +337,25 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// 获取指定包的所有版本及其发布时间（通过注册接口）
+        /// 获取指定包的所有版本（通过 flatcontainer 索引，轻量且不分页）
         /// </summary>
-        private async Task<Dictionary<string, DateTime>> GetVersionPublishedTimesAsync(string lowerPackageName)
+        private async Task<List<string>> GetVersionsAsync(string lowerPackageName)
         {
-            if (_versionTimesCache.TryGetValue(lowerPackageName, out var cached))
+            if (_versionsCache.TryGetValue(lowerPackageName, out var cached))
                 return cached;
 
-            string registrationUrl = $"https://api.nuget.org/v3/registration5-gz-semver2/{lowerPackageName}/index.json";
-            var response = await _httpClient.GetAsync(registrationUrl);
+            string flatIndexUrl = $"https://api.nuget.org/v3-flatcontainer/{lowerPackageName}/index.json";
+            var response = await _httpClient.GetAsync(flatIndexUrl);
             response.EnsureSuccessStatusCode();
 
             using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
-            var dict = new Dictionary<string, DateTime>();
+            var versions = jsonDoc.RootElement.GetProperty("versions")
+                .EnumerateArray()
+                .Select(v => v.GetString()!)
+                .ToList();
 
-            foreach (var page in jsonDoc.RootElement.GetProperty("items").EnumerateArray())
-            {
-                if (page.TryGetProperty("items", out var leafs))
-                {
-                    foreach (var leaf in leafs.EnumerateArray())
-                    {
-                        if (leaf.TryGetProperty("catalogEntry", out var entry) &&
-                            entry.TryGetProperty("version", out var verProp))
-                        {
-                            string ver = verProp.GetString()!;
-                            DateTime pubTime = DateTime.MinValue;
-                            if (entry.TryGetProperty("published", out var pubProp))
-                            {
-                                string pubStr = pubProp.GetString();
-                                DateTime.TryParse(pubStr, out pubTime);
-                            }
-                            dict[ver] = pubTime;
-                        }
-                    }
-                }
-            }
-
-            _versionTimesCache[lowerPackageName] = dict;
-            return dict;
+            _versionsCache[lowerPackageName] = versions;
+            return versions;
         }
 
         /// <summary>
