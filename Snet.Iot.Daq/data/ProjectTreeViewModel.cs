@@ -1,11 +1,11 @@
-﻿using MaterialDesignThemes.Wpf;
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@enum;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.handler;
 using Snet.Windows.Controls.property.core.DataAnnotations;
 using System.Collections.ObjectModel;
+using Wpf.Ui.Controls;
 
 namespace Snet.Iot.Daq.data
 {
@@ -20,6 +20,17 @@ namespace Snet.Iot.Daq.data
         public ProjectTreeViewModel() { }
 
         /// <summary>
+        /// 节点图片
+        /// </summary>
+        [Browsable(false)]
+        [Description("节点图片")]
+        public SymbolRegular Icon
+        {
+            get => GetProperty(() => Icon);
+            set => SetProperty(() => Icon, value);
+        }
+
+        /// <summary>
         /// 创建描述类型的树节点
         /// </summary>
         /// <param name="name">节点名称</param>
@@ -29,7 +40,7 @@ namespace Snet.Iot.Daq.data
         {
             Name = name;
             NodeType = ProjectNodeType.Describe;
-            Icon = PackIconKind.Server;
+            Icon = SymbolRegular.DataTreemap24;
             Children = children ?? Children;
             IsExpanded = isExpanded;
             UpdateSpecialData();
@@ -43,7 +54,7 @@ namespace Snet.Iot.Daq.data
         {
             Name = deviceDetails.GetObjSn();
             NodeType = ProjectNodeType.Device;
-            Icon = PackIconKind.ServerNetworkOutline;
+            Icon = SymbolRegular.Pulse32;
             DaqDetails = deviceDetails;
             UpdateSpecialData();
         }

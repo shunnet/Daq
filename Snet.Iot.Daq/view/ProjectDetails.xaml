@@ -9,7 +9,6 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     xmlns:model="clr-namespace:Snet.Iot.Daq.viewModel"
     xmlns:snet="https://snet.cn"
-    xmlns:ui="http://materialdesigninxaml.net/winfx/xaml/themes"
     xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
     snet:ResxLocalizationProvider.DefaultDictionary="Language">
@@ -312,10 +311,7 @@
             <TreeView.ItemTemplate>
                 <HierarchicalDataTemplate DataType="{x:Type data:ProjectDetailsTreeViewModel}" ItemsSource="{Binding Children}">
                     <StackPanel Margin="0,5,0,5" Orientation="Horizontal">
-                        <ui:PackIcon
-                            HorizontalAlignment="Center"
-                            VerticalAlignment="Center"
-                            Kind="{Binding Icon}" />
+                        <uis:SymbolIcon Symbol="{Binding Icon}" />
                         <TextBlock
                             Margin="5,0,5,0"
                             HorizontalAlignment="Center"

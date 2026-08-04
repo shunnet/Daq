@@ -50,16 +50,15 @@ namespace Snet.Iot.Daq.viewModel
         private ObservableCollection<IProjectDetailsTreeViewModel> detailsNode = new ObservableCollection<IProjectDetailsTreeViewModel>();
 
         /// <summary>
-        /// 选中的节点
+        /// 选中的节点<br/>
+        /// 注意：选中变化只更新选中状态，不触发全树保存——<br/>
+        /// 601 节点树在滚动/切换选中时频繁触发 SetAsync（全树序列化+遍历）会严重卡顿，<br/>
+        /// 配置保存在增删节点操作里统一执行。
         /// </summary>
         public IProjectDetailsTreeViewModel? DetailsNodeSelectedItem
         {
             get => GetProperty(() => DetailsNodeSelectedItem);
-            set
-            {
-                _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
-                SetProperty(() => DetailsNodeSelectedItem, value);
-            }
+            set => SetProperty(() => DetailsNodeSelectedItem, value);
         }
 
         /// <summary>
@@ -81,9 +80,48 @@ namespace Snet.Iot.Daq.viewModel
             set => SetProperty(ref _selectItems, value);
         }
         private List<string> _selectItems = new List<string>();
+
+        ///// <summary>
+        ///// 总数量
+        ///// </summary>
+        //public int Total
+        //{
+        //    get => GetProperty(() => Total);
+        //    set => SetProperty(() => Total, value);
+        //}
+
+        ///// <summary>
+        ///// 每页的页数
+        ///// </summary>
+        //public int PageSize
+        //{
+        //    get => pageSize;
+        //    set => SetProperty(ref pageSize, value);
+        //}
+        //private int pageSize = 200;
+
+        ///// <summary>
+        ///// 页索引
+        ///// </summary>
+        //public int PageIndex
+        //{
+        //    get => pageIndex;
+        //    set => SetProperty(ref pageIndex, value);
+        //}
+        //private int pageIndex = 1;
         #endregion
 
         #region 命令
+        ///// <summary>
+        ///// 当前页
+        ///// </summary>
+        //public IAsyncRelayCommand PageIndexChanged => pageIndexChanged ??= new AsyncRelayCommand<int>(PageIndexChangedExecuteAsync);
+        //private IAsyncRelayCommand? pageIndexChanged;
+        //private Task PageIndexChangedExecuteAsync(int index)
+        //{
+
+        //}
+
         /// <summary>
         /// 添加地址
         /// </summary>
@@ -417,7 +455,9 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (e?.NewValue is not IProjectDetailsTreeViewModel model)
                 return Task.CompletedTask;
-            DetailsNode.EnsureSingleSelection(model);
+            // 只更新当前选中节点，避免对 601 节点整棵树递归遍历（滚动/切换选中时严重卡顿）
+            model.IsSelected = true;
+            model.UpdateSpecialData();
             model.ExpandParents();
             return Task.CompletedTask;
         }

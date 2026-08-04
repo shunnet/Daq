@@ -44,17 +44,6 @@ namespace Snet.Iot.Daq.Core.data
         }
 
         /// <summary>
-        /// 节点图片
-        /// </summary>
-        [Browsable(false)]
-        [Description("节点图片")]
-        public object Icon
-        {
-            get => GetProperty(() => Icon);
-            set => SetProperty(() => Icon, value);
-        }
-
-        /// <summary>
         /// 节点名称
         /// </summary>
         [Description("节点名称")]
@@ -189,7 +178,14 @@ namespace Snet.Iot.Daq.Core.data
             switch (NodeType)
             {
                 case ProjectNodeType.Device:
-                    SpecialData = $"[ {DaqDetails.Name} ]";
+                    if (Details != null && Details.Count > 0)
+                    {
+                        SpecialData = $"[ {DaqDetails.Name} ] ( {Details.Count} )";
+                    }
+                    else
+                    {
+                        SpecialData = $"[ {DaqDetails.Name} ]";
+                    }
                     break;
                 case ProjectNodeType.Describe:
                     if (Children.Count > 0)

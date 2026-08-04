@@ -17,6 +17,8 @@
     Icon="/icon.ico"
     LoadAnimationEnabled="True"
     VerEnabled="True"
+    VirtualizingPanel.IsVirtualizing="True"
+    VirtualizingPanel.VirtualizationMode="Recycling"
     WindowStartupLocation="CenterScreen">
     <Grid x:Name="mainGrid">
         <!--  菜单项  -->

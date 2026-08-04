@@ -8,11 +8,6 @@ namespace Snet.Iot.Daq.Core.@interface
     public interface ITreeViewModel<T>
     {
         /// <summary>
-        /// 节点图片
-        /// </summary>
-        object Icon { get; set; }
-
-        /// <summary>
         /// 节点名称
         /// </summary>
         string Name { get; set; }

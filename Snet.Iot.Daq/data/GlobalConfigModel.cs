@@ -145,12 +145,12 @@ namespace Snet.Iot.Daq.data
         /// <summary>
         /// 默认文件路径
         /// </summary>
-        public static readonly string FilePath = Path.Combine(AppContext.BaseDirectory, "lib");
+        public static readonly string FilePath = Path.Combine("lib");
 
         /// <summary>
         /// 默认配置路径
         /// </summary>
-        public static readonly string ConfigPath = Path.Combine(AppContext.BaseDirectory, "config");
+        public static readonly string ConfigPath = Path.Combine("config");
 
         /// <summary>
         /// 界面配置

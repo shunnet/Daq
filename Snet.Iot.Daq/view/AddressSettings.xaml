@@ -147,9 +147,7 @@
                 SelectedItem="{Binding AddressConfigSelectedItem}"
                 SelectionMode="Single"
                 SnapsToDevicePixels="True"
-                UseLayoutRounding="True"
-                VirtualizingPanel.IsVirtualizing="True"
-                VirtualizingPanel.VirtualizationMode="Recycling">
+                UseLayoutRounding="True">
                 <i:Interaction.Triggers>
                     <!--  内容菜单打开  -->
                     <i:EventTrigger EventName="ContextMenuOpening">

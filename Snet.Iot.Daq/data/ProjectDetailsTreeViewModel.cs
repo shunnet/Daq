@@ -1,8 +1,9 @@
-﻿using MaterialDesignThemes.Wpf;
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.@interface;
+using Snet.Windows.Controls.property.core.DataAnnotations;
 using System.Collections.ObjectModel;
+using Wpf.Ui.Controls;
 
 namespace Snet.Iot.Daq.data
 {
@@ -18,6 +19,17 @@ namespace Snet.Iot.Daq.data
         { }
 
         /// <summary>
+        /// 节点图片
+        /// </summary>
+        [Browsable(false)]
+        [Description("节点图片")]
+        public SymbolRegular Icon
+        {
+            get => GetProperty(() => Icon);
+            set => SetProperty(() => Icon, value);
+        }
+
+        /// <summary>
         /// 创建地址类型的详情树节点
         /// </summary>
         /// <param name="address">地址模型</param>
@@ -25,7 +37,7 @@ namespace Snet.Iot.Daq.data
         /// <param name="isExpanded">是否展开</param>
         public ProjectDetailsTreeViewModel(IAddressModel address, ObservableCollection<IProjectDetailsTreeViewModel>? children = null, bool isExpanded = false) : base(address, children, isExpanded)
         {
-            Icon = PackIconKind.MapMarkerOutline;
+            Icon = SymbolRegular.Location12;
         }
 
         /// <summary>
@@ -34,7 +46,7 @@ namespace Snet.Iot.Daq.data
         /// <param name="deviceDetails">传输插件</param>
         public ProjectDetailsTreeViewModel(PluginConfigModel deviceDetails) : base(deviceDetails)
         {
-            Icon = PackIconKind.Transfer;
+            Icon = SymbolRegular.Pulse32;
         }
 
         /// <inheritdoc/>

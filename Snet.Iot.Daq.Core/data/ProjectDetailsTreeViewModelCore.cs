@@ -47,18 +47,6 @@ namespace Snet.Iot.Daq.Core.data
             UpdateSpecialData();
         }
 
-
-        /// <summary>
-        /// 节点图片
-        /// </summary>
-        [Browsable(false)]
-        [Description("节点图片")]
-        public object Icon
-        {
-            get => GetProperty(() => Icon);
-            set => SetProperty(() => Icon, value);
-        }
-
         /// <summary>
         /// 节点名称
         /// </summary>
