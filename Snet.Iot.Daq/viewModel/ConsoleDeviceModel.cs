@@ -10,7 +10,6 @@ using Snet.Iot.Daq.data;
 using Snet.Log;
 using Snet.Model.data;
 using Snet.Model.@enum;
-using Snet.Temporary.Core.handler;
 using Snet.Utility;
 using System.Collections.Concurrent;
 using System.IO;

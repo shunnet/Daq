@@ -8,7 +8,6 @@ using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.handler;
 using Snet.Model.data;
 using Snet.Model.@enum;
-using Snet.Temporary.Core.handler;
 using Snet.Utility;
 using Snet.Windows.Controls.@enum;
 using Snet.Windows.Controls.handler;
