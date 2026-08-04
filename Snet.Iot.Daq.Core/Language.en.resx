@@ -754,4 +754,7 @@
   <data name="此驱动目前不支持地址自动组包" xml:space="preserve">
     <value>This driver currently does not support automatic address grouping</value>
   </data>
+  <data name="请检查“项目详情”中传输设备是否正确设置给每个地址" xml:space="preserve">
+    <value>Please check if the transmission device in the 'Project Details' is correctly set for each address</value>
+  </data>
 </root>

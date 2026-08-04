@@ -754,4 +754,7 @@
   <data name="此驱动目前不支持地址自动组包" xml:space="preserve">
     <value>此驱动目前不支持地址自动组包</value>
   </data>
+  <data name="请检查“项目详情”中传输设备是否正确设置给每个地址" xml:space="preserve">
+    <value>请检查“项目详情”中传输设备是否正确设置给每个地址</value>
+  </data>
 </root>

@@ -433,6 +433,8 @@ namespace Snet.Iot.Daq.viewModel
                 string[] keys = PackerHandler.GetSupportAutoPackDeviceTypes();
                 string? key = keys.FirstOrDefault(k => DaqData.Param.Contains(k));
                 OperateResult result = OperateResult.CreateFailureResult("采集失败".GetLanguageValue(App.LanguageOperate));
+                //判断点位是否都放置了MQ传输设备
+
                 if (key != null && DaqData.AutoPack != null)
                 {
                     autoPack ??= PackerHandler.Instance(key);
@@ -499,6 +501,10 @@ namespace Snet.Iot.Daq.viewModel
                 }
                 //写入结果回调
                 await ResultMsgAsync(DaqData, result);
+                if (!result.Status && AddressDatas.Count == 0)
+                {
+                    await ResultMsgAsync(DaqData, OperateResult.CreateFailureResult("请检查“项目详情”中传输设备是否正确设置给每个地址".GetLanguageValue(App.LanguageOperate)));
+                }
             }
         }
 
@@ -625,9 +631,13 @@ namespace Snet.Iot.Daq.viewModel
             Address address = new Address();
             address.AddressArray = addressModels.Where(m => string.IsNullOrEmpty(m.ExpandParam)).Select(m => new AddressDetails
             {
+                SN = m.Guid,
+                AddressAnotherName = m.AnotherName,
                 AddressName = m.Address,
                 AddressDataType = m.Type,
-                AddressDescribe = m.Describe
+                AddressDescribe = m.Describe,
+                EncodingType = m.EncodingType,
+
             }).ToList();
             Address? result = autoPack.AddressAutoPack(address, deviceType, maxByteLength, format);
             if (result == null) return null;
