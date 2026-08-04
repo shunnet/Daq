@@ -31,6 +31,14 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>NuGet 源地址（可改为私有源）</summary>
         private const string DefaultNugetSource = "https://api.nuget.org/v3/index.json";
 
+        /// <summary>包名白名单（仅允许字母数字、下划线、点、连字符；杜绝路径穿越与参数注入）</summary>
+        private static readonly System.Text.RegularExpressions.Regex s_packageNameRegex =
+            new(@"^[A-Za-z0-9_\.\-]+$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
+        /// <summary>版本号白名单（如 1.0.0 或 1.0.0-beta.1）</summary>
+        private static readonly System.Text.RegularExpressions.Regex s_versionRegex =
+            new(@"^[0-9]+(\.[0-9]+){0,3}(-[A-Za-z0-9\.\-]+)?$", System.Text.RegularExpressions.RegexOptions.Compiled);
+
         // ============ 实例字段 ============
         private bool _disposed;
         private readonly string _pluginStoragePath;
@@ -158,8 +166,30 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         private async Task PublishSinglePackageAsync(string packageName, string? version, CancellationToken cancellationToken)
         {
+            // 包名/版本白名单校验：杜绝参数注入（如 --source http://evil）与路径穿越（如 ..\..\x）
+            if (string.IsNullOrWhiteSpace(packageName) ||
+                !s_packageNameRegex.IsMatch(packageName) ||
+                packageName.Contains("..", StringComparison.Ordinal))
+            {
+                throw new ArgumentException($"非法的包名：{packageName}");
+            }
+            if (version != null && !s_versionRegex.IsMatch(version))
+            {
+                throw new ArgumentException($"非法的版本号：{version}");
+            }
+
             // 输出目录直接使用包名
             string outDir = Path.Combine(_pluginStoragePath, packageName);
+
+            // 路径越界校验：确保输出目录仍在插件存储根目录内
+            string fullOutDir = Path.GetFullPath(outDir);
+            string fullStorage = Path.GetFullPath(_pluginStoragePath);
+            if (!fullOutDir.Equals(fullStorage, StringComparison.OrdinalIgnoreCase) &&
+                !fullOutDir.StartsWith(fullStorage + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+            {
+                throw new ArgumentException($"输出目录越界：{packageName}");
+            }
+
             string workDir = Path.Combine(Path.GetTempPath(), $"{packageName}_{Guid.NewGuid():N}");
 
             try
@@ -168,18 +198,19 @@ namespace Snet.Iot.Daq.Core.handler
                 Directory.CreateDirectory(workDir);
 
                 string projectName = $"{packageName}.Runtime";
-                await RunDotnetAsync($"new classlib -n {projectName}", workDir, cancellationToken);
+                await RunDotnetAsync(["new", "classlib", "-n", projectName], workDir, cancellationToken);
                 string projectDir = Path.Combine(workDir, projectName);
 
-                string packageRef = version != null
-                    ? $"{packageName} --version {version}"
-                    : packageName;
-                await RunDotnetAsync(
-                    $"add package {packageRef} --source {DefaultNugetSource}",
-                    projectDir, cancellationToken);
+                List<string> addArgs = ["add", "package", packageName, "--source", DefaultNugetSource];
+                if (version != null)
+                {
+                    addArgs.Add("--version");
+                    addArgs.Add(version);
+                }
+                await RunDotnetAsync(addArgs, projectDir, cancellationToken);
 
                 await RunDotnetAsync(
-                    $"publish -c Release -o \"{outDir}\"",
+                    ["publish", "-c", "Release", "-o", outDir],
                     projectDir, cancellationToken);
 
                 OnInfoEventHandlerAsync(this, EventInfoResult.CreateSuccessResult($"[OK] {packageName} {version ?? "latest"}"));
@@ -239,14 +270,14 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// 异步执行 dotnet 命令，带超时和取消支持
+        /// 异步执行 dotnet 命令，带超时和取消支持<br/>
+        /// 使用 ArgumentList 传参，避免字符串拼接导致的参数注入
         /// </summary>
-        private async Task RunDotnetAsync(string args, string workDir, CancellationToken cancellationToken)
+        private async Task RunDotnetAsync(IReadOnlyList<string> args, string workDir, CancellationToken cancellationToken)
         {
             var psi = new ProcessStartInfo
             {
                 FileName = DotnetExe,
-                Arguments = args,
                 WorkingDirectory = workDir,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
@@ -255,6 +286,10 @@ namespace Snet.Iot.Daq.Core.handler
                 StandardOutputEncoding = Encoding.UTF8,
                 StandardErrorEncoding = Encoding.UTF8
             };
+            foreach (string arg in args)
+            {
+                psi.ArgumentList.Add(arg);
+            }
 
             using var process = new Process { StartInfo = psi };
             process.Start();
@@ -277,14 +312,14 @@ namespace Snet.Iot.Daq.Core.handler
                 }
                 if (cancellationToken.IsCancellationRequested)
                     throw new OperationCanceledException(cancellationToken);
-                throw new TimeoutException($"dotnet 命令超时 ({DefaultTimeoutMs / 1000}s): {args}");
+                throw new TimeoutException($"dotnet 命令超时 ({DefaultTimeoutMs / 1000}s): {string.Join(' ', args)}");
             }
 
             string stdOut = await outputTask;
             string stdErr = await errorTask;
 
             if (process.ExitCode != 0)
-                throw new Exception($"dotnet {args} 失败 (ExitCode={process.ExitCode}): {stdErr}");
+                throw new Exception($"dotnet {string.Join(' ', args)} 失败 (ExitCode={process.ExitCode}): {stdErr}");
 
             //OnInfoEventHandlerAsync(this, EventInfoResult.CreateSuccessResult($"[dotnet] {args}: {stdOut.Trim()}"));
         }

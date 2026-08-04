@@ -15,8 +15,8 @@ namespace Snet.Iot.Daq.view
         public Home()
         {
             InitializeComponent();
-            Loaded -= HandleLoaded;
             Loaded += HandleLoaded;
+            Unloaded += HandleUnloaded;
         }
 
         /// <summary>
@@ -37,14 +37,13 @@ namespace Snet.Iot.Daq.view
         }
 
         /// <summary>
-        /// 控件卸载事件处理：停止并释放雪花动画，取消事件订阅
+        /// 控件卸载事件处理：停止并释放雪花动画
+        /// 注意：页面启用了导航缓存，卸载后可能再次加载，因此保留事件订阅以便重启动画
         /// </summary>
         private void HandleUnloaded(object sender, RoutedEventArgs e)
         {
             _snowflake?.Stop();
             _snowflake = null;
-            Loaded -= HandleLoaded;
-            Unloaded -= HandleUnloaded;
         }
     }
 }

@@ -174,8 +174,9 @@ namespace Snet.Iot.Daq.Core.data
                 FileHandler.StringToFile(Path.Combine(ConfigPath, SN), Param);
                 return true;
             }
-            catch
+            catch (Exception ex)
             {
+                Snet.Log.LogHelper.Error($"插件配置写入失败：{SN}，{ex.Message}", "PluginConfigModel", ex);
                 return false;
             }
         }
@@ -210,19 +211,38 @@ namespace Snet.Iot.Daq.Core.data
         }
 
         /// <summary>
-        /// 更新SN与文件名称
+        /// 更新SN与文件名称<br/>
+        /// 先写新文件、成功后删除旧文件，避免删除后写入失败导致配置丢失
         /// </summary>
         /// <param name="newSn">新的SN</param>
         /// <param name="oldSn">旧的SN</param>
         /// <returns>更新状态</returns>
         public bool UpdateSnAndFileName(string newSn, string oldSn)
         {
-            //先移除旧的文件
-            File.Delete(Path.Combine(ConfigPath, SN));
-            //更新新的SN
-            SN = SN.Replace(oldSn, newSn);
-            //保存并返回状态
-            return UpdateLocalConfig();
+            string oldFileName = SN;
+            string newFileName = SN.Replace(oldSn, newSn);
+
+            SN = newFileName;
+            if (!UpdateLocalConfig())
+            {
+                // 写入失败：回滚文件名，保留旧配置
+                SN = oldFileName;
+                return false;
+            }
+
+            if (!string.Equals(oldFileName, newFileName, StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    File.Delete(Path.Combine(ConfigPath, oldFileName));
+                }
+                catch (Exception ex)
+                {
+                    // 旧文件删除失败不影响新配置，仅记录（命名参数消除泛型重载二义性）
+                    Snet.Log.LogHelper.Warning(message: $"旧插件配置删除失败：{oldFileName}，{ex.Message}", foldername: "PluginConfigModel");
+                }
+            }
+            return true;
         }
     }
 }

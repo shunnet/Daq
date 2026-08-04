@@ -52,7 +52,7 @@ namespace Snet.Iot.Daq.Core.opc.core
         private readonly ILoggerFactory _loggerFactory;
         private readonly ActivitySource _activitySource;
         private readonly Meter _meter;
-        private static OpcType _opcType = OpcType.Client;
+        private readonly OpcType _opcType;
 
         /// <summary>
         /// 标识 LoggerFactory 是否由本类创建
@@ -116,7 +116,7 @@ namespace Snet.Iot.Daq.Core.opc.core
             _loggerFactory = Microsoft.Extensions.Logging.LoggerFactory.Create(builder =>
             {
                 // 使用 Serilog 作为日志后端
-                builder.AddSerilog(CreateProductionLogger(), dispose: true);
+                builder.AddSerilog(CreateProductionLogger(_opcType), dispose: true);
             });
 
             _ownsLoggerFactory = true;
@@ -132,13 +132,13 @@ namespace Snet.Iot.Daq.Core.opc.core
 
         /// <summary>
         /// 创建生产环境可用的 Serilog Logger
-        /// 
+        ///
         /// 日志路径规范：
         /// logs/
         ///   └─ yyyy-MM-dd/
         ///        └─ yyyyMMddHH.log （按小时滚动）
         /// </summary>
-        private static Serilog.Core.Logger CreateProductionLogger()
+        private static Serilog.Core.Logger CreateProductionLogger(OpcType opcType)
         {
             var baseDir = AppContext.BaseDirectory;
             var logRoot = Path.Combine(baseDir, "logs");
@@ -152,7 +152,7 @@ namespace Snet.Iot.Daq.Core.opc.core
                 .Enrich.WithProperty("Version", Version)
                 .WriteTo.Console()
                 .WriteTo.File(
-                    path: Path.Combine(logRoot, "{Date:yyyy-MM-dd}", "Opc.Ua.Telemetry".ToLower(), _opcType.ToString().ToLower(), "{Date:yyyyMMddHH}.log"),
+                    path: Path.Combine(logRoot, "{Date:yyyy-MM-dd}", "Opc.Ua.Telemetry".ToLower(), opcType.ToString().ToLower(), "{Date:yyyyMMddHH}.log"),
                     rollingInterval: RollingInterval.Hour,
                     retainedFileCountLimit: 31 * 24,
                     fileSizeLimitBytes: 50 * 1024 * 1024,

@@ -81,6 +81,12 @@ namespace Snet.Iot.Daq.viewModel
         private readonly ConcurrentDictionary<string, string> _addressMap = new();
 
         /// <summary>
+        /// 创建或映射失败的地址集合<br/>
+        /// 避免每个数据事件对同一地址重复调用 CreateAddress 并刷屏消息
+        /// </summary>
+        private readonly ConcurrentDictionary<string, byte> _failedAddress = new();
+
+        /// <summary>
         /// UA 写入复用字典（单线程路径，无需并发容器）
         /// </summary>
         private readonly ConcurrentDictionary<string, WriteModel> _singleWriteDict = new();
@@ -138,9 +144,16 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
+        /// 数据通道容量上限<br/>
+        /// 原为 ushort.MaxValue(65535)，消费端变慢时每条事件携带整包地址数据，积压可达数百 MB。<br/>
+        /// 1024 已能满足正常采集吞吐，超出时由 Wait 模式提供背压。
+        /// </summary>
+        private const int ChannelCapacity = 1024;
+
+        /// <summary>
         /// 通道配置，延迟创建
         /// </summary>
-        private BoundedChannelOptions channel => p_Channel ??= new BoundedChannelOptions(ushort.MaxValue)
+        private BoundedChannelOptions channel => p_Channel ??= new BoundedChannelOptions(ChannelCapacity)
         {
             FullMode = BoundedChannelFullMode.Wait,
             SingleReader = false,
@@ -462,6 +475,7 @@ namespace Snet.Iot.Daq.viewModel
                     }
 
                     _addressMap.Clear();
+                    _failedAddress.Clear();
 
                     if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "启动采集".GetLanguageValue(App.LanguageOperate));
 
@@ -686,7 +700,7 @@ namespace Snet.Iot.Daq.viewModel
                         if (service is null || !service.GetStatus().Status)
                             continue;
 
-                        if (!_addressMap.ContainsKey(addressName))
+                        if (!_addressMap.ContainsKey(addressName) && !_failedAddress.ContainsKey(addressName))
                         {
                             if (!_typeMap.TryGetValue(dataType, out var builtInType))
                                 continue;
@@ -709,6 +723,8 @@ namespace Snet.Iot.Daq.viewModel
 
                             if (!createResult.Status)
                             {
+                                // 标记失败，避免每个数据事件重复创建并刷屏消息
+                                _failedAddress[addressName] = 0;
                                 await ShowAsync?.Invoke(createResult.Message);
                                 continue;
                             }
@@ -731,7 +747,12 @@ namespace Snet.Iot.Daq.viewModel
 
                         // 写入
                         if (!_addressMap.TryGetValue(addressName, out var realAddress))
+                        {
+                            // 创建成功但未能映射到真实地址，标记避免重复创建
+                            if (!_failedAddress.ContainsKey(addressName))
+                                _failedAddress[addressName] = 0;
                             continue;
+                        }
 
                         _singleWriteDict[realAddress] = new WriteModel(value, dataType);
 
@@ -846,33 +867,34 @@ namespace Snet.Iot.Daq.viewModel
                                 continue;
 
                             // 根据字节处理模型，优先从JSON字符串获取，否则从文件获取
-                            List<BytesModel>? bm = null;
-                            try
+                            // 统一以 addressModel.Address 为缓存键，先查缓存、miss 才解析，避免每个采集周期重复 JSON 反序列化与文件读取
+                            if (!bytesModels.TryGetValue(addressModel.Address, out List<BytesModel>? bm) || bm == null)
                             {
-                                bm = kv.Value?.AddressExtendParam?.ToString()?.ToJsonEntity<List<BytesModel>>();
-                            }
-                            catch (System.Text.Json.JsonException)
-                            {
-                                // AddressExtendParam 不是有效的 BytesModel JSON，可能是文件模式
-                            }
-
-                            if (bm != null)
-                            {
-                                bm = bytesModels.GetOrAdd(kv.Value.AddressName, bm);
-                            }
-                            else if (addressModel.ExpandParam != null)
-                            {
-                                if (!File.Exists(addressModel.ExpandParam))
+                                bm = null;
+                                try
                                 {
-                                    ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展参数文件不存在".GetLanguageValue(App.LanguageOperate));
-                                    continue;
+                                    bm = kv.Value?.AddressExtendParam?.ToString()?.ToJsonEntity<List<BytesModel>>();
                                 }
-                                if (!bytesModels.TryGetValue(addressModel.Address, out bm) || bm == null)
+                                catch (System.Text.Json.JsonException)
                                 {
+                                    // AddressExtendParam 不是有效的 BytesModel JSON，可能是文件模式
+                                }
+
+                                if (bm != null)
+                                {
+                                    bytesModels.TryAdd(addressModel.Address, bm);
+                                }
+                                else if (addressModel.ExpandParam != null)
+                                {
+                                    if (!File.Exists(addressModel.ExpandParam))
+                                    {
+                                        ShowAsync?.Invoke(DeviceHierarchyToolTip + ", " + $" {addressModel.Address} -" + "扩展参数文件不存在".GetLanguageValue(App.LanguageOperate));
+                                        continue;
+                                    }
                                     bm = FileHandler.FileToString(addressModel.ExpandParam).ToJsonEntity<List<BytesModel>>();
                                     if (bm != null)
                                     {
-                                        bytesModels[addressModel.Address] = bm;
+                                        bytesModels.TryAdd(addressModel.Address, bm);
                                     }
                                 }
                             }
@@ -974,17 +996,18 @@ namespace Snet.Iot.Daq.viewModel
                 .GroupBy(kv => kv.Key.Address!)
                 .ToDictionary(g => g.Key, g => g.SelectMany(x => x.Value).ToList());
 
-            //循环MQ插件路径
+            //循环MQ插件路径（清空操作移出循环，避免只保留最后一组插件的路径）
+            MqPluginPath ??= new();
+            MqPluginPath.Clear();
             foreach (var item in _mqPluginMap)
             {
-                if (MqPluginPath is not null)
-                    MqPluginPath.Clear();
-                else
-                    MqPluginPath = new();
-
                 foreach (var model in item.Value)
                 {
-                    MqPluginPath.Add(PluginHandlerCore.PluginOperate.GetPluginPath(model.Name));
+                    string path = PluginHandlerCore.PluginOperate.GetPluginPath(model.Name);
+                    if (!MqPluginPath.Contains(path))
+                    {
+                        MqPluginPath.Add(path);
+                    }
                 }
             }
         }
@@ -1019,20 +1042,30 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
-        /// 结果消息抛出
+        /// 上次结果状态（用于避免每条样本都触发 UI 属性通知）
+        /// </summary>
+        private bool? _lastResultStatus;
+
+        /// <summary>
+        /// 结果消息抛出<br/>
+        /// 仅在状态翻转（成功→失败 / 失败→成功）时更新 UI 属性，高频率采集下避免每样本触发绑定通知
         /// </summary>
         public async Task ResultMsgAsync(PluginConfigModel pcm, BaseModel bm)
         {
-            if (bm.Status)
+            if (_lastResultStatus != bm.Status)
             {
-                LedColor = System.Windows.Media.Colors.Green;
-                CollectStatus = LanguageHandler.GetLanguageValue("正常", App.LanguageOperate);
-            }
-            else
-            {
-                LedColor = System.Windows.Media.Colors.Red;
-                CollectStatus = LanguageHandler.GetLanguageValue("异常", App.LanguageOperate);
-                DeviceStatusChangLiang = true;
+                _lastResultStatus = bm.Status;
+                if (bm.Status)
+                {
+                    LedColor = System.Windows.Media.Colors.Green;
+                    CollectStatus = LanguageHandler.GetLanguageValue("正常", App.LanguageOperate);
+                }
+                else
+                {
+                    LedColor = System.Windows.Media.Colors.Red;
+                    CollectStatus = LanguageHandler.GetLanguageValue("异常", App.LanguageOperate);
+                    DeviceStatusChangLiang = true;
+                }
             }
             await ResultAsync.Invoke(pcm, bm);
         }
@@ -1077,6 +1110,9 @@ namespace Snet.Iot.Daq.viewModel
 
         public void Dispose()
         {
+            // 取消静态语言事件订阅，防止实例被静态事件根住无法回收
+            Snet.Core.handler.LanguageHandler.OnLanguageEventAsync -= LanguageHandler_OnLanguageEventAsync;
+
             // 取消令牌，防止后台异步任务继续执行
             if (TokenSource != null)
             {
@@ -1100,6 +1136,9 @@ namespace Snet.Iot.Daq.viewModel
 
         public async ValueTask DisposeAsync()
         {
+            // 取消静态语言事件订阅，防止实例被静态事件根住无法回收
+            Snet.Core.handler.LanguageHandler.OnLanguageEventAsync -= LanguageHandler_OnLanguageEventAsync;
+
             if (daqHandler != null)
                 await daqHandler.DisposeAsync();
             daqHandler = null;

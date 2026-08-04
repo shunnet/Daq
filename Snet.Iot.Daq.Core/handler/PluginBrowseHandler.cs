@@ -131,8 +131,8 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>版本列表缓存（flatcontainer 索引），避免重复请求</summary>
         private readonly ConcurrentDictionary<string, List<string>> _versionsCache = new(StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>版本发布时间缓存（registration leaf，按需获取）</summary>
-        private readonly ConcurrentDictionary<string, Dictionary<string, DateTime>> _versionTimesCache = new(StringComparer.OrdinalIgnoreCase);
+        /// <summary>版本发布时间缓存（registration leaf，按需获取）<br/>嵌套 ConcurrentDictionary 保证并发读写安全</summary>
+        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, DateTime>> _versionTimesCache = new(StringComparer.OrdinalIgnoreCase);
 
         /// <summary>
         /// 无参构造函数（建议仅在反射/序列化时使用）
@@ -323,7 +323,7 @@ namespace Snet.Iot.Daq.Core.handler
                     string pubStr = pubProp.GetString();
                     if (DateTime.TryParse(pubStr, out var pubTime))
                     {
-                        var times = _versionTimesCache.GetOrAdd(lowerName, _ => new Dictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase));
+                        var times = _versionTimesCache.GetOrAdd(lowerName, _ => new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase));
                         times[version] = pubTime;
                         return pubTime;
                     }

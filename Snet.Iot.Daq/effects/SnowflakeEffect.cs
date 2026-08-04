@@ -70,6 +70,7 @@ namespace Snet.Iot.Daq.effects
         /// </summary>
         public void Stop()
         {
+            SkinHandler.OnSkinEvent -= SkinHandler_OnSkinEvent;
             CompositionTarget.Rendering -= UpdateSnowFlakes;
             ClearSnowFlakes();
 

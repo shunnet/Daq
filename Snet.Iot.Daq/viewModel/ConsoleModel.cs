@@ -544,6 +544,12 @@ namespace Snet.Iot.Daq.viewModel
 
 
         /// <summary>
+        /// 失败消息节流缓存（相同设备+消息在 1 秒窗口内只显示一次）<br/>
+        /// 防止 MQ/采集持续失败时消息洪峰刷屏界面并持续写日志
+        /// </summary>
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, long> _errorThrottle = new();
+
+        /// <summary>
         /// 设备结果信息
         /// </summary>
         /// <param name="result">结果</param>
@@ -552,6 +558,17 @@ namespace Snet.Iot.Daq.viewModel
             if (!result.Status)
             {
                 string msg = $"[ Error ] {result.Time} : [ {model.Type} ] {result.Message}";
+                string key = $"{model.Guid}|{result.Message}";
+                long now = DateTime.UtcNow.Ticks;
+                if (_errorThrottle.TryGetValue(key, out long last))
+                {
+                    if (now - last < TimeSpan.TicksPerSecond)
+                        return;
+                }
+                _errorThrottle[key] = now;
+                if (_errorThrottle.Count > 1000)
+                    _errorThrottle.Clear();  // 防止失败消息种类过多时字典本身无限增长
+
                 await uiMessage.ShowAsync(msg, withTime: false);
                 LogHelper.Error(msg, foldername: "msg");
             }
