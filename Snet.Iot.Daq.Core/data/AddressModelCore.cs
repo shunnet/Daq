@@ -13,8 +13,11 @@ namespace Snet.Iot.Daq.Core.data
     public class AddressModelCore : DaqPluginOperateModel.ReadModel, IAddressModel
     {
         /// <summary>
-        /// 信息传递包装器异步
+        /// 信息传递包装器异步<br/>
+        /// 包含事件委托，序列化会循环引用或报错，必须忽略
         /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
         private EventingWrapperAsync<EventInfoResult> OnInfoEventWrapperAsync;
 
         /// <inheritdoc/>

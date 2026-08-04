@@ -304,7 +304,7 @@
                                             <Image
                                                 Width="32"
                                                 Height="32"
-                                                Source="{Binding Icon, Converter={StaticResource ByteArrayToImageConverter}}" />
+                                                Source="/resources/image/nuget.png" />
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>

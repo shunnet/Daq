@@ -37,6 +37,8 @@ namespace Snet.Iot.Daq.Core.data
                 }
             }
         }
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
         private PluginConfigModel _daqDetails;
 
         /// <summary>

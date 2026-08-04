@@ -22,10 +22,9 @@ namespace Snet.Iot.Daq.Core.data
         /// <param name="version">版本</param>
         /// <param name="describe">描述</param>
         /// <param name="updateTime">更新时间</param>
-        public PluginBrowseDataGridModel(int index, byte[] icon, string packName, string version, string describe, DateTime updateTime)
+        public PluginBrowseDataGridModel(int index, string packName, string version, string describe, DateTime updateTime)
         {
             Index = index;
-            Icon = icon;
             PackName = packName;
             Version = version;
             Describe = describe;
@@ -45,11 +44,6 @@ namespace Snet.Iot.Daq.Core.data
         /// 序号
         /// </summary>
         public int Index { get; set; }
-
-        /// <summary>
-        /// 图标
-        /// </summary>
-        public byte[] Icon { get; set; }
 
         /// <summary>
         /// 包名

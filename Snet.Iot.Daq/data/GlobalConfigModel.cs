@@ -83,9 +83,10 @@ namespace Snet.Iot.Daq.data
         public static Func<Task>? RefreshAsyncFunc;
 
         /// <summary>
-        /// 刷新插件信息
+        /// 刷新插件信息<br/>
+        /// 返回内部任务的真实 Task，避免调用方 await 时未等待刷新完成导致并发重叠刷新（设备被重复重启）
         /// </summary>
-        public static Task RefreshAsync() { RefreshAsyncFunc?.Invoke(); return Task.CompletedTask; }
+        public static Task RefreshAsync() => RefreshAsyncFunc?.Invoke() ?? Task.CompletedTask;
 
         /// <summary>
         /// 接口名称

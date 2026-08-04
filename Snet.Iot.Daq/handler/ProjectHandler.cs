@@ -41,26 +41,20 @@ namespace Snet.Iot.Daq.handler
 
         /// <summary>
         /// 异步保存项目配置到 JSON 文件<br/>
-        /// 包含重试机制（最多5次，间隔500ms），用于处理文件被占用的情况
+        /// 包含重试机制（最多5次，间隔500ms），用于处理文件被占用的情况<br/>
+        /// 注意：不再自动触发 RefreshAsync —— 调用方均已在保存后显式刷新，<br/>
+        /// 原逻辑形成"保存→刷新→设备重启→再保存"的级联链，并发堆积导致内存暴涨
         /// </summary>
         /// <param name="data">待保存的项目树数据</param>
         /// <param name="path">配置文件保存路径</param>
         /// <returns>true 表示写入成功；false 表示达到最大重试次数或发生非 IO 异常</returns>
         public static async Task<bool> SaveConfigAsync(ObservableCollection<IProjectTreeViewModel> data, string path)
         {
-            bool fileWritten = await ProjectHandlerCore.WriteToFileWithRetryAsync(
+            return await ProjectHandlerCore.WriteToFileWithRetryAsync(
                 path,
                 data.ToJson(true),
                 onRetry: (retries, msg) => LogHelper.Error($"文件被占用，重试 {retries}/5：{msg}"),
                 onError: msg => LogHelper.Error($"配置保存失败: {msg}"));
-
-            if (fileWritten)
-            {
-                _ = GlobalConfigModel.RefreshAsync()
-                    .ContinueWith(t => LogHelper.Error(t.Exception?.Message), TaskContinuationOptions.OnlyOnFaulted);
-            }
-
-            return fileWritten;
         }
 
         /// <summary>

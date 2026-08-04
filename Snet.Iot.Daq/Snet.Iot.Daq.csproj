@@ -8,10 +8,14 @@
 		<UseWPF>true</UseWPF>
 		<SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
 		<ApplicationIcon>Icon.ico</ApplicationIcon>
-		<Version>1.0.2.0</Version>
+		<Version>1.0.2.1</Version>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
 	</PropertyGroup>
+
+	<ItemGroup>
+	  <None Remove="resources\image\nuget.png" />
+	</ItemGroup>
 	<ItemGroup>
 		<None Include="..\README.md" Pack="true" PackagePath="\" />
 	</ItemGroup>
@@ -31,6 +35,7 @@
 		<Resource Include="icon.ico" />
 		<Resource Include="resources\image\home-background.png" />
 		<Resource Include="resources\image\home-head.png" />
+		<Resource Include="resources\image\nuget.png" />
 	</ItemGroup>
 	
 	<ItemGroup>

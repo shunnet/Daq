@@ -123,6 +123,9 @@ namespace Snet.Iot.Daq.Core.data
             get => children;
             set => SetProperty(ref children, value);
         }
+        // 字段与属性重复序列化（IncludeFields=true），且 Children 为树形集合，字段本身必须忽略
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
         private ObservableCollection<IProjectDetailsTreeViewModel> children = new ObservableCollection<IProjectDetailsTreeViewModel>();
 
         /// <summary>

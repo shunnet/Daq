@@ -107,7 +107,7 @@ namespace Snet.Iot.Daq.viewModel
                     }
                 }
                 ProjectTree.Details = DetailsNode;  //给父级赋值
-                _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                await ProjectTree.SetAsync(BossProjectTree);  //父级保存（必须等待，避免与后续刷新并发叠加内存）
                 await GlobalConfigModel.RefreshAsync();
             }
         }
@@ -137,7 +137,7 @@ namespace Snet.Iot.Daq.viewModel
                     _ = DetailsNode[DetailsNode.Count - 1].SetAsync(DetailsNode).ConfigureAwait(false);
                 }
                 ProjectTree.Details = DetailsNode;  //给父级赋值
-                _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                await ProjectTree.SetAsync(BossProjectTree);  //父级保存（必须等待，避免与后续刷新并发叠加内存）
                 await GlobalConfigModel.RefreshAsync();
             }
         }
@@ -282,38 +282,46 @@ namespace Snet.Iot.Daq.viewModel
             if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data))
             {
                 AddressValue value = data[address.Address];
-                if (DetailsNodeSelectedItem.Children.Count > 0)
+                if (value.Quality == QualityType.Normal)
                 {
-                    StringBuilder error_strs = new StringBuilder();
-                    error_strs.AppendLine("存在传输失败数据如下".GetLanguageValue(App.LanguageOperate));
-                    foreach (var item in DetailsNodeSelectedItem.Children)
+                    if (DetailsNodeSelectedItem.Children.Count > 0)
                     {
-                        string desName = $"{item.Name}{item.SpecialData}";  //详细名称
-                        PluginConfigModel mq = item.MqDetails;
-                        result = await address.TestTransmitDataAsync(mq, value);
-                        if (!result.GetDetails(out msg))
+                        StringBuilder error_strs = new StringBuilder();
+                        error_strs.AppendLine("存在传输失败数据如下".GetLanguageValue(App.LanguageOperate));
+                        foreach (var item in DetailsNodeSelectedItem.Children)
                         {
-                            error_strs.AppendLine();
-                            error_strs.AppendLine($"{desName} - {"传输失败".GetLanguageValue(App.LanguageOperate)}");
-                            error_strs.AppendLine(msg);
+                            string desName = $"{item.Name}{item.SpecialData}";  //详细名称
+                            PluginConfigModel mq = item.MqDetails;
+                            result = await address.TestTransmitDataAsync(mq, value);
+                            if (!result.GetDetails(out msg))
+                            {
+                                error_strs.AppendLine();
+                                error_strs.AppendLine($"{desName} - {"传输失败".GetLanguageValue(App.LanguageOperate)}");
+                                error_strs.AppendLine(msg);
+                            }
+                            else
+                            {
+                                error_strs.Remove(0, error_strs.Length);
+                            }
+                        }
+                        if (error_strs.Length > 1)
+                        {
+                            await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}\r\n\r\n{error_strs}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                         }
                         else
                         {
-                            error_strs.Remove(0, error_strs.Length);
+                            await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}\r\n\r\n{"传输成功".GetLanguageValue(App.LanguageOperate)}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                         }
-                    }
-                    if (error_strs.Length > 1)
-                    {
-                        await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}\r\n\r\n{error_strs}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                     }
                     else
                     {
-                        await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}\r\n\r\n{"传输成功".GetLanguageValue(App.LanguageOperate)}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                     }
                 }
                 else
                 {
-                    await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    msg = value.Message;
+                    await Windows.Controls.message.MessageBox.Show($"{"读取失败".GetLanguageValue(App.LanguageOperate)}:{msg}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                 }
             }
             else

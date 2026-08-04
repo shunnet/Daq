@@ -128,12 +128,6 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>用于 HTTP 请求的客户端，生命周期由本类管理</summary>
         private readonly HttpClient _httpClient;
 
-        /// <summary>版本列表缓存（flatcontainer 索引），避免重复请求</summary>
-        private readonly ConcurrentDictionary<string, List<string>> _versionsCache = new(StringComparer.OrdinalIgnoreCase);
-
-        /// <summary>版本发布时间缓存（registration leaf，按需获取）<br/>嵌套 ConcurrentDictionary 保证并发读写安全</summary>
-        private readonly ConcurrentDictionary<string, ConcurrentDictionary<string, DateTime>> _versionTimesCache = new(StringComparer.OrdinalIgnoreCase);
-
         /// <summary>
         /// 无参构造函数（建议仅在反射/序列化时使用）
         /// </summary>
@@ -231,7 +225,7 @@ namespace Snet.Iot.Daq.Core.handler
 
             // 2. 构建 nuspec 文件 URL 并下载
             string nuspecUrl = $"https://api.nuget.org/v3-flatcontainer/{lowerName}/{version}/{lowerName}.nuspec";
-            var response = await _httpClient.GetAsync(nuspecUrl, cancellationToken);
+            using var response = await _httpClient.GetAsync(nuspecUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
             string xml = await response.Content.ReadAsStringAsync();
@@ -253,13 +247,9 @@ namespace Snet.Iot.Daq.Core.handler
             // 2. 获取发布时间（利用缓存，GetNuspecAsync 内部已填充）
             DateTime publishedTime = await GetPublishedTimeAsync(packageName, metadata.Version);
 
-            // 3. 下载图标为字节数组
-            byte[]? iconBytes = await DownloadIconAsync(packageName, metadata.Version, metadata.IconUrl);
-
             return new PluginBrowseDataGridModel
             {
                 Index = index,
-                Icon = iconBytes,               // 字节数组，界面需转换器
                 PackName = metadata.Id,
                 Version = metadata.Version,
                 Describe = metadata.Description ?? metadata.Summary,  // 优先用 Description
@@ -298,7 +288,7 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// 从 NuGet 注册接口获取指定版本的发布时间
+        /// 从 NuGet 注册接口获取指定版本的发布时间（每次全新请求，不做缓存）
         /// </summary>
         /// <param name="packageName">包名</param>
         /// <param name="version">精确版本号</param>
@@ -308,25 +298,20 @@ namespace Snet.Iot.Daq.Core.handler
             try
             {
                 string lowerName = packageName.ToLowerInvariant();
-                if (_versionTimesCache.TryGetValue(lowerName, out var cached) && cached.TryGetValue(version, out var cachedTime))
-                    return cachedTime;
 
                 // 单版本 registration leaf，轻量且不依赖注册索引的分页结构
                 string leafUrl = $"https://api.nuget.org/v3/registration5-gz-semver2/{lowerName}/{version}.json";
-                var response = await _httpClient.GetAsync(leafUrl);
+                using var response = await _httpClient.GetAsync(leafUrl);
                 if (!response.IsSuccessStatusCode)
                     return DateTime.MinValue;
 
-                using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+                string body = await response.Content.ReadAsStringAsync();
+                using var jsonDoc = JsonDocument.Parse(body);
                 if (jsonDoc.RootElement.TryGetProperty("published", out var pubProp))
                 {
                     string pubStr = pubProp.GetString();
                     if (DateTime.TryParse(pubStr, out var pubTime))
-                    {
-                        var times = _versionTimesCache.GetOrAdd(lowerName, _ => new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase));
-                        times[version] = pubTime;
                         return pubTime;
-                    }
                 }
             }
             catch (Exception ex)
@@ -337,62 +322,21 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// 获取指定包的所有版本（通过 flatcontainer 索引，轻量且不分页）
+        /// 获取指定包的所有版本（通过 flatcontainer 索引，每次全新请求，不做缓存）
         /// </summary>
         private async Task<List<string>> GetVersionsAsync(string lowerPackageName)
         {
-            if (_versionsCache.TryGetValue(lowerPackageName, out var cached))
-                return cached;
-
             string flatIndexUrl = $"https://api.nuget.org/v3-flatcontainer/{lowerPackageName}/index.json";
-            var response = await _httpClient.GetAsync(flatIndexUrl);
+            using var response = await _httpClient.GetAsync(flatIndexUrl);
             response.EnsureSuccessStatusCode();
 
-            using var jsonDoc = await JsonDocument.ParseAsync(await response.Content.ReadAsStreamAsync());
+            string body = await response.Content.ReadAsStringAsync();
+            using var jsonDoc = JsonDocument.Parse(body);
             var versions = jsonDoc.RootElement.GetProperty("versions")
                 .EnumerateArray()
                 .Select(v => v.GetString()!)
                 .ToList();
-
-            _versionsCache[lowerPackageName] = versions;
             return versions;
-        }
-
-        /// <summary>
-        /// 下载图标字节数组（优先旧式 iconUrl，其次通过 NuGet 图标端点）
-        /// </summary>
-        private async Task<byte[]?> DownloadIconAsync(string packageName, string version, string? iconUrl)
-        {
-            // 1. 旧式 iconUrl（直接下载）
-            if (!string.IsNullOrWhiteSpace(iconUrl))
-            {
-                try
-                {
-                    var resp = await _httpClient.GetAsync(iconUrl);
-                    resp.EnsureSuccessStatusCode();
-                    return await resp.Content.ReadAsByteArrayAsync();
-                }
-                catch (Exception ex)
-                {
-                    System.Diagnostics.Debug.WriteLine($"旧式 iconUrl 下载失败 ({packageName}): {ex.Message}");
-                }
-            }
-
-            // 2. 新式内嵌图标（通过 NuGet 统一端点）
-            string lowerName = packageName.ToLowerInvariant();
-            string iconEndpoint = $"https://api.nuget.org/v3-flatcontainer/{lowerName}/{version}/icon";
-            try
-            {
-                var resp = await _httpClient.GetAsync(iconEndpoint);
-                resp.EnsureSuccessStatusCode();
-                return await resp.Content.ReadAsByteArrayAsync();
-            }
-            catch (Exception ex)
-            {
-                System.Diagnostics.Debug.WriteLine($"NuGet 图标端点下载失败 ({packageName} {version}): {ex.Message}");
-            }
-
-            return null;
         }
 
         /// <summary>

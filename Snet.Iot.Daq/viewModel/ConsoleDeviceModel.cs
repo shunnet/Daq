@@ -7,6 +7,7 @@ using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
+using Snet.Log;
 using Snet.Model.data;
 using Snet.Model.@enum;
 using Snet.Temporary.Core.handler;
@@ -683,6 +684,12 @@ namespace Snet.Iot.Daq.viewModel
                     {
                         if (token.IsCancellationRequested)
                             continue;
+
+                        if (addressValue.Quality != QualityType.Normal)
+                        {
+                            await LogHelper.ErrorAsync($"{addressValue.AddressName} - {addressValue.Message}", foldername: Path.Combine("UaService", "Transmit", "Failure"), token: token);
+                            continue;
+                        }
 
                         FolderState fs = await UaCreateFolder();
                         if (fs == null)

@@ -14,13 +14,19 @@ namespace Snet.Iot.Daq.Core.mvvm
         #region 字典属性包
 
         /// <summary>
-        /// 属性值存储字典（延迟初始化）
+        /// 属性值存储字典（延迟初始化）<br/>
+        /// 必须 JsonIgnore：序列化选项 IncludeFields=true 会序列化私有字段，<br/>
+        /// 属性包内含 Parent 等对象引用（属性级 JsonIgnore 对字典内值无效），会导致循环引用序列化递归爆炸
         /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
         private Dictionary<string, object>? _propertyBag;
 
         /// <summary>
         /// 用于保护属性包读写操作的同步锁对象，避免在 lock 中使用 PropertyBag 自身（防止外部引用干扰）
         /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
         private readonly object _propertyBagLock = new();
 
         /// <summary>

@@ -616,7 +616,16 @@ namespace Snet.Iot.Daq.viewModel
                 if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data))
                 {
                     AddressValue value = data[address.Address];
-                    await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                    if (value.Quality == QualityType.Normal)
+                    {
+                        await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+
+                    }
+                    else
+                    {
+                        msg = value.Message;
+                        await Windows.Controls.message.MessageBox.Show($"{"读取失败".GetLanguageValue(App.LanguageOperate)}:{msg}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                    }
                 }
                 else
                 {
