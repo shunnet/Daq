@@ -59,6 +59,11 @@ namespace Snet.Iot.Daq.chart
             public bool LineRemove { get; set; }
 
             /// <summary>
+            /// 移除所有线条数据的右键菜单
+            /// </summary>
+            public bool DataRemove { get; set; }
+
+            /// <summary>
             /// 是否需要线条调整右键菜单
             /// </summary>
             public bool LineAdjust { get; set; }

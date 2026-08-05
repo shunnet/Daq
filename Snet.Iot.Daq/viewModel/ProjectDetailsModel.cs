@@ -112,16 +112,6 @@ namespace Snet.Iot.Daq.viewModel
         #endregion
 
         #region 命令
-        ///// <summary>
-        ///// 当前页
-        ///// </summary>
-        //public IAsyncRelayCommand PageIndexChanged => pageIndexChanged ??= new AsyncRelayCommand<int>(PageIndexChangedExecuteAsync);
-        //private IAsyncRelayCommand? pageIndexChanged;
-        //private Task PageIndexChangedExecuteAsync(int index)
-        //{
-
-        //}
-
         /// <summary>
         /// 添加地址
         /// </summary>

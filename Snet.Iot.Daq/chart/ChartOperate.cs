@@ -34,15 +34,13 @@ namespace Snet.Iot.Daq.chart
     public class ChartOperate : CoreUnify<ChartOperate, ChartData.Basics>, IDisposable, IAsyncDisposable
     {
         /// <summary>
-        /// 无参构造函数<br/>
-        /// </summary>
-        public ChartOperate() : base() { }
-
-        /// <summary>
         /// 有参构造函数<br/>
         /// </summary>
         /// <param name="basics">基础数据</param>
-        public ChartOperate(ChartData.Basics basics) : base(basics) { }
+        public ChartOperate(ChartData.Basics basics) : base(basics)
+        {
+            SetTheme(SkinHandler.GetSkin(), basics.ChartControl);
+        }
 
         /// <summary>
         /// 皮肤切换事件处理器<br/>
@@ -50,7 +48,7 @@ namespace Snet.Iot.Daq.chart
         /// </summary>
         private void SkinHandler_OnSkinEvent(object? sender, EventSkinResult e)
         {
-            Style(e.Skin ??= SkinType.Dark, wpfPlot);
+            SetTheme(e.Skin ??= SkinType.Dark, wpfPlot);
         }
 
         #region 接口重写参数
@@ -367,6 +365,27 @@ namespace Snet.Iot.Daq.chart
         }
 
         /// <summary>
+        /// 判断线条是否存在
+        /// </summary>
+        public OperateResult DoesItExist(string sn)
+        {
+            BegOperate();
+            try
+            {
+                if (!GetStatus().GetDetails(out string? message))
+                {
+                    return EndOperate(false, message);
+                }
+                bool status = DataLoggerChartManage.ContainsKey(sn);
+                return EndOperate(status, status ? "存在" : "不存在");
+            }
+            catch (Exception ex)
+            {
+                return EndOperate(false, ex.Message, exception: ex);
+            }
+        }
+
+        /// <summary>
         /// 创建数据线（DataLogger）<br/>
         /// 优化点：
         /// 1. 使用 TryAdd + Count 属性避免并发问题；
@@ -464,6 +483,37 @@ namespace Snet.Iot.Daq.chart
                     return EndOperate(false, message);
                 }
                 return EndOperate(false, $"{sn}{LanguageOperate.GetLanguageValue("不存在")}");
+            }
+            catch (Exception ex)
+            {
+                return EndOperate(false, ex.Message, exception: ex);
+            }
+        }
+
+        /// <summary>
+        /// 移除所有线条
+        /// </summary>
+        public OperateResult Remove()
+        {
+            BegOperate();
+            try
+            {
+                if (!GetStatus().GetDetails(out string? message))
+                {
+                    return EndOperate(false, message);
+                }
+
+                foreach (var item in DataLoggerChartManage)
+                {
+                    // 先清空数据
+                    if (Clear(item.Key).GetDetails(out message))
+                    {
+                        // 把此线条从控件中移除（UI 线程）
+                        item.Value.plot.Dispatcher.Invoke(() => item.Value.plot.Plot.Remove(item.Value.logger));
+                    }
+                }
+                DataLoggerChartManage.Clear();
+                return EndOperate(true);
             }
             catch (Exception ex)
             {
@@ -578,18 +628,10 @@ namespace Snet.Iot.Daq.chart
         }
 
         /// <summary>
-        /// 将 WPF 的 Color 转换为 System.Drawing.Color（ScottPlot 使用）
-        /// </summary>
-        private System.Drawing.Color ToDrawingColor(System.Windows.Media.Color color)
-        {
-            return System.Drawing.Color.FromArgb(color.A, color.R, color.G, color.B);
-        }
-
-        /// <summary>
         /// 应用皮肤样式到 ScottPlot<br/>
         /// 优化点：延迟创建样式对象并复用，避免频繁 new 对象带来的开销。
         /// </summary>
-        public bool Style(SkinType skin, WpfPlot? plot = null)
+        public bool SetTheme(SkinType skin, WpfPlot? plot = null)
         {
             try
             {
@@ -692,6 +734,13 @@ namespace Snet.Iot.Daq.chart
                     plot.Menu?.AddSeparator();
                     plot.Menu?.Add(LanguageOperate.GetLanguageValue("保存图片"), SaveImage);
                     plot.Menu?.Add(LanguageOperate.GetLanguageValue("复制图片"), CopyImage);
+
+                    if (basics.DataRemove)
+                    {
+                        plot.Menu?.AddSeparator();
+                        plot.Menu?.Add(App.LanguageOperate.GetLanguageValue("移除数据"), Clear);
+                    }
+
                     if (basics.LineRemove)
                     {
                         plot.Menu?.AddSeparator();
@@ -812,7 +861,27 @@ namespace Snet.Iot.Daq.chart
         {
             if (plot == null)
                 return;
-            plot.Clear();
+            Remove();
+            Reset(plot);
+            // 重新应用当前皮肤样式，避免样式丢失
+            switch (CurrentSkinType)
+            {
+                case SkinType.Dark: wpfPlot?.Plot.SetStyle(dark); break;
+                case SkinType.Light: wpfPlot?.Plot.SetStyle(light); break;
+            }
+            plot.PlotControl?.Refresh();
+        }
+
+        /// <summary>
+        /// 移除所有线条并重置样式<br/>
+        /// </summary>
+        private void Clear(Plot plot)
+        {
+            if (plot == null)
+                return;
+
+            Clear();
+
             Reset(plot);
             // 重新应用当前皮肤样式，避免样式丢失
             switch (CurrentSkinType)
