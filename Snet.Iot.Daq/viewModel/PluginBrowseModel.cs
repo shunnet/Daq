@@ -285,7 +285,7 @@ namespace Snet.Iot.Daq.viewModel
             get => pageSize;
             set => SetProperty(ref pageSize, value);
         }
-        private int pageSize = 20;
+        private int pageSize = 50;
 
         /// <summary>
         /// 页索引

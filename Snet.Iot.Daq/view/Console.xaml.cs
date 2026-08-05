@@ -1,5 +1,5 @@
-﻿using ICSharpCode.AvalonEdit;
-using Snet.Utility;
+﻿using Snet.Utility;
+using Snet.Windows.Controls.edit;
 using Snet.Windows.Controls.handler;
 using System.Windows.Controls;
 using System.Windows.Input;

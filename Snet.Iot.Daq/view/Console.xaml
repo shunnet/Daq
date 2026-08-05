@@ -4,7 +4,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:data="clr-namespace:Snet.Iot.Daq.data"
-    xmlns:edit="http://icsharpcode.net/sharpdevelop/avalonedit"
     xmlns:h="clr-namespace:Snet.Windows.Controls.handler;assembly=Snet.Windows.Controls"
     xmlns:i="http://schemas.microsoft.com/xaml/behaviors"
     xmlns:local="clr-namespace:Snet.Iot.Daq.view"
@@ -259,12 +258,6 @@
                                 <WrapPanel />
                             </ItemsPanelTemplate>
                         </ItemsControl.ItemsPanel>
-
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <view:ConsoleDevice />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
                     </ItemsControl>
                 </ScrollViewer>
             </Grid>
@@ -423,18 +416,18 @@
                     </Button>
 
                     <!--  数据框  -->
-                    <edit:TextEditor
+                    <snet:TextEditorControl
                         x:Name="edit"
                         h:EditBindingHandler.EditText="{Binding Info}"
                         IsReadOnly="True"
                         PreviewKeyDown="TextEditor_PreviewKeyDown"
                         PreviewTextInput="TextEditor_PreviewTextInput"
                         TextChanged="TextEditor_TextChanged">
-                        <edit:TextEditor.Resources>
+                        <snet:TextEditorControl.Resources>
                             <Style BasedOn="{StaticResource UiScrollViewer}" TargetType="ScrollViewer" />
                             <Style BasedOn="{StaticResource UiScrollBar}" TargetType="ScrollBar" />
-                        </edit:TextEditor.Resources>
-                    </edit:TextEditor>
+                        </snet:TextEditorControl.Resources>
+                    </snet:TextEditorControl>
 
                 </Grid>
             </GroupBox>
