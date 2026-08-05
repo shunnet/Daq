@@ -150,7 +150,7 @@ namespace Snet.Iot.Daq.viewModel
             GlobalConfigModel.deviceModel.SetValue(PluginType.Mq);
             if ((await DialogHost.Show(GlobalConfigModel.device, GlobalConfigModel.DialogHostTag_ClickClose)).ToBool())
             {
-                PluginConfigModel plugin = GlobalConfigModel.deviceModel.GetValue();
+                PluginConfigModel plugin = GlobalConfigModel.deviceModel.GetValue().Guid.GetPlugin();
                 foreach (var items in DetailsNode)
                 {
                     IProjectDetailsTreeViewModel item = new ProjectDetailsTreeViewModel(plugin);

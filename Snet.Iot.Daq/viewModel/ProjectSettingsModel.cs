@@ -219,6 +219,8 @@ namespace Snet.Iot.Daq.viewModel
 
                     //设置父级关系
                     models.InitChildrenParent();
+                    //回灌全局引用（插件/地址），避免导入的树与全局字典断链
+                    models.RebindGlobals();
                     ProjectNode.Clear();
                     ProjectNode = models;
                     ProjectNodeSelectedItem = ProjectHandlerCore.GetFirstSelectItem(ProjectNode);
