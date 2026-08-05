@@ -145,6 +145,9 @@ namespace Snet.Iot.Daq.chart
         /// </summary>
         private async Task AutoRefreshAsync(CancellationToken token, int millisecond)
         {
+            if (millisecond == 0)
+                return;
+
             // 防止并发调用同时启动多个循环
             if (AutoRefreshStatus)
                 return;

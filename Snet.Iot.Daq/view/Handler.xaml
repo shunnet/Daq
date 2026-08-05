@@ -26,8 +26,7 @@
         ui:ElevationAssist.Elevation="Dp2"
         ui:GroupBoxAssist.HeaderPadding="7"
         Header="{Binding}"
-        Style="{StaticResource MaterialDesignCardGroupBox}"
-        Visibility="{Binding TabControlVisibility}">
+        Style="{StaticResource MaterialDesignCardGroupBox}">
         <GroupBox.HeaderTemplate>
             <DataTemplate>
                 <StackPanel
