@@ -65,10 +65,16 @@ namespace Snet.Iot.Daq.viewModel
         private ConcurrentDictionary<string, MqHandler> mqHandlers = new();
 
         /// <summary>
-        /// 字节处理模型
+        /// 字节处理模型缓存<br/>
+        /// 值保存参数来源与解析结果，来源变化(配置更新/组包移除)时自动重新解析或清除
         /// </summary>
+        private ConcurrentDictionary<string, (object Source, List<BytesModel> Models)> bytesModels = new();
 
-        private ConcurrentDictionary<string, List<BytesModel>> bytesModels = new();
+        /// <summary>
+        /// 字节模型解析失败的地址集合<br/>
+        /// 避免每个数据事件对同一地址重复提示
+        /// </summary>
+        private readonly ConcurrentDictionary<string, byte> _failedBytesModels = new();
 
         /// <summary>
         /// 运行时间记录
@@ -458,6 +464,7 @@ namespace Snet.Iot.Daq.viewModel
 
                     _addressMap.Clear();
                     _failedAddress.Clear();
+                    _failedBytesModels.Clear();
 
                     if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "启动采集".GetLanguageValue(App.LanguageOperate));
 
@@ -664,7 +671,7 @@ namespace Snet.Iot.Daq.viewModel
                     while (UaSyncChannel.Reader.TryRead(out AddressValue? addressValue))
                     {
                         if (token.IsCancellationRequested)
-                            continue;
+                            break;
 
                         if (addressValue.Quality != QualityType.Normal)
                         {
@@ -836,7 +843,7 @@ namespace Snet.Iot.Daq.viewModel
                     while (DataSyncChannel.Reader.TryRead(out EventDataResult? e))
                     {
                         if (token.IsCancellationRequested)
-                            continue;
+                            break;
 
                         if (!e.Status)
                         {
@@ -844,75 +851,19 @@ namespace Snet.Iot.Daq.viewModel
                             continue;
                         }
 
-                        var keys = e.GetSource<ConcurrentDictionary<string, AddressValue>>();
-                        if (keys == null || keys.Count == 0)
-                            continue;
-
-                        foreach (var kv in keys)
+                        // 支持字典与列表两种数据形态（列表为多批次解包结果）
+                        switch (e.ResultData)
                         {
-                            //地址的值
-                            AddressValue addressValue = kv.Value;
-
-                            if (!_addressIndex.TryGetValue(kv.Key, out var addressModel) ||
-                                !_mqPluginMap.TryGetValue(kv.Key, out var pluginConfigs))
-                                continue;
-
-                            if (kv.Value.Quality != QualityType.Normal)
-                            {
-                                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult($"{DeviceHierarchyToolTip}, {addressValue.AddressName} - {kv.Value.Message}"));
-                                continue;
-                            }
-
-                            // 根据字节处理模型，优先从JSON字符串获取，否则从文件获取
-                            // 统一以 addressModel.Address 为缓存键，先查缓存、miss 才解析，避免每个采集周期重复 JSON 反序列化与文件读取
-                            if (!bytesModels.TryGetValue(addressValue.AddressName, out List<BytesModel>? bm) || bm == null)
-                            {
-                                bm = null;
-                                if (addressValue.AddressExtendParam != null)
-                                {
-                                    if (addressValue.AddressExtendParam is string)
-                                    {
-                                        string str = addressValue.AddressExtendParam.ToString();
-                                        if (str.IsJson())   // 传进来的 json 字符串组包
-                                        {
-                                            bm = str.ToJsonEntity<List<BytesModel>>();
-                                        }
-                                    }
-                                    else if (addressValue.AddressExtendParam is List<BytesModel>)   //组包
-                                    {
-                                        bm = addressValue.AddressExtendParam.GetSource<List<BytesModel>>();
-                                    }
-
-                                    if (bm != null)
-                                    {
-                                        bytesModels.TryAdd(addressValue.AddressName, bm);
-                                    }
-                                    else
-                                    {
-                                        ShowAsync?.Invoke($"{DeviceHierarchyToolTip}, {addressValue.AddressName} - {"扩展参数不正确".GetLanguageValue(App.LanguageOperate)}");
-                                        continue;
-                                    }
-                                }
-                            }
-                            else if (addressValue.AddressExtendParam == null)
-                            {
-                                // 组包已移除：新数据不再携带扩展参数，清除旧缓存避免继续按组包解析
-                                bytesModels.TryRemove(addressValue.AddressName, out _);
-                                bm = null;
-                            }
-
-                            // 无字节模型，直接转发
-                            if (bm == null)
-                            {
-                                if (TokenSource is null)
-                                    return;
-                                await UaSyncChannel.Writer.WriteAsync(addressValue, TokenSource.Token);
-                                await MqTransmissionAsync(new() { [addressModel] = addressValue }, pluginConfigs);
-                                continue;
-                            }
-
-                            // 字节转换与转发
-                            await TransformAndForwardAsync(addressValue, bm, addressModel, pluginConfigs);
+                            case ConcurrentDictionary<string, AddressValue> dict:
+                                await ProcessKeysAsync(dict, token);
+                                break;
+                            case List<ConcurrentDictionary<string, AddressValue>> list:
+                                foreach (var d in list)
+                                    await ProcessKeysAsync(d, token);
+                                break;
+                            default:
+                                await LogHelper.ErrorAsync($"[ DataSyncChannelDataEventAsync ] 未知数据形态：{e.Message}");
+                                break;
                         }
                     }
                 }
@@ -936,6 +887,108 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
+        /// 处理一组地址值：逐地址解包/转发，单地址异常不影响整组消费
+        /// </summary>
+        private async Task ProcessKeysAsync(ConcurrentDictionary<string, AddressValue> keys, CancellationToken token)
+        {
+            if (keys.Count == 0)
+                return;
+
+            foreach (var kv in keys)
+            {
+                try
+                {
+                    //地址的值
+                    AddressValue addressValue = kv.Value;
+
+                    // 数据质量异常先上报（不依赖地址是否在索引中）
+                    if (kv.Value.Quality != QualityType.Normal)
+                    {
+                        await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult($"{DeviceHierarchyToolTip}, {addressValue.AddressName} - {kv.Value.Message}"));
+                        continue;
+                    }
+
+                    if (!_addressIndex.TryGetValue(kv.Key, out var addressModel) ||
+                        !_mqPluginMap.TryGetValue(kv.Key, out var pluginConfigs))
+                        continue;
+
+                    // 字节处理模型：缓存命中且参数来源未变才复用；组包移除(参数为空)时清除缓存
+                    List<BytesModel>? bm = GetBytesModels(addressValue);
+
+                    // 参数存在但解析失败：字节数据无法解包只能丢弃，非字节数据仍可直通
+                    if (bm == null && addressValue.AddressExtendParam != null)
+                    {
+                        if (addressValue.ResultValue is byte[])
+                        {
+                            if (_failedBytesModels.TryAdd(addressValue.AddressName, 0))
+                                ShowAsync?.Invoke($"{DeviceHierarchyToolTip}, {addressValue.AddressName} - {"扩展参数不正确".GetLanguageValue(App.LanguageOperate)}");
+                            continue;
+                        }
+                    }
+
+                    // 组包批次地址的值为原始字节数组才需解包；不可组包地址已是解析后的单值，直接转发
+                    if (bm != null && addressValue.ResultValue is not byte[])
+                        bm = null;
+
+                    // 无字节模型，直接转发
+                    if (bm == null)
+                    {
+                        if (TokenSource is null)
+                            return;
+                        await UaSyncChannel.Writer.WriteAsync(addressValue, TokenSource.Token);
+                        await MqTransmissionAsync(new() { [addressModel] = addressValue }, pluginConfigs);
+                        continue;
+                    }
+
+                    // 字节转换与转发
+                    await TransformAndForwardAsync(addressValue, bm, addressModel, pluginConfigs);
+                }
+                catch (Exception ex)
+                {
+                    if (token.IsCancellationRequested)
+                        break;
+                    await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult($"[ DataSyncChannelDataEventAsync ] 地址 {kv.Key} 处理异常：" + ex.Message));
+                }
+            }
+        }
+
+        /// <summary>
+        /// 获取地址的字节处理模型<br/>
+        /// 优先使用数据携带的最新扩展参数；缓存命中且来源未变时直接复用，来源变化(配置更新)时重新解析<br/>
+        /// 数据不再携带扩展参数(组包已移除)时清除缓存
+        /// </summary>
+        private List<BytesModel>? GetBytesModels(AddressValue addressValue)
+        {
+            object? param = addressValue.AddressExtendParam;
+
+            // 组包已移除：新数据不再携带扩展参数，清除旧缓存
+            if (param == null)
+            {
+                bytesModels.TryRemove(addressValue.AddressName, out _);
+                return null;
+            }
+
+            // 缓存命中且参数来源未变，直接复用，避免每个采集周期重复反序列化与文件读取
+            if (bytesModels.TryGetValue(addressValue.AddressName, out var cached) && cached.Source == param)
+                return cached.Models;
+
+            List<BytesModel>? models = param switch
+            {
+                // 组包直接传入模型集合
+                List<BytesModel> list => list,
+                // 传进来的 json 字符串组包
+                string str when str.IsJson() => str.ToJsonEntity<List<BytesModel>>(),
+                // 扩展参数为 json 文件路径时读取解析
+                string filePath when File.Exists(filePath) => FileHandler.FileToString(filePath).ToJsonEntity<List<BytesModel>>(),
+                _ => null
+            };
+
+            if (models != null)
+                bytesModels[addressValue.AddressName] = (param, models);
+            return models;
+        }
+
+        /// <summary>
         /// 字节转换并转发到 UA 通道与 MQ
         /// </summary>
         private async Task TransformAndForwardAsync(AddressValue addressValue, List<BytesModel> bm, IAddressModel addressModel, List<PluginConfigModel> pluginConfigs)
@@ -944,26 +997,34 @@ namespace Snet.Iot.Daq.viewModel
 
             OperateResult result = await bytesHandler.TransformAsync(addressValue.ResultValue.GetSource<byte[]>(), addressValue.Time, bm);
             if (!result.GetDetails(out ConcurrentDictionary<string, AddressValue>? res))
+            {
+                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult($"{DeviceHierarchyToolTip}, {addressValue.AddressName} - 解包失败：" + result.Message));
                 return;
+            }
 
             foreach (var item in res)
             {
+                // 以原始地址名重新查索引与 MQ 配置，避免整批数据共用批次首地址的配置
+                _addressIndex.TryGetValue(item.Key, out var sourceModel);
+                _mqPluginMap.TryGetValue(item.Key, out var sourcePlugins);
+                sourceModel ??= addressModel;
+
                 AddressModel newModel = new()
                 {
                     Address = item.Key,
                     Describe = item.Value.AddressDescribe,
                     EncodingType = item.Value.EncodingType,
-                    Guid = item.Value.SN,
-                    SimplifyValue = addressModel.SimplifyValue,
+                    Guid = sourceModel.Guid,
+                    SimplifyValue = sourceModel.SimplifyValue,
                     Length = item.Value.Length,
                     Time = item.Value.Time,
-                    Topic = addressModel.Topic,
+                    Topic = sourceModel.Topic,
                     Type = item.Value.AddressDataType,
                 };
                 if (TokenSource is null)
                     return;
                 await UaSyncChannel.Writer.WriteAsync(item.Value, TokenSource.Token);
-                await MqTransmissionAsync(new() { [newModel] = item.Value }, pluginConfigs);
+                await MqTransmissionAsync(new() { [newModel] = item.Value }, sourcePlugins ?? pluginConfigs);
             }
         }
 
