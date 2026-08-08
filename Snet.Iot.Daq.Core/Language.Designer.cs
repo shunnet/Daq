@@ -1175,6 +1175,24 @@ namespace Snet.Iot.Daq.Core {
                 return ResourceManager.GetString("此驱动目前不支持地址自动组包", resourceCulture);
             }
         }
+
+        /// <summary>
+        ///   查找类似 组包结果为空 的本地化字符串。
+        /// </summary>
+        public static string 组包结果为空 {
+            get {
+                return ResourceManager.GetString("组包结果为空", resourceCulture);
+            }
+        }
+
+        /// <summary>
+        ///   查找类似 地址自动组包失败： 的本地化字符串。
+        /// </summary>
+        public static string 地址自动组包失败 {
+            get {
+                return ResourceManager.GetString("地址自动组包失败：", resourceCulture);
+            }
+        }
         
         /// <summary>
         ///   查找类似 添加 的本地化字符串。

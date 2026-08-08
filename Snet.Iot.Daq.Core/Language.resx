@@ -757,4 +757,10 @@
   <data name="请检查“项目详情”中传输设备是否正确设置给每个地址" xml:space="preserve">
     <value>请检查“项目详情”中传输设备是否正确设置给每个地址</value>
   </data>
+  <data name="组包结果为空" xml:space="preserve">
+    <value>组包结果为空</value>
+  </data>
+  <data name="地址自动组包失败：" xml:space="preserve">
+    <value>地址自动组包失败：</value>
+  </data>
 </root>

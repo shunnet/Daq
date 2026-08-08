@@ -5,11 +5,11 @@ using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mvvm;
-using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.data;
 using Snet.Log;
 using Snet.Model.data;
 using Snet.Model.@enum;
+using Snet.Opc.ua.service;
 using Snet.Utility;
 using System.Collections.Concurrent;
 using System.IO;
@@ -34,10 +34,6 @@ namespace Snet.Iot.Daq.viewModel
         #endregion
 
         #region 属性
-        /// <summary>
-        /// 自动组包处理
-        /// </summary>
-        private PackerHandler autoPack;
 
         /// <summary>
         /// 字节处理
@@ -621,45 +617,6 @@ namespace Snet.Iot.Daq.viewModel
 
         #region 功能方法
         /// <summary>
-        /// 地址自动组包入口方法(插件工具自动组包入口)
-        /// 根据设备类型将离散地址集合合并为批量读取结构，减少通信轮次
-        /// </summary>
-        /// <param name="addressModels">插件工具地址，包含待组包的地址列表</param>
-        /// <param name="deviceType">设备类型标识（目前支持 "SiemensS7"）</param>
-        /// <param name="maxByteLength">单次批量读取的最大字节数（西门子S7默认240/400）</param>
-        /// <param name="format">数据字节序格式</param>
-        /// <returns>组包后的地址对象，失败返回null</returns>
-        public List<IAddressModel>? AddressAutoPack(List<IAddressModel> addressModels, string deviceType = "SiemensS7Net", int maxByteLength = 200, DataFormat format = DataFormat.ABCD)
-        {
-            Address address = new Address();
-            address.AddressArray = addressModels.Where(m => string.IsNullOrEmpty(m.ExpandParam)).Select(m => new AddressDetails
-            {
-                SN = m.Guid,
-                AddressAnotherName = m.AnotherName,
-                AddressName = m.Address,
-                AddressDataType = m.Type,
-                AddressDescribe = m.Describe,
-                EncodingType = m.EncodingType,
-
-            }).ToList();
-            Address? result = autoPack.AddressAutoPack(address, deviceType, maxByteLength, format);
-            if (result == null) return null;
-            List<IAddressModel> models = new List<IAddressModel>();
-            foreach (var model in result.AddressArray)
-            {
-                models.Add(new AddressModelCore
-                {
-                    Length = model.Length,
-                    EncodingType = model.EncodingType,
-                    Address = model.AddressName,
-                    Type = model.AddressDataType,
-                    Describe = model.AddressDescribe,
-                    ExpandParam = model.AddressExtendParam.ToJson()
-                });
-            }
-            return models;
-        }
-        /// <summary>
         /// 通道地址事件消费
         /// </summary>
         private async Task UaSyncChannelDataEventAsync(CancellationToken token)
@@ -915,20 +872,13 @@ namespace Snet.Iot.Daq.viewModel
                     // 字节处理模型：缓存命中且参数来源未变才复用；组包移除(参数为空)时清除缓存
                     List<BytesModel>? bm = GetBytesModels(addressValue);
 
-                    // 参数存在但解析失败：字节数据无法解包只能丢弃，非字节数据仍可直通
+                    // 参数存在但解析失败：该地址配置了字节解析但无法获得模型，提示后丢弃，避免每周期刷屏
                     if (bm == null && addressValue.AddressExtendParam != null)
                     {
-                        if (addressValue.ResultValue is byte[])
-                        {
-                            if (_failedBytesModels.TryAdd(addressValue.AddressName, 0))
-                                ShowAsync?.Invoke($"{DeviceHierarchyToolTip}, {addressValue.AddressName} - {"扩展参数不正确".GetLanguageValue(App.LanguageOperate)}");
-                            continue;
-                        }
+                        if (_failedBytesModels.TryAdd(addressValue.AddressName, 0))
+                            ShowAsync?.Invoke($"{DeviceHierarchyToolTip}, {addressValue.AddressName} - {"扩展参数不正确".GetLanguageValue(App.LanguageOperate)}");
+                        continue;
                     }
-
-                    // 组包批次地址的值为原始字节数组才需解包；不可组包地址已是解析后的单值，直接转发
-                    if (bm != null && addressValue.ResultValue is not byte[])
-                        bm = null;
 
                     // 无字节模型，直接转发
                     if (bm == null)
@@ -940,7 +890,7 @@ namespace Snet.Iot.Daq.viewModel
                         continue;
                     }
 
-                    // 字节转换与转发
+                    // 字节转换与转发（组包批次 / 手动设置扩展参数的地址均按模型解包，不区分值是否字节数组）
                     await TransformAndForwardAsync(addressValue, bm, addressModel, pluginConfigs);
                 }
                 catch (Exception ex)
@@ -954,39 +904,50 @@ namespace Snet.Iot.Daq.viewModel
 
         /// <summary>
         /// 获取地址的字节处理模型<br/>
-        /// 优先使用数据携带的最新扩展参数；缓存命中且来源未变时直接复用，来源变化(配置更新)时重新解析<br/>
-        /// 数据不再携带扩展参数(组包已移除)时清除缓存
+        /// 组包配置存在时：缓存命中且参数来源未变直接复用，来源变化(配置更新)时重新解析<br/>
+        /// 组包配置移除时：立即清除缓存（配置为权威信号）；过渡期数据仍带参数则照常解析不丢<br/>
+        /// 数据不携带扩展参数(不可组包地址/未按组包订阅地址)：无缓存或缓存不被使用，直接直通，不做任何缓存操作
         /// </summary>
         private List<BytesModel>? GetBytesModels(AddressValue addressValue)
         {
             object? param = addressValue.AddressExtendParam;
 
-            // 组包已移除：新数据不再携带扩展参数，清除旧缓存
-            if (param == null)
+            // 组包配置已移除：清除缓存（配置为权威信号，不依赖数据是否仍携带参数）
+            if (DaqData?.AutoPack == null)
             {
                 bytesModels.TryRemove(addressValue.AddressName, out _);
-                return null;
+                // 数据仍带参数：驱动尚未重新订阅，参数来自数据本身，照常解析过渡期数据（不再重建缓存）
+                return param == null ? null : ParseBytesModels(param);
             }
+
+            // 数据不携带扩展参数：这类地址本无缓存，或值非字节数组不会被解包使用，直接直通
+            if (param == null)
+                return null;
 
             // 缓存命中且参数来源未变，直接复用，避免每个采集周期重复反序列化与文件读取
             if (bytesModels.TryGetValue(addressValue.AddressName, out var cached) && cached.Source == param)
                 return cached.Models;
 
-            List<BytesModel>? models = param switch
-            {
-                // 组包直接传入模型集合
-                List<BytesModel> list => list,
-                // 传进来的 json 字符串组包
-                string str when str.IsJson() => str.ToJsonEntity<List<BytesModel>>(),
-                // 扩展参数为 json 文件路径时读取解析
-                string filePath when File.Exists(filePath) => FileHandler.FileToString(filePath).ToJsonEntity<List<BytesModel>>(),
-                _ => null
-            };
-
+            List<BytesModel>? models = ParseBytesModels(param);
             if (models != null)
                 bytesModels[addressValue.AddressName] = (param, models);
             return models;
         }
+
+        /// <summary>
+        /// 解析扩展参数为字节处理模型<br/>
+        /// 支持组包模型集合、JSON 字符串、JSON 文件路径三种来源（手动设置与组包格式一致）
+        /// </summary>
+        private static List<BytesModel>? ParseBytesModels(object? param) => param switch
+        {
+            // 组包直接传入模型集合
+            List<BytesModel> list => list,
+            // 手动设置的扩展参数 json 字符串组包
+            string str when str.IsJson() => str.ToJsonEntity<List<BytesModel>>(),
+            // 扩展参数为 json 文件路径时读取解析
+            string filePath when File.Exists(filePath) => FileHandler.FileToString(filePath).ToJsonEntity<List<BytesModel>>(),
+            _ => null
+        };
 
         /// <summary>
         /// 字节转换并转发到 UA 通道与 MQ

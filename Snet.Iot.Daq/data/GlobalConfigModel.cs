@@ -1,10 +1,10 @@
 ﻿using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@interface;
-using Snet.Iot.Daq.Core.mqtt.service;
-using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
+using Snet.Mqtt.service;
+using Snet.Opc.ua.service;
 using Snet.Utility;
 using Snet.Windows.Controls.handler;
 using Snet.Windows.Controls.property;

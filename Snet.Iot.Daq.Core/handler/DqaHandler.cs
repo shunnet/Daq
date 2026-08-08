@@ -41,6 +41,12 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         private readonly ConcurrentDictionary<string, EventHandlerAsync<EventInfoResult>> _infoHandlers = new();
 
+        /// <summary>
+        /// 每个 guid 组包成功后的地址集合缓存<br/>
+        /// 取消订阅时需用同一组包结果匹配，避免按原始地址取消失败导致订阅项残留
+        /// </summary>
+        private readonly ConcurrentDictionary<string, Address> _packedAdd = new();
+
         /// <inheritdoc/>
         /// <summary>
         /// 同步释放所有已打开的 DAQ 实例并清空事件委托缓存
@@ -55,6 +61,7 @@ namespace Snet.Iot.Daq.Core.handler
             icoDaq.Clear();
             _dataHandlers.Clear();
             _infoHandlers.Clear();
+            _packedAdd.Clear();
 
             base.Dispose();
         }
@@ -76,6 +83,7 @@ namespace Snet.Iot.Daq.Core.handler
             icoDaq.Clear();
             _dataHandlers.Clear();
             _infoHandlers.Clear();
+            _packedAdd.Clear();
 
             await base.DisposeAsync();
         }
@@ -330,10 +338,11 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
-        /// 批量订阅多个地址的数据变化
+        /// 批量订阅多个地址的数据变化（含自动组包）
         /// </summary>
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待订阅的地址模型集合</param>
+        /// <param name="autoPack">自动组包参数；null 表示不组包</param>
         /// <returns>操作结果，包含批量订阅成功/失败状态</returns>
         public async Task<OperateResult> SubscribeAsync(string guid, List<IAddressModel> address, AddressAutoPackModel? autoPack = null)
         {
@@ -345,7 +354,7 @@ namespace Snet.Iot.Daq.Core.handler
                 return open.result;
             }
 
-            //执行组包功能
+            // 执行组包功能；组包成功后订阅组包后的地址（取消订阅时须用同一组包结果，否则订阅项残留）
             Address add = address.AddressConvert();
             if (autoPack != null)
             {
@@ -354,15 +363,24 @@ namespace Snet.Iot.Daq.Core.handler
                 if (!string.IsNullOrWhiteSpace(key))   //支持组包
                 {
                     OperateResult result = await open.operate.PackerAsync(add, key, autoPack.MaxByteLength, autoPack.Format);
-                    //组包的地址
-                    Address addPack = result.GetSource<Address>();
-                    // 批量订阅地址
-                    return await open.operate.SubscribeAsync(addPack);
+                    if (result.Status)
+                    {
+                        Address? addPack = result.GetSource<Address>();
+                        if (addPack != null)
+                        {
+                            // 缓存组包结果，供取消订阅匹配
+                            _packedAdd[guid] = addPack;
+                            return await open.operate.SubscribeAsync(addPack);
+                        }
+                        return OperateResult.CreateFailureResult("组包结果为空".GetLanguageValue(Core.LanguageOperate));
+                    }
+                    // 组包失败：返回明确错误（不静默降级为未组包订阅）
+                    return OperateResult.CreateFailureResult("地址自动组包失败：".GetLanguageValue(Core.LanguageOperate) + result.Message);
                 }
+                return OperateResult.CreateFailureResult("此驱动目前不支持地址自动组包".GetLanguageValue(Core.LanguageOperate));
             }
-            // 批量订阅地址
+            // 批量订阅地址（未组包）
             return await open.operate.SubscribeAsync(add);
-
         }
 
         /// <summary>
@@ -381,8 +399,8 @@ namespace Snet.Iot.Daq.Core.handler
                 return open.result;
             }
 
-            // 取消订阅地址
-            return await open.operate.UnSubscribeAsync(address.AddressConvert());
+            // 取消订阅地址（组包后需用组包结果匹配）
+            return await open.operate.UnSubscribeAsync(GetUnsubscribeAddress(guid, address.AddressConvert()));
         }
 
         /// <summary>
@@ -401,8 +419,19 @@ namespace Snet.Iot.Daq.Core.handler
                 return open.result;
             }
 
-            // 批量取消订阅地址
-            return await open.operate.UnSubscribeAsync(address.AddressConvert());
+            // 批量取消订阅地址（组包后需用组包结果匹配）
+            return await open.operate.UnSubscribeAsync(GetUnsubscribeAddress(guid, address.AddressConvert()));
+        }
+
+        /// <summary>
+        /// 获取用于取消订阅的地址集合<br/>
+        /// 若该设备此前组包成功，使用缓存的组包结果；否则使用原始地址
+        /// </summary>
+        private Address GetUnsubscribeAddress(string guid, Address original)
+        {
+            if (_packedAdd.TryGetValue(guid, out var packed))
+                return packed;
+            return original;
         }
 
         /// <summary>
