@@ -5,6 +5,7 @@ using Snet.Iot.Daq.Core.@interface;
 using Snet.Model.data;
 using Snet.Model.@event;
 using Snet.Model.@interface;
+using Snet.Utility;
 using System.Collections.Concurrent;
 
 namespace Snet.Iot.Daq.Core.handler
@@ -334,7 +335,7 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="guid">设备唯一标识符</param>
         /// <param name="address">待订阅的地址模型集合</param>
         /// <returns>操作结果，包含批量订阅成功/失败状态</returns>
-        public async Task<OperateResult> SubscribeAsync(string guid, List<IAddressModel> address)
+        public async Task<OperateResult> SubscribeAsync(string guid, List<IAddressModel> address, AddressAutoPackModel? autoPack = null)
         {
             // 打开或获取设备实例
             (IDaq operate, OperateResult result) open = await OpenAsync(guid);
@@ -344,8 +345,24 @@ namespace Snet.Iot.Daq.Core.handler
                 return open.result;
             }
 
+            //执行组包功能
+            Address add = address.AddressConvert();
+            if (autoPack != null)
+            {
+                string[] keys = PackerHandler.GetSupportAutoPackDeviceTypes();
+                string? key = keys.FirstOrDefault(k => open.operate.GetBasicsArgs().ToJson().Contains(k));
+                if (!string.IsNullOrWhiteSpace(key))   //支持组包
+                {
+                    OperateResult result = await open.operate.PackerAsync(add, key, autoPack.MaxByteLength, autoPack.Format);
+                    //组包的地址
+                    Address addPack = result.GetSource<Address>();
+                    // 批量订阅地址
+                    return await open.operate.SubscribeAsync(addPack);
+                }
+            }
             // 批量订阅地址
-            return await open.operate.SubscribeAsync(address.AddressConvert());
+            return await open.operate.SubscribeAsync(add);
+
         }
 
         /// <summary>

@@ -556,8 +556,8 @@
   <data name="取消软启采集成功" xml:space="preserve">
     <value>取消软启采集成功</value>
   </data>
-  <data name="扩展参数文件不存在" xml:space="preserve">
-    <value>扩展参数文件不存在</value>
+  <data name="扩展参数不正确" xml:space="preserve">
+    <value>扩展参数不正确</value>
   </data>
   <data name="不支持类型转换" xml:space="preserve">
     <value>不支持类型转换</value>

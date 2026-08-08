@@ -138,6 +138,8 @@ namespace Snet.Iot.Daq.Core.data
             AddressDetails address = new AddressDetails(Address, Type, Length, EncodingType);
             address.AddressAnotherName = AnotherName;
             address.AddressExtendParam = ExpandParam;
+            address.AddressDescribe = Describe;
+            address.SN = Guid;
             return address;
         }
 

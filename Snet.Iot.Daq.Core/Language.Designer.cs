@@ -826,11 +826,11 @@ namespace Snet.Iot.Daq.Core {
         }
         
         /// <summary>
-        ///   查找类似 扩展参数文件不存在 的本地化字符串。
+        ///   查找类似 扩展参数不正确 的本地化字符串。
         /// </summary>
-        public static string 扩展参数文件不存在 {
+        public static string 扩展参数不正确 {
             get {
-                return ResourceManager.GetString("扩展参数文件不存在", resourceCulture);
+                return ResourceManager.GetString("扩展参数不正确", resourceCulture);
             }
         }
         

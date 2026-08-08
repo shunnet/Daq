@@ -556,8 +556,8 @@
   <data name="取消软启采集成功" xml:space="preserve">
     <value>Cancel soft start acquisition successfully</value>
   </data>
-  <data name="扩展参数文件不存在" xml:space="preserve">
-    <value>The extension parameter file does not exist</value>
+  <data name="扩展参数不正确" xml:space="preserve">
+    <value>Incorrect extension parameters</value>
   </data>
   <data name="不支持类型转换" xml:space="preserve">
     <value>Type conversion is not supported</value>
