@@ -13,8 +13,8 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Snet.Mqtt" Version="26.220.1" />
-		<PackageReference Include="Snet.Opc" Version="26.220.2" />
+		<PackageReference Include="Snet.Mqtt" Version="26.221.1" />
+		<PackageReference Include="Snet.Opc" Version="26.221.1" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="NuGet.Versioning" Version="7.6.0" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
