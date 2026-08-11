@@ -14,7 +14,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Snet.Mqtt" Version="26.222.1" />
-		<PackageReference Include="Snet.Opc" Version="26.222.1" />
+		<PackageReference Include="Snet.Opc" Version="26.223.1" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="NuGet.Versioning" Version="7.6.0" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
