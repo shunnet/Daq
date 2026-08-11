@@ -98,7 +98,7 @@ namespace Snet.Iot.Daq.viewModel
                     // 在循环外分配字典，避免每次迭代产生 GC 压力
                     Dictionary<string, double> values = new Dictionary<string, double>(4);
 
-                    using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(_interval));
+                    using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
                     while (await timer.WaitForNextTickAsync(token))
                     {
                         HardwareData hardwareData = systemMonitoring.GetInfo();
@@ -194,11 +194,6 @@ namespace Snet.Iot.Daq.viewModel
         /// 系统信息监控
         /// </summary>
         private SystemMonitoring systemMonitoring;
-
-        /// <summary>
-        /// 间隔
-        /// </summary>
-        private int _interval = 500;
 
         /// <summary>
         /// 全局的任务取消控制
@@ -602,8 +597,7 @@ namespace Snet.Iot.Daq.viewModel
             {
                 ChartControl = ChartControl,
                 LineAdjust = true,
-                HideGrid = true,
-                RefreshTime = _interval
+                HideGrid = true
             });
             chartOperate.On();
             chartOperate.Create(new() { SN = "Cpu", Title = "处理器", TitleEN = "Cpu", Color = "#4CAF50" });
