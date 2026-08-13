@@ -1,0 +1,99 @@
+@page "/login"
+@rendermode InteractiveServer
+@layout LoginLayout
+@inherits LocalizedComponentBase
+@using Microsoft.AspNetCore.Authorization
+@attribute [AllowAnonymous]
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+@inject IHttpContextAccessor Http
+
+<div class="login-card card">
+    <div class="login-brand">
+        <img src="images/icon.png" width="60" height="60" alt="Snet" />
+        <h1 class="login-title">Snet.Iot.Daq</h1>
+        <p class="login-sub">@T("插件化工业物联网数据采集工具")</p>
+    </div>
+
+    @if (_mustChange)
+    {
+        <form method="post" action="/login" class="login-form">
+            <input type="hidden" name="mode" value="change" />
+            <input type="hidden" name="username" value="@_changeUsername" />
+            <div class="login-input">
+                <i class="bi bi-lock"></i>
+                <input type="password" name="password" placeholder="@T("旧密码")" autocomplete="current-password" />
+            </div>
+            <div class="login-input">
+                <i class="bi bi-key"></i>
+                <input type="password" name="newPassword" placeholder="@T("新密码（至少 6 位）")" />
+            </div>
+            <div class="login-input">
+                <i class="bi bi-shield-check"></i>
+                <input type="password" name="confirmPassword" placeholder="@T("确认新密码")" />
+            </div>
+            @if (_error is not null)
+            {
+                <div class="login-error">@T(_error)</div>
+            }
+            <button type="submit" class="btn btn-primary btn-lg btn-block">
+                <i class="bi bi-key"></i>@T("修改密码")
+            </button>
+        </form>
+    }
+    else
+    {
+        <form method="post" action="/login" class="login-form">
+            <div class="login-input">
+                <i class="bi bi-person"></i>
+                <input type="text" name="username" value="admin" placeholder="@T("用户名")" autocomplete="username" />
+            </div>
+            <div class="login-input">
+                <i class="bi bi-lock"></i>
+                <input type="password" name="password" placeholder="@T("密码")" autocomplete="current-password" />
+            </div>
+            @if (_error is not null)
+            {
+                <div class="login-error">@T(_error)</div>
+            }
+            <button type="submit" class="btn btn-primary btn-lg btn-block">
+                <i class="bi bi-box-arrow-in-right"></i>@T("登录")
+            </button>
+        </form>
+    }
+
+    <div class="login-footer">
+        <div class="segmented">
+            <button class="@(Localization.CurrentLanguage == "zh" ? "active" : "")" @onclick="SetZhAsync">@T("简体中文")</button>
+            <button class="@(Localization.CurrentLanguage == "en" ? "active" : "")" @onclick="SetEnAsync">English</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    private string? _error;
+    private bool _mustChange;
+    /// <summary>改密目标用户名：SSR 阶段从 HttpContext 取当前登录用户（强制改密会话），避免默认 admin 导致普通用户永远改密失败</summary>
+    private string _changeUsername = "";
+
+    protected override void OnInitialized()
+    {
+        var uri = Nav.ToAbsoluteUri(Nav.Uri);
+        _mustChange = uri.Query.Contains("mode=change");
+        var error = uri.Query.Contains("error=")
+            ? System.Web.HttpUtility.ParseQueryString(uri.Query).Get("error")
+            : null;
+        if (!string.IsNullOrEmpty(error))
+            _error = error;
+        _changeUsername = Http.HttpContext?.User?.Identity?.Name ?? "";
+    }
+
+    private Task SetZhAsync() => SetLangAsync("zh");
+    private Task SetEnAsync() => SetLangAsync("en");
+
+    private async Task SetLangAsync(string lang)
+    {
+        await Localization.SetLanguageAsync(lang);
+        await JS.InvokeVoidAsync("snet.setLang", lang);
+    }
+}

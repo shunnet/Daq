@@ -1,0 +1,140 @@
+@inherits LayoutComponentBase
+@using System.Reflection
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Authentication
+@using Microsoft.AspNetCore.Components.Authorization
+@using Snet.Iot.Daq.Web.Services
+@using Snet.Iot.Daq.Web.Components.Shared
+@inject LocalizationService Localization
+@inject ThemeService Theme
+@inject IJSRuntime JS
+@inject NavigationManager Nav
+
+<div class="app-shell">
+    <header class="app-bar">
+        @if (_isAdmin)
+        {
+            <button class="btn btn-icon nav-toggle" title="@T("折叠导航")" @onclick="ToggleNavAsync">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 6h18M3 12h18M3 18h18" />
+                </svg>
+            </button>
+        }
+        <span class="brand">
+            <img src="images/icon.png" width="40" height="40" alt="Snet" />
+            Snet.Iot.Daq
+            <span class="brand-version">@_version</span>
+        </span>
+        <div class="spacer"></div>
+        <div class="segmented">
+            <button class="@(Localization.CurrentLanguage == "zh" ? "active" : "")" @onclick="SetZhAsync">中</button>
+            <button class="@(Localization.CurrentLanguage == "en" ? "active" : "")" @onclick="SetEnAsync">EN</button>
+        </div>
+        <button class="btn btn-icon" title="@T("主题")" @onclick="ToggleThemeAsync">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                @if (Theme.IsDark)
+                {
+                    <circle cx="12" cy="12" r="5" />
+                    <path d="M12 1v2M12 21v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M1 12h2M21 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4" />
+                }
+                else
+                {
+                    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" />
+                }
+            </svg>
+        </button>
+        <button class="btn btn-icon" title="@T("退出登录")" @onclick="LogoutAsync">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <path d="M16 17l5-5-5-5M21 12H9" />
+            </svg>
+        </button>
+    </header>
+
+    <div class="app-body">
+        <nav class="app-nav @(_navCollapsed || !_isAdmin ? "collapsed" : "")">
+            @if (_isAdmin)
+            {
+                <NavItem Href="/plugins/browse" Icon="browse" Label="@T("插件浏览")" />
+                <NavItem Href="/plugins/settings" Icon="plugin" Label="@T("插件设置")" />
+                <NavItem Href="/addresses" Icon="address" Label="@T("地址")" />
+                <NavItem Href="/projects" Icon="project" Label="@T("项目")" />
+            }
+            <NavItem Href="/console" Icon="console" Label="@T("控制台")" />
+            @if (_isAdmin)
+            {
+                <NavItem Href="/users" Icon="user" Label="@T("用户管理")" NavClass="nav-users" />
+            }
+            <a class="nav-item nav-about" href="https://snet.cn" target="_blank" rel="noopener">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="9" />
+                    <path d="M12 16v-4M12 8h.01" />
+                </svg>
+                <span>@T("关于")</span>
+            </a>
+        </nav>
+
+        <main class="app-main">
+            @Body
+        </main>
+    </div>
+</div>
+
+@code {
+    private bool _navCollapsed;
+    private bool _isAdmin;
+
+    private static readonly string _version = typeof(Program).Assembly
+        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
+
+    /// <summary>级联认证状态：从持久化的 AuthState 取角色（SSR 首渲染已由 App 根组件写入）</summary>
+    [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }
+
+    private string T(string key) => Localization.T(key);
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var state = await AuthState;
+            _isAdmin = state.User.Identity?.IsAuthenticated == true
+                && state.User.IsInRole(AuthService.RoleAdmin);
+        }
+    }
+
+    private Task SetZhAsync() => SetLangAsync("zh");
+    private Task SetEnAsync() => SetLangAsync("en");
+
+    private async Task SetLangAsync(string lang)
+    {
+        await Localization.SetLanguageAsync(lang);
+        await JS.InvokeVoidAsync("snet.setLang", lang);
+        StateHasChanged();
+    }
+
+    private async Task ToggleThemeAsync()
+    {
+        Theme.Toggle();
+        await JS.InvokeVoidAsync("snet.setTheme", Theme.IsDark);
+        StateHasChanged();
+    }
+
+    private void ToggleNavAsync() => _navCollapsed = !_navCollapsed;
+
+    private void LogoutAsync() => Nav.NavigateTo("/logout", forceLoad: true);
+
+    protected override void OnInitialized()
+    {
+        Theme.ThemeChanged += OnThemeChanged;
+        Localization.LanguageChanged += OnLangChanged;
+    }
+
+    private void OnThemeChanged() => InvokeAsync(StateHasChanged);
+    private void OnLangChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Theme.ThemeChanged -= OnThemeChanged;
+        Localization.LanguageChanged -= OnLangChanged;
+    }
+}

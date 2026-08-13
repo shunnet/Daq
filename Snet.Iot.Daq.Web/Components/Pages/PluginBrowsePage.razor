@@ -1,0 +1,296 @@
+@page "/plugins/browse"
+@rendermode InteractiveServer
+@inherits LocalizedComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using Snet.Iot.Daq.Core.data
+@using Snet.Iot.Daq.Core.handler
+@using Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Utility
+@attribute [Authorize(Policy = AuthService.AdminPolicy)]
+@inject ToastService Toast
+@inject DownloadTaskManager DownloadManager
+@inject IJSRuntime JS
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="bi bi-box-seam me-2"></i>@T("插件浏览")</div>
+        <span class="plugin-path-hint" title="@WebPaths.FilePath">@T("插件下载位置")：@WebPaths.FilePath</span>
+    </div>
+
+    <SearchBox @bind-Value="_keyword" Placeholder="@T("搜索插件包名")" OnSearch="() => { _pageIndex = 1; StateHasChanged(); }">
+        <button class="btn" @onclick="RefreshAsync" title="@T("刷新")"><i class="bi bi-arrow-clockwise"></i></button>
+        <span class="spacer"></span>
+        <span class="tree-actions">
+            <span class="tree-actions-expand @(IsBrowseActionsOpen ? "open" : "")">
+                <button class="btn btn-sm" @onclick="SelectAll"><i class="bi bi-check2-square"></i>@T("全选")</button>
+                <button class="btn btn-sm" @onclick="InverseSelection"><i class="bi bi-square-half"></i>@T("反选")</button>
+                <button class="btn btn-sm btn-primary" disabled="@(_selected.Count == 0)" @onclick="DownloadSelectedAsync"><i class="bi bi-download"></i>@T("下载选中")</button>
+                <button class="btn btn-sm btn-danger" disabled="@(!_downloading)" @onclick="StopDownloadAsync"><i class="bi bi-stop"></i>@T("停止下载")</button>
+            </span>
+            <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="ToggleBrowseActions" title="@T("操作")">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                    <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                    <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                </svg>
+            </button>
+        </span>
+    </SearchBox>
+
+    @if (_loading)
+    {
+        <SkeletonCards Count="6" />
+    }
+    else if (_all.Count == 0)
+    {
+        <Empty Text="@T("插件列表为空，点击刷新从 NuGet 市场拉取")">
+            <button class="btn btn-primary" @onclick="RefreshAsync"><i class="bi bi-arrow-clockwise"></i>@T("刷新")</button>
+        </Empty>
+    }
+    else
+    {
+        var paged = _all
+            .Where(MatchKeyword)
+            .Skip((_pageIndex - 1) * _pageSize).Take(_pageSize).ToList();
+        var total = _all.Count(MatchKeyword);
+
+        <div class="item-cards">
+            @foreach (var item in paged)
+            {
+                <div class="item-card">
+                    <div class="item-head">
+                        <input type="checkbox" @bind="item.IsSelected" />
+                        <span class="item-name">@item.PackName</span>
+                        <span class="tag tag-success">v@(item.Version)</span>
+                    </div>
+                    <div class="item-desc">@item.Describe</div>
+                    <div class="item-meta">
+                        <span>@T("更新时间")</span>
+                        <span class="num">@item.UpdateTime.ToString("yyyy-MM-dd")</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="snet-table-wrap">
+            <table class="snet-table">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" checked="@_allSelected" @onchange="OnAllSelectedChange" /></th>
+                        <th><i class="bi bi-list-ol"></i>@T("序号")</th>
+                        <th><i class="bi bi-box-seam"></i>@T("包名")</th>
+                        <th><i class="bi bi-hash"></i>@T("版本")</th>
+                        <th><i class="bi bi-card-text"></i>@T("描述")</th>
+                        <th><i class="bi bi-arrow-repeat"></i>@T("更新时间")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in paged)
+                    {
+                        <tr>
+                            <td><input type="checkbox" @bind="item.IsSelected" /></td>
+                            <td class="num">@item.Index</td>
+                            <td>@item.PackName</td>
+                            <td>@item.Version</td>
+                            <td>@item.Describe</td>
+                            <td class="num">@item.UpdateTime.ToString("yyyy-MM-dd")</td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <PageBar Total="@total" PageIndex="@_pageIndex" PageSize="@_pageSize"
+                 OnPageChange="@OnPageChange" OnSizeChange="@OnSizeChange" />
+    }
+</div>
+
+    <Toast />
+@code {
+    private List<PluginBrowseDataGridModel> _all = new();
+    private List<PluginBrowseDataGridModel> _selected => _all.Where(x => x.IsSelected).ToList();
+    private string? _keyword;
+    private int _pageIndex = 1;
+    private int _pageSize = 50;
+    private bool _loading = true;
+    private bool _allSelected => _all.Count > 0 && _all.All(x => x.IsSelected);
+    private bool _downloading;
+    private bool _browseActionsOpen;
+    private bool IsBrowseActionsOpen => _browseActionsOpen;
+    private DotNetObjectReference<PluginBrowsePage>? _jsRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        DownloadManager.JobChanged += OnJobChanged;
+        MenuCoordinator.Register(CloseMenu);
+        await LoadCacheAsync();
+        _loading = false;
+        if (_all.Count == 0)
+            await RefreshAsync();
+    }
+
+    /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
+    private void CloseMenu()
+    {
+        if (_browseActionsOpen)
+        {
+            _browseActionsOpen = false;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        DownloadManager.JobChanged -= OnJobChanged;
+        // 注销 document 上的外部点击监听：否则切页后旧 handler 残留会清掉新页面的监听（菜单失去失焦关闭能力）
+        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
+        if (_jsRef is not null)
+        {
+            _jsRef.Dispose();
+            _jsRef = null;
+        }
+    }
+
+    /// <summary>工具栏操作按钮：⋯ 点击展开，区域外点击收起（刷新按钮常显）</summary>
+    private async Task ToggleBrowseActions()
+    {
+        MenuCoordinator.CloseAllOthers();
+        _browseActionsOpen = !_browseActionsOpen;
+        if (_browseActionsOpen)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    [JSInvokable]
+    public void CloseAllActions()
+    {
+        _browseActionsOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>搜索匹配：包名 + 描述（支持中文关键字，如「西门子」匹配 Snet.Siemens 的描述）</summary>
+    private bool MatchKeyword(PluginBrowseDataGridModel x)
+    {
+        if (string.IsNullOrEmpty(_keyword)) return true;
+        return x.PackName.Contains(_keyword, StringComparison.OrdinalIgnoreCase)
+            || (x.Describe?.Contains(_keyword, StringComparison.OrdinalIgnoreCase) ?? false);
+    }
+
+    private void SelectAll()
+    {
+        foreach (var item in _all) item.IsSelected = true;
+    }
+
+    private void InverseSelection()
+    {
+        foreach (var item in _all) item.IsSelected = !item.IsSelected;
+    }
+
+    private void OnJobChanged(DownloadTaskManager.DownloadJob job)
+    {
+        if (job.Status == "完成")
+            Toast.Success($"{T("下载完成")}: {job.PackName}");
+        else if (job.Status == "失败")
+            Toast.Error($"{T("下载失败")}: {job.PackName}");
+        else if (job.Status == "已取消")
+            Toast.Warning($"{T("已停止下载")}: {job.PackName}");
+        else if (job.Status == "下载中")
+            Toast.Info($"{T("下载中")}: {job.PackName}");
+        // 无活动任务时复位下载状态（停止下载按钮自动禁用）
+        if (!DownloadManager.Jobs.Any(j => j.Status is "排队" or "下载中" or "安装中"))
+            _downloading = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    private async Task LoadCacheAsync()
+    {
+        if (!File.Exists(WebPaths.PluginBrowseCachePath)) return;
+        try
+        {
+            var cached = File.ReadAllText(WebPaths.PluginBrowseCachePath).ToJsonEntity<List<PluginBrowseDataGridModel>>();
+            if (cached is { Count: > 0 })
+                _all = cached;
+        }
+        catch
+        {
+            // 缓存损坏忽略，走网络刷新
+        }
+    }
+
+    private async Task RefreshAsync()
+    {
+        _loading = true;
+        _pageIndex = 1;
+        try
+        {
+            using var handler = new PluginBrowseHandler();
+            // 与 WPF 一致：按更新时间倒序（最新在前）
+            _all = (await handler.GetPluginBrowseDataGridModelsAsync(false))
+                .OrderByDescending(x => x.UpdateTime)
+                .ToList();
+            for (var i = 0; i < _all.Count; i++) _all[i].Index = i + 1;
+            // 缓存写入失败不阻断主流程：数据已加载成功，仅记日志（避免偶发序列化/写盘异常误报"刷新失败"）
+            try
+            {
+                Directory.CreateDirectory(WebPaths.UiConfigPath);
+                await File.WriteAllTextAsync(WebPaths.PluginBrowseCachePath, _all.ToJson(true));
+            }
+            catch (Exception cacheEx)
+            {
+                Console.WriteLine("[browse-cache] write failed: " + cacheEx);
+            }
+            Toast.Success(T("插件列表刷新成功"));
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(T("刷新失败") + ": " + ex.Message);
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private Task OnPageChange(int page) { _pageIndex = page; return Task.CompletedTask; }
+    private Task OnSizeChange(int size) { _pageSize = size; _pageIndex = 1; return Task.CompletedTask; }
+    private void OnAllSelectedChange(ChangeEventArgs e)
+    {
+        var all = e.Value is true;
+        foreach (var item in _all) item.IsSelected = all;
+    }
+
+    private async Task DownloadSelectedAsync()
+    {
+        if (_selected.Count == 0) return;
+        if (!await DownloadTaskManager.IsSdkAvailableAsync())
+        {
+            Toast.Error(T("服务器未安装 .NET SDK，无法下载插件"));
+            return;
+        }
+        try
+        {
+            await DownloadManager.EnqueueAsync(_selected);
+            Toast.Success($"{T("已加入下载队列")}: {_selected.Count} 个插件");
+            _downloading = true;
+        }
+        catch (InvalidOperationException ex)
+        {
+            Toast.Error(ex.Message);
+        }
+    }
+
+    private void StopDownloadAsync()
+    {
+        // 取消所有进行中的下载任务（DownloadTaskManager 全局取消令牌）
+        DownloadManager.StopAll();
+        _downloading = false;
+        Toast.Warning(T("已停止下载"));
+    }
+}

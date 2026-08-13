@@ -13,6 +13,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.Core", "Snet.I
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "debug", "debug", "{B39AC3F5-1B3B-40EE-8F96-B3C86B3F7FA3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.Web", "Snet.Iot.Daq.Web\Snet.Iot.Daq.Web.csproj", "{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -35,6 +37,10 @@ Global
 		{2C9A5818-334A-4C27-B85C-049F950B9069}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{2C9A5818-334A-4C27-B85C-049F950B9069}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{2C9A5818-334A-4C27-B85C-049F950B9069}.Release|Any CPU.Build.0 = Release|Any CPU
+		{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

@@ -1,0 +1,46 @@
+@using Microsoft.AspNetCore.Components.Routing
+
+<NavLink class="@($"nav-item {NavClass}")" Href="@Href" Match="@MatchMode">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        @switch (Icon)
+        {
+            case "console":
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <path d="M8 21h8M12 17v4" />
+                break;
+            case "plugin":
+                <rect x="2" y="3" width="20" height="14" rx="2" />
+                <path d="M8 21h8M12 17v4M8 7l4 4-4 4M13 7h3" />
+                break;
+            case "browse":
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z" />
+                <path d="M3.3 7l8.7 5 8.7-5M12 22V12" />
+                break;
+            case "address":
+                <circle cx="12" cy="12" r="9" />
+                <circle cx="12" cy="12" r="3" />
+                break;
+            case "project":
+                <path d="M3 7l9-4 9 4-9 4-9-4z" />
+                <path d="M3 7v10l9 4 9-4V7M12 11v10" />
+                break;
+            case "user":
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                <circle cx="12" cy="7" r="4" />
+                break;
+            default:
+                <circle cx="12" cy="12" r="9" />
+                break;
+        }
+    </svg>
+    <span>@Label</span>
+</NavLink>
+
+@code {
+    [Parameter] public string Href { get; set; } = "";
+    [Parameter] public string Icon { get; set; } = "";
+    [Parameter] public string Label { get; set; } = "";
+    [Parameter] public string NavClass { get; set; } = "";
+
+    private NavLinkMatch MatchMode => Href == "/console" ? NavLinkMatch.All : NavLinkMatch.Prefix;
+}

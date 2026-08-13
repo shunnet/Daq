@@ -1,0 +1,52 @@
+﻿@using System.Security.Claims
+@using Microsoft.AspNetCore.Components
+@using Snet.Iot.Daq.Web.Services
+@inject PersistentComponentState AppState
+@inject IHttpContextAccessor Http
+
+@code {
+    /// <summary>SSR 首渲染：把 HttpContext 登录用户持久化给交互电路（布局按角色渲染导航）</summary>
+    protected override void OnInitialized()
+    {
+        ServerAuthStateProvider.PersistFromHttpContext(AppState, Http.HttpContext?.User);
+    }
+}
+
+<!DOCTYPE html>
+<html lang="zh-Hans">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="/" />
+    <ResourcePreloader />
+    <link rel="stylesheet" href="@Assets["css/bootstrap.min.css"]" />
+    <link rel="stylesheet" href="@Assets["app.css"]" />
+    <link rel="stylesheet" href="@Assets["Snet.Iot.Daq.Web.styles.css"]" />
+    <link rel="stylesheet" href="@Assets["icons/font/bootstrap-icons.min.css"]" />
+    <ImportMap />
+    <link rel="icon" type="image/png" href="~/images/icon.png" />
+    <HeadOutlet />
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('snet-theme');
+                document.documentElement.setAttribute('data-theme', theme || 'dark');
+                var lang = localStorage.getItem('snet-lang');
+                if (lang) document.documentElement.setAttribute('lang', lang);
+            } catch (e) { }
+        })();
+    </script>
+</head>
+
+<body>
+    <CascadingAuthenticationState>
+        <Routes @rendermode="InteractiveServer" />
+    </CascadingAuthenticationState>
+    <ReconnectModal />
+    <script src="@Assets["js/bootstrap.bundle.min.js"]"></script>
+    <script src="@Assets["js/app.js"]"></script>
+    <script src="@Assets["_framework/blazor.web.js"]"></script>
+</body>
+
+</html>

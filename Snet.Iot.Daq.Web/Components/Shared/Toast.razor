@@ -1,0 +1,17 @@
+@inject ToastService ToastSvc
+@rendermode InteractiveServer
+
+<div class="toast-host">
+    @foreach (var item in ToastSvc.Items)
+    {
+        <div class="toast @item.Type">@item.Message</div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => ToastSvc.OnChanged += OnToastChanged;
+
+    private void OnToastChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose() => ToastSvc.OnChanged -= OnToastChanged;
+}

@@ -1,0 +1,16 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+
+<div class="segmented">
+    @for (var i = 0; i < Options.Count; i++)
+    {
+        <button class="@(SelectedIndex == i ? "active" : "")" @onclick="() => OnSelect.InvokeAsync(i)">
+            @Options[i]
+        </button>
+    }
+</div>
+
+@code {
+    [Parameter] public List<string> Options { get; set; } = new();
+    [Parameter] public int SelectedIndex { get; set; }
+    [Parameter] public EventCallback<int> OnSelect { get; set; }
+}

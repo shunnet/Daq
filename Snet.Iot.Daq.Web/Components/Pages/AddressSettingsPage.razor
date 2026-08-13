@@ -1,0 +1,638 @@
+@page "/addresses"
+@rendermode InteractiveServer
+@inherits LocalizedComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using Snet.Iot.Daq.Core.data
+@using Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Iot.Daq.Web.Data
+@using Snet.Model.data
+@attribute [Authorize(Policy = AuthService.AdminPolicy)]
+@inject DbGate DbGate
+@inject AppStateService AppState
+@inject ToastService Toast
+@inject IJSRuntime JS
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="bi bi-geo-alt me-2"></i>@T("地址设置")</div>
+    </div>
+
+    <SearchBox @bind-Value="_keyword" Placeholder="@T("搜索：地址 / 别名 / 描述")" OnSearch="@LoadAsync">
+        <button class="btn" @onclick="LoadAsync" title="@T("查询")"><i class="bi bi-search"></i></button>
+        <span class="spacer"></span>
+        <span class="tree-actions">
+            <span class="tree-actions-expand @(IsAddressActionsOpen ? "open" : "")">
+                <InputFile OnChange="@OnImportAsync" accept=".json" multiple="false" class="upload-input-hidden" />
+                <button class="btn btn-sm btn-primary" @onclick="OpenAdd"><i class="bi bi-plus-lg"></i>@T("添加")</button>
+                <button class="btn btn-sm" @onclick="TriggerImport"><i class="bi bi-file-earmark-arrow-down"></i>@T("导入")</button>
+                <button class="btn btn-sm" @onclick="ExportAsync"><i class="bi bi-file-earmark-arrow-up"></i>@T("导出")</button>
+                <button class="btn btn-sm" @onclick="InverseSelection"><i class="bi bi-square-half"></i>@T("反选")</button>
+                <button class="btn btn-sm" @onclick="SelectAll"><i class="bi bi-check2-square"></i>@T("全选")</button>
+                <button class="btn btn-sm btn-danger" @onclick="DeleteSelectedAsync"><i class="bi bi-trash"></i>@T("删除")</button>
+            </span>
+            <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="ToggleAddressActions" title="@T("操作")">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                    <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                    <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                </svg>
+            </button>
+        </span>
+    </SearchBox>
+
+    @if (_loading)
+    {
+        <SkeletonCards Count="4" />
+    }
+    else if (_items.Count == 0)
+    {
+        <Empty Text="@T("暂无地址数据")" />
+    }
+    else
+    {
+        <div class="item-cards">
+            @foreach (var item in _items)
+            {
+                <div class="item-card" @onclick="() => OpenEdit(item)">
+                    <div class="item-head">
+                        <input type="checkbox" @bind="item.IsSelected" @onclick:stopPropagation />
+                        <span class="item-name mono">@item.Address</span>
+                        <span class="tag tag-primary">@item.AnotherName</span>
+                    </div>
+                    <div class="item-desc">@item.Describe</div>
+                    <div class="item-meta">
+                        <span>@item.Type</span>
+                        <span>@item.Topic</span>
+                        <span>@item.Time.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <div class="snet-table-wrap">
+            <table class="snet-table">
+                <thead>
+                    <tr>
+                        <th><input type="checkbox" value="@_allSelected" @onchange="OnAllSelectedChange" /></th>
+                        <th><i class="bi bi-list-ol"></i>@T("序号")</th>
+                        <th><i class="bi bi-geo-alt"></i>@T("地址")</th>
+                        <th><i class="bi bi-tag"></i>@T("别名")</th>
+                        <th><i class="bi bi-grid-1x2"></i>@T("类型")</th>
+                        <th><i class="bi bi-card-text"></i>@T("描述")</th>
+                        <th><i class="bi bi-clock-history"></i>@T("时间")</th>
+                        <th><i class="bi bi-sliders"></i>@T("操作")</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var item in _items)
+                    {
+                        <tr>
+                            <td><input type="checkbox" @bind="item.IsSelected" /></td>
+                            <td class="num">@item.Index</td>
+                            <td class="mono">@item.Address</td>
+                            <td>@item.AnotherName</td>
+                            <td>@item.Type</td>
+                            <td>@item.Describe</td>
+                            <td class="num">@item.Time.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <td><button class="btn btn-sm" @onclick="() => OpenEdit(item)"><i class="bi bi-pencil"></i>@T("修改")</button></td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+
+        <PageBar Total="@_total" PageIndex="@_pageIndex" PageSize="@_pageSize"
+                 OnPageChange="@OnPageChange" OnSizeChange="@OnSizeChange" />
+    }
+</div>
+
+@if (_editing)
+{
+    <ModalDialog Title="@T("地址编辑")" TitleIcon="bi-geo-alt" OnClose="@CloseEdit">
+        <div class="form-field">
+            <label>@T("地址")</label>
+            <input @bind="_form.Address" />
+        </div>
+        <div class="form-field">
+            <label>@T("别名")</label>
+            <input @bind="_form.AnotherName" />
+        </div>
+        <div class="form-field">
+            <label>@T("类型")</label>
+            <select @bind="_form.Type">
+                @foreach (var name in Enum.GetNames<DataType>())
+                {
+                    <option value="@name">@name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@T("长度")</label>
+            <input type="number" min="1" max="65535" @bind="_form.Length" />
+        </div>
+        <div class="form-field">
+            <label>@T("编码类型")</label>
+            <select @bind="_form.EncodingType">
+                @foreach (var name in Enum.GetNames<EncodingType>())
+                {
+                    <option value="@name">@name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@T("描述")</label>
+            <input @bind="_form.Describe" />
+        </div>
+        <div class="form-field">
+            <label>@T("主题")</label>
+            <input @bind="_form.Topic" />
+        </div>
+        <div class="form-field">
+            <label>@T("精简值")</label>
+            <input type="checkbox" @bind="_form.SimplifyValue" />
+        </div>
+        <div class="form-field">
+            <label>@T("扩展参数")</label>
+            <textarea rows="4" @bind="_form.ExpandParam"></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="CloseEdit"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="SaveAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+</div>
+    </ModalDialog>
+}
+
+@if (_confirmDelete)
+{
+    <ConfirmDialog Title="@T("温馨提示")" Message="@_deleteMessage" ConfirmText="@T("删除")" CancelText="@T("取消")"
+                   OnCancel="() => _confirmDelete = false" OnConfirm="@DoDeleteAsync" />
+}
+
+@if (_showSourceImportConfirm)
+{
+    <ConfirmDialog Title="@T("温馨提示")" Message="@T("你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置")"
+                   ConfirmText="@T("确定")" CancelText="@T("取消")"
+                   OnCancel="CancelSourceImport" OnConfirm="ConfirmSourceImport" />
+}
+
+@if (_showSourceParamDialog)
+{
+    <ModalDialog Title="@T("源数据导入设置")" TitleIcon="bi-gear" OnClose="CancelSourceImport">
+        <div class="form-field">
+            <label>@T("数据传输主题")</label>
+            <input @bind="_sourceTopic" placeholder="Snet" />
+        </div>
+        <div class="form-field">
+            <label>@T("数据传输精简值")</label>
+            <input type="checkbox" @bind="_sourceSimplifyValue" />
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="CancelSourceImport"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="SaveSourceImportAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+    <Toast />
+@code {
+    private List<AddressModel> _items = new();
+    private string? _keyword;
+    private int _total;
+    private int _pageIndex = 1;
+    private int _pageSize = 200;
+    private bool _loading = true;
+    private bool _allSelected;
+    private bool _editing;
+    private bool _confirmDelete;
+    private string _deleteMessage = "";
+    /// <summary>底层源数据格式导入流程状态（对齐 DAQ：确认 → 参数设置 → 导入）</summary>
+    private bool _showSourceImportConfirm;
+    private bool _showSourceParamDialog;
+    private string? _pendingImportJson;
+    private string _sourceTopic = "Snet";
+    private bool _sourceSimplifyValue;
+    private bool _isNew;
+    private AddressModel _form = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        MenuCoordinator.Register(CloseMenu);
+        await LoadAsync();
+    }
+
+    /// <summary>工具栏操作按钮：⋯ 点击展开，区域外点击收起（查询按钮常显，其余统一 btn-sm）</summary>
+    private bool _addressActionsOpen;
+    private bool IsAddressActionsOpen => _addressActionsOpen;
+    private DotNetObjectReference<AddressSettingsPage>? _jsRef;
+
+    private async Task ToggleAddressActions()
+    {
+        MenuCoordinator.CloseAllOthers();
+        _addressActionsOpen = !_addressActionsOpen;
+        if (_addressActionsOpen)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    [JSInvokable]
+    public void CloseAllActions()
+    {
+        _addressActionsOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
+    private void CloseMenu()
+    {
+        if (_addressActionsOpen)
+        {
+            _addressActionsOpen = false;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        MenuCoordinator.Unregister(CloseMenu);
+        // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
+        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
+        if (_jsRef is not null)
+        {
+            _jsRef.Dispose();
+            _jsRef = null;
+        }
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        await Task.Delay(50);
+        _items = DbGate.QueryAddresses(_keyword, _pageIndex, _pageSize, out _total);
+        _loading = false;
+    }
+
+    private Task OnPageChange(int page)
+    {
+        _pageIndex = page;
+        return LoadAsync();
+    }
+
+    private Task OnSizeChange(int size)
+    {
+        _pageSize = size;
+        _pageIndex = 1;
+        return LoadAsync();
+    }
+
+    private void SelectAll()
+    {
+        foreach (var item in _items) item.IsSelected = true;
+        _allSelected = true;
+    }
+
+    private void InverseSelection()
+    {
+        foreach (var item in _items) item.IsSelected = !item.IsSelected;
+    }
+
+    private void OnAllSelectedChange() { foreach (var item in _items) item.IsSelected = _allSelected; }
+
+    private void OpenAdd()
+    {
+        _isNew = true;
+        _form = new AddressModel { Topic = "Snet", Time = DateTime.Now };
+        _editing = true;
+    }
+
+    private void OpenEdit(AddressModel item)
+    {
+        _isNew = false;
+        // 深拷贝编辑：取消修改不污染列表项与数据库（对齐 WPF Revoke 语义）
+        _form = new AddressModel
+        {
+            Index = item.Index,
+            Guid = item.Guid,
+            Address = item.Address,
+            AnotherName = item.AnotherName,
+            Describe = item.Describe,
+            Type = item.Type,
+            Length = item.Length,
+            EncodingType = item.EncodingType,
+            Topic = item.Topic,
+            SimplifyValue = item.SimplifyValue,
+            ExpandParam = item.ExpandParam,
+            Time = item.Time
+        };
+        _editing = true;
+    }
+
+    private void CloseEdit() => _editing = false;
+
+    private async Task SaveAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_form.Address) || string.IsNullOrWhiteSpace(_form.AnotherName))
+        {
+            Toast.Warning(T("地址和别名不能为空"));
+            return;
+        }
+        if (_isNew)
+        {
+            _form.Guid = Guid.NewGuid().ToString();
+            var result = DbGate.InsertUniqueAddresses(new[] { _form });
+            if (result.Duplicate > 0)
+            {
+                Toast.Error(T("添加失败，地址或别名重复！"));
+                return;
+            }
+            AppState.AddressDict[_form.Guid] = _form;
+            Toast.Success(T("添加成功"));
+        }
+        else
+        {
+            _form.Time = DateTime.Now;
+            int updated;
+            lock (DbGate.DbLock)
+            {
+                updated = DbGate.Db.Update(_form);
+            }
+            if (updated == 0)
+            {
+                // 行已被并发删除：不把幽灵地址回灌字典
+                Toast.Error(T("修改失败，地址已不存在"));
+                return;
+            }
+            AppState.AddressDict[_form.Guid] = _form;
+            Toast.Success(T("修改成功"));
+        }
+        // 感知更新：项目树中引用该地址的节点同步刷新名称（对齐原版 RefreshAsync）
+        AppState.NotifyEntityChanged();
+        _editing = false;
+        await LoadAsync();
+    }
+
+    private Task DeleteSelectedAsync()
+    {
+        var selected = _items.Where(x => x.IsSelected).ToList();
+        if (selected.Count == 0) return Task.CompletedTask;
+        var used = selected.Where(UseCheck).Select(x => x.Address).ToList();
+        if (used.Count > 0)
+        {
+            Toast.Warning(T("地址配置在项目设置中有使用") + ": " + string.Join(", ", used));
+            return Task.CompletedTask;
+        }
+        _deleteMessage = string.Format("{0} ({1})", T("确认删除选中的地址项吗？"), selected.Count);
+        _confirmDelete = true;
+        return Task.CompletedTask;
+    }
+
+    private async Task DoDeleteAsync()
+    {
+        _confirmDelete = false;
+        var selected = _items.Where(x => x.IsSelected).ToList();
+        lock (DbGate.DbLock)
+        {
+            DbGate.Db.RunInTransaction(() =>
+            {
+                foreach (var item in selected)
+                {
+                    DbGate.Db.Execute("DELETE FROM AddressModel WHERE [Index] = ?", item.Index);
+                    AppState.AddressDict.Remove(item.Guid, out _);
+                }
+            });
+        }
+        Toast.Success(T("删除成功"));
+        _pageIndex = 1;
+        await LoadAsync();
+        // 感知更新：项目树中引用已删地址的节点同步刷新（引用丢失后名称回退）
+        AppState.NotifyEntityChanged();
+    }
+
+    /// <summary>使用检查：ProjectConfig.json 内容包含地址 Guid 则视为被项目引用。读失败视为未使用，不阻断操作也不击穿电路</summary>
+    private static bool UseCheck(IAddressModel model)
+    {
+        if (!File.Exists(WebPaths.ProjectConfigPath)) return false;
+        try
+        {
+            return File.ReadAllText(WebPaths.ProjectConfigPath).Contains(model.Guid);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>导入/导出 JSON 行字段（含 Guid/Time 对齐 WPF 导出格式，保证跨端导入不换身份）</summary>
+    private sealed class AddressFileModel
+    {
+        public string Address { get; set; } = "";
+        public string AnotherName { get; set; } = "";
+        public string Type { get; set; } = "Int16";
+        public ushort Length { get; set; } = 1;
+        public string EncodingType { get; set; } = "UTF8";
+        public string? Describe { get; set; }
+        public string? Topic { get; set; }
+        public bool SimplifyValue { get; set; }
+        public string? ExpandParam { get; set; }
+        public string? Guid { get; set; }
+        public DateTime? Time { get; set; }
+    }
+
+    private static readonly System.Text.Json.JsonSerializerOptions JsonIoOptions = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+        Converters = { new System.Text.Json.Serialization.JsonStringEnumConverter() }
+    };
+
+    private async Task TriggerImport()
+    {
+        await JS.InvokeVoidAsync("snet.clickFileInput");
+    }
+
+    private async Task OnImportAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+        try
+        {
+            await using var stream = file.OpenReadStream(maxAllowedSize: 10 * 1024 * 1024);
+            using var reader = new StreamReader(stream);
+            var json = await reader.ReadToEndAsync();
+            if (string.IsNullOrWhiteSpace(json))
+            {
+                Toast.Warning(T("文件内容为空"));
+                return;
+            }
+
+            // 底层源数据格式（对齐 DAQ ImportAddressAsync）：先弹确认，再设置插件必要参数，最后才导入
+            if (IsSourceFormat(json))
+            {
+                _pendingImportJson = json;
+                _showSourceImportConfirm = true;
+                return;
+            }
+
+            await ImportModelsAsync(ParseImportJson(json), null);
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(T("导入失败") + ": " + ex.Message);
+        }
+    }
+
+    /// <summary>底层源数据格式判定（对齐 DAQ：SN + AddressName + AddressDataType + AddressType 四标记）</summary>
+    private static bool IsSourceFormat(string json) =>
+        json.Contains("SN") && json.Contains("AddressName") && json.Contains("AddressDataType") && json.Contains("AddressType");
+
+    /// <summary>执行导入：普通格式 models 直接导入；源格式按用户设置的参数映射（对齐 DAQ 转换逻辑）</summary>
+    private async Task ImportModelsAsync(List<AddressFileModel>? models, AddressSourceModel? source)
+    {
+        if (models is null || models.Count == 0)
+        {
+            Toast.Error(T("导入失败：未识别到地址数据"));
+            return;
+        }
+        var cores = models.Select(m => new AddressModel
+        {
+            Address = m.Address,
+            AnotherName = m.AnotherName,
+            Type = Enum.TryParse<DataType>(m.Type, out var t) ? t : DataType.Int16,
+            Length = m.Length,
+            EncodingType = Enum.TryParse<EncodingType>(m.EncodingType, out var enc) ? enc : EncodingType.UTF8,
+            Describe = m.Describe ?? "",
+            // 源格式导入：Topic/SimplifyValue 取自用户设置（对齐 DAQ sourceModel）
+            Topic = source?.Topic ?? m.Topic ?? "Snet",
+            SimplifyValue = source?.SimplifyValue ?? m.SimplifyValue,
+            ExpandParam = m.ExpandParam ?? "",
+            // 保留导出时的身份与时间（WPF 导出格式含 Guid/Time）：跨端导入不换 Guid
+            Guid = string.IsNullOrWhiteSpace(m.Guid) ? Guid.NewGuid().ToString() : m.Guid,
+            Time = m.Time ?? DateTime.Now
+        }).ToList();
+
+        var result = DbGate.InsertUniqueAddresses(cores);
+        if (result.Duplicate > 0)
+            Toast.Warning(string.Format(T("导入完成：新增 {0} 个，重复跳过 {1} 个"), result.Success, result.Duplicate));
+        else
+            Toast.Success(string.Format(T("导入成功：{0} 个地址"), result.Success));
+        _pageIndex = 1;
+        await LoadAsync();
+        // 感知更新：导入的新地址同步回灌项目树引用
+        AppState.NotifyEntityChanged();
+    }
+
+    /// <summary>源格式确认 → 打开参数设置弹窗（对齐 DAQ：确认后弹出 AddressSourceModel 属性面板）</summary>
+    private void ConfirmSourceImport()
+    {
+        _showSourceImportConfirm = false;
+        _sourceTopic = "Snet";
+        _sourceSimplifyValue = false;
+        _showSourceParamDialog = true;
+    }
+
+    /// <summary>源格式导入完成：按用户设置的参数映射源数据并导入</summary>
+    private async Task SaveSourceImportAsync()
+    {
+        var json = _pendingImportJson;
+        _showSourceParamDialog = false;
+        _pendingImportJson = null;
+        if (json is null) return;
+        var models = ParseSourceJson(json, _sourceTopic, _sourceSimplifyValue);
+        await ImportModelsAsync(models, new AddressSourceModel { Topic = _sourceTopic, SimplifyValue = _sourceSimplifyValue });
+    }
+
+    /// <summary>取消源格式导入：友好提示（对齐 DAQ「导入取消」）</summary>
+    private void CancelSourceImport()
+    {
+        _showSourceImportConfirm = false;
+        _showSourceParamDialog = false;
+        _pendingImportJson = null;
+        Toast.Info(T("导入取消"));
+    }
+
+    /// <summary>解析导入 JSON：兼容自身导出格式与底层源数据格式（AddressDetails / Address 包装）</summary>
+    private static List<AddressFileModel>? ParseImportJson(string json)
+    {
+        try
+        {
+            if (IsSourceFormat(json))
+                return ParseSourceJson(json, "Snet", false);
+            return System.Text.Json.JsonSerializer.Deserialize<List<AddressFileModel>>(json, JsonIoOptions);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>解析底层源数据格式（对齐 DAQ：Topic/SimplifyValue 取用户设置，ExpandParam 映射 AddressExtendParam）</summary>
+    private static List<AddressFileModel>? ParseSourceJson(string json, string topic, bool simplifyValue)
+    {
+        try
+        {
+            List<AddressDetails>? details;
+            if (json.Contains("AddressArray"))
+            {
+                var addr = System.Text.Json.JsonSerializer.Deserialize<Address>(json, JsonIoOptions);
+                details = addr?.AddressArray;
+            }
+            else
+            {
+                details = System.Text.Json.JsonSerializer.Deserialize<List<AddressDetails>>(json, JsonIoOptions);
+            }
+            return details?.Select(d => new AddressFileModel
+            {
+                Address = d.AddressName ?? "",
+                AnotherName = d.AddressAnotherName ?? d.AddressName ?? "",
+                Type = d.AddressDataType.ToString(),
+                Length = d.Length,
+                EncodingType = d.EncodingType.ToString(),
+                Describe = d.AddressDescribe ?? "",
+                Topic = topic,
+                SimplifyValue = simplifyValue,
+                ExpandParam = d.AddressExtendParam?.ToString(),
+                Guid = d.SN
+            }).ToList();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private async Task ExportAsync()
+    {
+        try
+        {
+            var all = DbGate.QueryAddresses(null, 1, int.MaxValue, out _);
+            var models = all.Select(a => new AddressFileModel
+            {
+                Address = a.Address,
+                AnotherName = a.AnotherName,
+                Type = a.Type.ToString(),
+                Length = a.Length,
+                EncodingType = a.EncodingType.ToString(),
+                Describe = a.Describe,
+                Topic = a.Topic,
+                SimplifyValue = a.SimplifyValue,
+                ExpandParam = a.ExpandParam,
+                // 对齐 WPF 导出格式：含 Guid 与 Time，WPF 端可直接导入
+                Guid = a.Guid,
+                Time = a.Time
+            }).ToList();
+            var json = System.Text.Json.JsonSerializer.Serialize(models, JsonIoOptions);
+            await JS.InvokeVoidAsync("snet.download", $"Address[{DateTime.Now:yyyyMMddHHmmss}].json", json);
+            Toast.Success(string.Format(T("导出成功：{0} 个地址"), models.Count));
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(T("导出失败") + ": " + ex.Message);
+        }
+    }
+}

@@ -1,0 +1,406 @@
+@page "/console"
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@inherits LocalizedComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using Snet.Iot.Daq.Web.Components.Shared
+@attribute [Authorize]
+@inject DeviceRuntimeManager RuntimeManager
+@inject MonitorSampler Sampler
+@inject LoggerBuffer LogBuffer
+@inject AppStateService AppState
+@inject ToastService Toast
+@inject DaqHostedService Host
+
+@code {
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
+    private bool _isAdmin;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var state = await AuthState;
+            _isAdmin = state.User.IsInRole(AuthService.RoleAdmin);
+        }
+        MenuCoordinator.Register(CloseMenu);
+    }
+}
+
+<div class="console-page">
+<div class="card console-devices">
+    <div class="card-header">
+        <div class="card-title"><i class="bi bi-activity me-2"></i>@T("控制台")</div>
+        @if (_isAdmin)
+        {
+            <button class="btn btn-sm" @onclick="RefreshAsync"><i class="bi bi-arrow-clockwise"></i>@T("刷新")</button>
+        }
+    </div>
+
+    <div class="device-wall">
+        @if (!RuntimeManager.Runtimes.Any())
+        {
+            <div class="empty">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <path d="M8 21h8M12 17v4" />
+                </svg>
+                <span>@T("暂无采集设备，请在项目设置中添加设备")</span>
+            </div>
+        }
+        else
+        {
+            @foreach (var rt in RuntimeManager.Runtimes)
+            {
+                // 设备卡结构对齐 WPF ConsoleDevice.xaml：头=名称 / 采集操作行+分隔线 / 信息六行 / 底部=LED+操作菜单
+                <div class="device-card card">
+                    <div class="device-head">
+                        <i class="bi bi-hdd-stack"></i>
+                        <span class="device-name">@rt.DeviceName</span>
+                    </div>
+                    @if (_isAdmin)
+                    {
+                        <div class="device-run">
+                            <div class="device-actions">
+                                <button class="btn btn-icon device-act-collect" title="@T("采集")" disabled="@rt.IsRun" @onclick="() => CollectAsync(rt)"><i class="bi bi-play-fill"></i></button>
+                                <button class="btn btn-icon device-act-stop" title="@T("停止")" disabled="@(!rt.IsRun)" @onclick="() => StopAsync(rt)"><i class="bi bi-stop-fill"></i></button>
+                                <button class="btn btn-icon device-act-retry" title="@T("重试")" @onclick="() => RetryAsync(rt)"><i class="bi bi-arrow-clockwise"></i></button>
+                            </div>
+                        </div>
+                    }
+                    <div class="device-info">
+                        <div class="row"><i class="bi bi-hdd"></i><span class="label">@T("设备类型")</span><span class="mono">@rt.DeviceType</span></div>
+                        <div class="row"><i class="bi bi-diagram-3"></i><span class="label">@T("设备层级")</span><span>@rt.DeviceHierarchy</span></div>
+                        <div class="row"><i class="bi bi-hash"></i><span class="label">@T("地址数量")</span><span class="num">@rt.AddressCount</span></div>
+                        <div class="row"><i class="bi bi-stopwatch"></i><span class="label">@T("采集时间")</span><span class="num">@rt.CollectTimeSeconds s</span></div>
+                        <div class="row"><i class="bi bi-activity"></i><span class="label">@T("采集状态")</span><span>@T(rt.CollectStatus)</span></div>
+                        <div class="row"><i class="bi bi-clock-history"></i><span class="label">@T("更新时间")</span><span class="num">@rt.UpdateTime</span></div>
+                    </div>
+                    <div class="device-footer">
+                        <Led State="@(rt.LedGreen ? "on" : rt.LedRed ? "error" : "off")" />
+                        @if (_isAdmin)
+                        {
+                            <div class="device-more">
+                                <button class="btn btn-icon device-more-toggle" title="@T("操作")" @onclick="() => ToggleMore(rt)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                                    </svg>
+                                </button>
+                                @if (_moreOpen == rt.Guid)
+                                {
+                                    <div class="device-more-menu">
+                                        <button @onclick="() => WebApiStartAsync(rt)"><i class="bi bi-play-circle"></i>@T("WebApi 启动")</button>
+                                        <button @onclick="() => WebApiStopAsync(rt)"><i class="bi bi-stop-circle"></i>@T("WebApi 停止")</button>
+                                        <button @onclick="() => WebApiExampleAsync(rt)"><i class="bi bi-braces"></i>@T("WebApi 请求示例")</button>
+                                        <button @onclick="() => SoftCollectAsync(rt, true)"><i class="bi bi-star"></i>@T("添加软启采集")</button>
+                                        <button @onclick="() => SoftCollectAsync(rt, false)"><i class="bi bi-slash-circle"></i>@T("取消软启采集")</button>
+                                    </div>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+</div>
+
+<div class="console-bottom">
+    <div class="card console-monitor">
+        <div class="card-header">
+            <div class="card-title"><i class="bi bi-cpu me-2"></i>@T("监控")</div>
+        </div>
+        <div class="monitor-grid">
+            <div class="monitor-item">
+                <span class="monitor-label">CPU</span>
+                <span class="monitor-value num">@_cpu.ToString("F1")%</span>
+                <div class="monitor-bar"><div class="monitor-bar-fill" style="width: @Math.Min(100, _cpu)%; background: #4caf50"></div></div>
+            </div>
+            <div class="monitor-item" title="@(_totalRamMb.ToString("F0")) MB">
+                <span class="monitor-label">RAM</span>
+                <span class="monitor-value num">@_ramMb.ToString("F0")%</span>
+                <div class="monitor-bar"><div class="monitor-bar-fill" style="width: @Math.Min(100, _ramMb)%; background: #2196f3"></div></div>
+            </div>
+        </div>
+        <!-- 服务端管理（对齐 WPF 控制台 MqttServer/OpcUaServer 按钮）：卡片式布局，操作按钮仅管理员可见，卡片+状态所有人可见 -->
+        <div class="server-grid">
+            <div class="server-card @(AppState.MqttService is not null ? "on" : "")">
+                <div class="server-head">
+                    <i class="bi bi-broadcast"></i>
+                    <span class="server-name">MQTT</span>
+                    <span class="tag @(AppState.MqttService is not null ? "tag-success" : "")">@(AppState.MqttService is not null ? @T("已启动") : @T("未启动"))</span>
+                </div>
+                @if (_isAdmin)
+                {
+                    <div class="server-actions">
+                        @if (AppState.MqttService is null)
+                        {
+                            <button class="btn btn-sm btn-primary" @onclick='() => StartServerAsync("mqtt")'><i class="bi bi-play"></i>@T("启动")</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm" @onclick='() => StopServerAsync("mqtt")'><i class="bi bi-stop"></i>@T("停止")</button>
+                        }
+                        <button class="btn btn-sm" @onclick='() => EditServerConfigAsync("mqtt")'><i class="bi bi-pencil"></i>@T("修改")</button>
+                    </div>
+                }
+            </div>
+            <div class="server-card @(AppState.UaService is not null ? "on" : "")">
+                <div class="server-head">
+                    <i class="bi bi-cpu"></i>
+                    <span class="server-name">OPC UA</span>
+                    <span class="tag @(AppState.UaService is not null ? "tag-success" : "")">@(AppState.UaService is not null ? @T("已启动") : @T("未启动"))</span>
+                </div>
+                @if (_isAdmin)
+                {
+                    <div class="server-actions">
+                        @if (AppState.UaService is null)
+                        {
+                            <button class="btn btn-sm btn-primary" @onclick='() => StartServerAsync("ua")'><i class="bi bi-play"></i>@T("启动")</button>
+                        }
+                        else
+                        {
+                            <button class="btn btn-sm" @onclick='() => StopServerAsync("ua")'><i class="bi bi-stop"></i>@T("停止")</button>
+                        }
+                        <button class="btn btn-sm" @onclick='() => EditServerConfigAsync("ua")'><i class="bi bi-pencil"></i>@T("修改")</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+
+    <div class="card console-log">
+        <div class="card-header">
+            <div class="card-title"><i class="bi bi-info-circle me-2"></i>@T("信息")</div>
+            @if (_isAdmin)
+            {
+                <button class="btn btn-sm" @onclick="ClearLogAsync"><i class="bi bi-eraser"></i>@T("清空")</button>
+            }
+        </div>
+        <LogView Lines="@_logLines" />
+    </div>
+</div>
+</div>
+
+@if (_editServerKind is not null)
+{
+    <ModalDialog Title="@T("修改服务配置")" TitleIcon="bi-gear" OnClose="CloseServerConfig">
+        <div class="form-field">
+            <label>@T("服务配置")</label>
+            <textarea class="mono param-json" style="min-height:180px" @bind="_serverConfigJson"></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="CloseServerConfig"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="SaveServerConfigAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+    <Toast />
+@code {
+    private double _cpu;
+    private double _ramMb;
+    private double _totalRamMb;
+    private List<string> _logLines = new();
+    private string? _editServerKind;
+    private string _serverConfigJson = "";
+    private bool _serverBusy;
+
+    protected override void OnInitialized()
+    {
+        RuntimeManager.RuntimesChanged += OnRuntimesChanged;
+        RuntimeManager.RuntimeStateChanged += OnRuntimeStateChanged;
+        AppState.ServerStateChanged += OnServerStateChanged;
+        AppState.EntityChanged += OnEntityChanged;
+        Sampler.Sample += OnSample;
+        LogBuffer.Changed += OnLogChanged;
+        _logLines = LogBuffer.Snapshot();
+    }
+
+    private void OnServerStateChanged() => InvokeAsync(StateHasChanged);
+
+    /// <summary>感知更新：快照同步由 DeviceRuntimeManager 订阅 EntityChanged 完成（不依赖本电路在线），这里只负责重渲染</summary>
+    private void OnEntityChanged() => InvokeAsync(StateHasChanged);
+
+    private void OnRuntimesChanged() => InvokeAsync(StateHasChanged);
+    private void OnRuntimeStateChanged(DeviceRuntime rt) => InvokeAsync(StateHasChanged);
+    private void OnSample(MonitorSampler.MonitorSample sample)
+    {
+        _cpu = sample.Cpu;
+        _ramMb = sample.RamPercent;
+        _totalRamMb = sample.TotalRamMb;
+        InvokeAsync(StateHasChanged);
+    }
+    private bool _logRenderPending;
+    private void OnLogChanged()
+    {
+        // 高频日志合并渲染：200ms 窗口内多次推送只渲染一次，避免逐条全量快照的 O(n²) 开销
+        if (_logRenderPending) return;
+        _logRenderPending = true;
+        InvokeAsync(async () =>
+        {
+            await Task.Delay(200);
+            _logRenderPending = false;
+            _logLines = LogBuffer.Snapshot();
+            StateHasChanged();
+        });
+    }
+
+    private Task RefreshAsync()
+    {
+        RuntimeManager.SyncFromProjects(AppState);
+        // 对齐 DAQ ConsoleModel.RefreshAsync：刷新后提示已加载设备数量
+        Toast.Info(string.Format(T("{0} 台设备已加载"), RuntimeManager.Count));
+        return Task.CompletedTask;
+    }
+
+    private Task CollectAsync(DeviceRuntime rt) => rt.CollectAsync();
+    private Task StopAsync(DeviceRuntime rt) => rt.StopAsync();
+    private Task RetryAsync(DeviceRuntime rt) => rt.RetryAsync();
+    private Task ClearLogAsync()
+    {
+        LogBuffer.Clear();
+        return Task.CompletedTask;
+    }
+
+    // ================= 设备卡操作菜单（对齐 WPF ConsoleDevice.xaml Row2 的 ⋯ 菜单） =================
+    private string? _moreOpen;
+    private void ToggleMore(DeviceRuntime rt)
+    {
+        // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
+        MenuCoordinator.CloseAllOthers();
+        _moreOpen = _moreOpen == rt.Guid ? null : rt.Guid;
+    }
+
+    /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
+    private void CloseMenu()
+    {
+        if (_moreOpen is not null)
+        {
+            _moreOpen = null;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task WebApiStartAsync(DeviceRuntime rt)
+    {
+        _moreOpen = null;
+        var r = await rt.WebApiStartAsync();
+        Toast.Show(r.Message, r.Status ? "success" : "error");
+    }
+
+    private async Task WebApiStopAsync(DeviceRuntime rt)
+    {
+        _moreOpen = null;
+        var r = await rt.WebApiStopAsync();
+        Toast.Show(r.Message, r.Status ? "success" : "error");
+    }
+
+    private async Task WebApiExampleAsync(DeviceRuntime rt)
+    {
+        _moreOpen = null;
+        var r = await rt.WebApiExampleAsync();
+        if (r.Status)
+            Toast.Show(r.ResultData?.ToString() ?? T("无数据"), "info");
+        else
+            Toast.Error(r.Message);
+    }
+
+    private async Task SoftCollectAsync(DeviceRuntime rt, bool on)
+    {
+        _moreOpen = null;
+        rt.SetSoftCollect(on);
+        await AppState.SaveProjectsAsync();
+        Toast.Success(on ? T("添加软启采集成功") : T("取消软启采集成功"));
+    }
+
+    /// <summary>启动服务端（对齐 WPF MqttServerStartAsync / OpcUaServerStartAsync：首次写默认配置再启动）</summary>
+    private async Task StartServerAsync(string kind)
+    {
+        if (_serverBusy) return;
+        _serverBusy = true;
+        try
+        {
+            var (ok, msg) = await Host.StartServerAsync(kind);
+            Toast.Show(msg, ok ? "success" : "error");
+        }
+        finally
+        {
+            _serverBusy = false;
+        }
+    }
+
+    /// <summary>停止服务端（对齐 WPF MqttServerStopAsync / OpcUaServerStopAsync）</summary>
+    private async Task StopServerAsync(string kind)
+    {
+        if (_serverBusy) return;
+        _serverBusy = true;
+        try
+        {
+            var (ok, msg) = await Host.StopServerAsync(kind);
+            Toast.Show(msg, ok ? "success" : "warning");
+        }
+        finally
+        {
+            _serverBusy = false;
+        }
+    }
+
+    /// <summary>修改服务端配置（对齐 WPF MqttServerUpdateAsync / OpcUaServerUpdateAsync：弹窗编辑 Basics JSON 后写盘）</summary>
+    private async Task EditServerConfigAsync(string kind)
+    {
+        _editServerKind = kind;
+        var path = kind == "mqtt" ? WebPaths.MqttServerConfigPath : WebPaths.UaServerConfigPath;
+        _serverConfigJson = File.Exists(path) ? await File.ReadAllTextAsync(path) : "{}";
+    }
+
+    private void CloseServerConfig()
+    {
+        _editServerKind = null;
+        _serverConfigJson = "";
+    }
+
+    private async Task SaveServerConfigAsync()
+    {
+        var kind = _editServerKind;
+        if (kind is null) return;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(_serverConfigJson);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object)
+            {
+                Toast.Error(T("参数 JSON 错误"));
+                return;
+            }
+            Directory.CreateDirectory(WebPaths.ServerConfigPath);
+            var path = kind == "mqtt" ? WebPaths.MqttServerConfigPath : WebPaths.UaServerConfigPath;
+            await File.WriteAllTextAsync(path, _serverConfigJson);
+            // 运行中修改：停止后按新配置重启（对齐 WPF 修改后需重启服务生效）
+            if ((kind == "mqtt" && AppState.MqttService is not null)
+                || (kind == "ua" && AppState.UaService is not null))
+            {
+                await Host.StopServerAsync(kind);
+                await Host.StartServerAsync(kind);
+            }
+            CloseServerConfig();
+            Toast.Success(T("保存成功"));
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(T("参数 JSON 错误") + ": " + ex.Message);
+        }
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        MenuCoordinator.Unregister(CloseMenu);
+        RuntimeManager.RuntimesChanged -= OnRuntimesChanged;
+        RuntimeManager.RuntimeStateChanged -= OnRuntimeStateChanged;
+        AppState.ServerStateChanged -= OnServerStateChanged;
+        AppState.EntityChanged -= OnEntityChanged;
+        Sampler.Sample -= OnSample;
+        LogBuffer.Changed -= OnLogChanged;
+    }
+}

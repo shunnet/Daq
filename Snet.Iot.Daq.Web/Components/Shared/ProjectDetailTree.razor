@@ -1,0 +1,143 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Iot.Daq.Web.Services
+@inject LocalizationService Localization
+
+<div class="project-tree detail-tree">
+    @foreach (var node in Nodes)
+    {
+        <div class="tree-node">
+            <div class="tree-node-row @(node.IsSelected ? "selected" : "")" @onclick="() => OnNodeClick.InvokeAsync(node)"
+                 @ondblclick:stopPropagation @ondblclick="() => node.IsExpanded = !node.IsExpanded">
+                @if (node.Children.Count > 0)
+                {
+                    <button class="tree-toggle" @onclick:stopPropagation @onclick="() => node.IsExpanded = !node.IsExpanded">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="transform: rotate(@(node.IsExpanded ? 90 : 0)deg); transition: transform .15s">
+                            <path d="M9 18l6-6-6-6" />
+                        </svg>
+                    </button>
+                }
+                else
+                {
+                    <span class="tree-toggle-placeholder"></span>
+                }
+                @if (node.NodeType == ProjectDetailsNodeType.Mq)
+                {
+                    <svg class="tree-icon device" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M4 7h16M4 12h16M4 17h16" />
+                        <circle cx="7" cy="7" r="2" fill="currentColor" />
+                        <circle cx="17" cy="12" r="2" fill="currentColor" />
+                        <circle cx="7" cy="17" r="2" fill="currentColor" />
+                    </svg>
+                }
+                else
+                {
+                    <svg class="tree-icon group" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <path d="M12 2l8 4-8 4-8-4 8-4z" />
+                        <path d="M4 10l8 4 8-4M4 15l8 4 8-4" />
+                    </svg>
+                }
+                <span class="tree-label">@node.Name</span>
+                @if (!string.IsNullOrEmpty(node.SpecialData))
+                {
+                    <span class="tree-meta">@node.SpecialData</span>
+                }
+                @if (ActionsTemplate is not null)
+                {
+                    <span class="tree-actions">
+                        <span class="tree-actions-expand @(IsActionOpen(node) ? "open" : "")">
+                            @ActionsTemplate(node)
+                        </span>
+                        <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="() => ToggleActionOpen(node)" title="@T("操作")">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                                <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                                <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                            </svg>
+                        </button>
+                    </span>
+                }
+            </div>
+            @if (node.IsExpanded && node.Children.Count > 0)
+            {
+                <ProjectDetailTree Nodes="@node.Children" OnNodeClick="@OnNodeClick" ActionsTemplate="@ActionsTemplate" />
+            }
+        </div>
+    }
+</div>
+
+@code {
+    private string T(string key) => Localization.T(key);
+
+    protected override void OnInitialized()
+    {
+        Localization.LanguageChanged += OnLanguageChanged;
+        MenuCoordinator.Register(CloseMenu);
+    }
+
+    private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
+
+    /// <summary>全局互斥回调：其他菜单打开前先收起本组件全部菜单</summary>
+    private void CloseMenu()
+    {
+        if (_openActions.Count > 0)
+        {
+            _openActions.Clear();
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    [Parameter] public IList<IProjectDetailsTreeViewModel> Nodes { get; set; } = new List<IProjectDetailsTreeViewModel>();
+    [Parameter] public EventCallback<IProjectDetailsTreeViewModel> OnNodeClick { get; set; }
+    [Parameter] public RenderFragment<IProjectDetailsTreeViewModel>? ActionsTemplate { get; set; }
+
+    [Inject] private IJSRuntime JS { get; set; } = default!;
+
+    private readonly Dictionary<string, bool> _openActions = new();
+    private DotNetObjectReference<ProjectDetailTree>? _jsRef;
+
+    private bool IsActionOpen(IProjectDetailsTreeViewModel node) => _openActions.GetValueOrDefault(KeyOf(node));
+
+    private async Task ToggleActionOpen(IProjectDetailsTreeViewModel node)
+    {
+        // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
+        MenuCoordinator.CloseAllOthers();
+        var key = KeyOf(node);
+        // 互斥：展开新项前先收起其他项（点 A 再点 B 时 A 收起）
+        var open = !_openActions.GetValueOrDefault(key);
+        _openActions.Clear();
+        if (open) _openActions[key] = true;
+        // 展开后注册「区域外点击收起」；收起时注销（移出不关闭）
+        if (open)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    [JSInvokable]
+    public void CloseAllActions()
+    {
+        _openActions.Clear();
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        Localization.LanguageChanged -= OnLanguageChanged;
+        MenuCoordinator.Unregister(CloseMenu);
+        GC.SuppressFinalize(this);
+        // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
+        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
+        if (_jsRef is not null)
+        {
+            _jsRef.Dispose();
+            _jsRef = null;
+        }
+    }
+
+    private static string KeyOf(IProjectDetailsTreeViewModel node) => node.Guid;
+}

@@ -1,0 +1,19 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+
+<div class="empty">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+        <circle cx="11" cy="11" r="7" />
+        <path d="M21 21l-4.3-4.3M8 11h6M11 8v6" />
+    </svg>
+    <span>@Text</span>
+    @if (Action.HasDelegate)
+    {
+        <button class="btn btn-sm" @onclick="Action">@ActionText</button>
+    }
+</div>
+
+@code {
+    [Parameter] public string Text { get; set; } = "暂无数据";
+    [Parameter] public EventCallback Action { get; set; }
+    [Parameter] public string ActionText { get; set; } = "";
+}

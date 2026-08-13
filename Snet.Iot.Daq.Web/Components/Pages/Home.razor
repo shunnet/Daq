@@ -1,0 +1,15 @@
+@page "/"
+@rendermode InteractiveServer
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Authorization
+@attribute [AllowAnonymous]
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        var state = await AuthProvider.GetAuthenticationStateAsync();
+        Nav.NavigateTo(state.User.Identity?.IsAuthenticated == true ? "/console" : "/login", forceLoad: true);
+    }
+}

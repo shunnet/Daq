@@ -1,0 +1,13 @@
+@using Microsoft.AspNetCore.Authorization
+@using Snet.Iot.Daq.Web.Components.Pages
+
+<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(NotFound)">
+    <Found Context="routeData">
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <RedirectToLogin />
+            </NotAuthorized>
+        </AuthorizeRouteView>
+        <FocusOnNavigate RouteData="routeData" Selector="h1" />
+    </Found>
+</Router>

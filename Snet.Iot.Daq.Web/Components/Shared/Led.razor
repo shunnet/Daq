@@ -1,0 +1,16 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+
+<span class="led @(StateClass)" style="@Style"></span>
+
+@code {
+    /// <summary>on=绿色呼吸 / error=红色 / 默认灰</summary>
+    [Parameter] public string State { get; set; } = "off";
+    [Parameter] public string? Style { get; set; }
+
+    private string StateClass => State switch
+    {
+        "on" => "on",
+        "error" => "error",
+        _ => ""
+    };
+}

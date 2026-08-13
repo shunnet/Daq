@@ -1,0 +1,912 @@
+@page "/projects"
+@rendermode InteractiveServer
+@inherits LocalizedComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using Microsoft.AspNetCore.Components.Forms
+@using Snet.Iot.Daq.Core.data
+@using Snet.Iot.Daq.Core.handler
+@using Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Model.data
+@using Snet.Utility
+@using System.Collections.ObjectModel
+@attribute [Authorize(Policy = AuthService.AdminPolicy)]
+@inject AppStateService AppState
+@inject DeviceRuntimeManager RuntimeManager
+@inject ToastService ToastSvc
+@inject IJSRuntime JS
+
+<div class="card project-card">
+    <div class="card-header">
+        <div class="card-title"><i class="bi bi-diagram-3 me-2"></i>@T("项目设置")</div>
+        <div style="display:flex;gap:8px">
+            <InputFile OnChange="@OnImportProjectAsync" accept=".json" multiple="false" class="upload-input-hidden" />
+            <button class="btn btn-sm" @onclick="TriggerProjectImport"><i class="bi bi-file-earmark-arrow-down"></i>@T("导入")</button>
+            <button class="btn btn-sm" @onclick="ExportProjectAsync"><i class="bi bi-file-earmark-arrow-up"></i>@T("导出")</button>
+            <button class="btn btn-primary btn-sm" @onclick="AddTopProjectAsync"><i class="bi bi-plus-lg"></i>@T("添加顶级项")</button>
+        </div>
+    </div>
+
+    @if (AppState.ProjectDict.Count == 0)
+    {
+        <Empty Text="@T("暂无项目，点击右上角添加顶级项")" />
+    }
+    else
+    {
+        <div class="project-layout">
+            <div class="project-tree-panel">
+                <ProjectTree Nodes="@AppState.ProjectDict" OnNodeClick="@OnNodeClick" ActionsTemplate="@NodeActions" />
+            </div>
+            <div class="project-detail-panel">
+                @if (_selectedDevice is not null)
+                {
+                    <div class="detail-toolbar">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
+                            <rect x="2" y="3" width="20" height="14" rx="2" />
+                            <path d="M8 21h8M12 17v4" />
+                        </svg>
+                        <span class="detail-device-name">@_selectedDevice.Name</span>
+                        <span class="tag tag-primary">@(_selectedDevice.DaqDetails?.Name ?? "")</span>
+                        <span class="spacer"></span>
+                        <span class="tree-actions">
+                            <span class="tree-actions-expand @(_detailActionsOpen ? "open" : "")">
+                                <button class="btn btn-sm btn-primary" @onclick="AddAddressAsync"><i class="bi bi-pin-map"></i>@T("添加采集地址")</button>
+                                <button class="btn btn-sm" @onclick="AddAllMqAsync"><i class="bi bi-send"></i>@T("批量添加传输")</button>
+                                <button class="btn btn-sm" @onclick="CollapseAllDetails"><i class="bi bi-arrows-collapse"></i>@T("折叠")</button>
+                                <button class="btn btn-sm" @onclick="ExpandAllDetails"><i class="bi bi-arrows-expand"></i>@T("展开")</button>
+                            </span>
+                            <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="ToggleDetailActions" title="@T("操作")">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                    <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                                    <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                                    <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                                </svg>
+                            </button>
+                        </span>
+                    </div>
+                    @if (_selectedDevice.Details is null || _selectedDevice.Details.Count == 0)
+                    {
+                        <Empty Text="@T("暂无采集地址，点击「添加采集地址」从地址库选择")" />
+                    }
+                    else
+                    {
+                        // 地址超过 50 条分页（树区域内部滚动，不挤出 app-main）
+                        var details = _selectedDevice.Details;
+                        var detailTotalPages = Math.Max(1, (int)Math.Ceiling(details.Count / 50.0));
+                        var detailPageItems = details.Skip((_detailPage - 1) * 50).Take(50).ToList();
+                        <div class="detail-tree-scroll">
+                            <ProjectDetailTree Nodes="@detailPageItems" OnNodeClick="@OnDetailNodeClick" ActionsTemplate="@DetailActions" />
+                        </div>
+                        @if (details.Count > 50)
+                        {
+                            <PageBar Total="@details.Count" PageIndex="@_detailPage" PageSize="50"
+                                     OnPageChange="@(p => { _detailPage = p; return Task.CompletedTask; })" />
+                        }
+                    }
+                }
+                else
+                {
+                    <Empty Text="@T("选择左侧设备节点，配置采集地址与 MQ 传输设备")" />
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@if (_showAddDialog)
+{
+    <ModalDialog Title="@(_targetParent is null ? T("添加项目") : T("添加子项"))" TitleIcon="@(_targetParent is null ? "bi-folder-plus" : "bi-plus-square")" OnClose="CloseAddDialog">
+        <div class="form-field">
+            <label>@T("项目名称")</label>
+            <input @bind="_newProjectName" />
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="CloseAddDialog"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="SaveProjectAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_showDeviceDialog)
+{
+    <ModalDialog Title="@T("添加设备")" TitleIcon="bi-hdd-stack" OnClose="() => _showDeviceDialog = false">
+        @if (_deviceCandidates.Count == 0)
+        {
+            <div class="empty" style="padding:24px 8px">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <path d="M8 21h8M12 17v4M8 7l4 4-4 4M13 7h3" />
+                </svg>
+                <span>@T("暂无 Daq 采集插件配置。请先在「插件设置 → 插件配置」添加 Daq 类型配置")</span>
+                <a href="/plugins/settings" class="btn btn-primary"><i class="bi bi-gear"></i>@T("前往插件设置")</a>
+            </div>
+        }
+        else
+        {
+            <div class="form-field">
+                <label>@T("采集设备")</label>
+                <select @bind="_selectedDeviceConfig">
+                    @foreach (var c in _deviceCandidates)
+                    {
+                        <option value="@c.Guid">@c.Name (@c.SN)</option>
+                    }
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" @onclick="() => _showDeviceDialog = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
+                <button class="btn btn-primary" @onclick="ConfirmAddDeviceAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+            </div>
+        }
+    </ModalDialog>
+}
+
+@if (_showAddressPicker)
+{
+    <ModalDialog Title="@T("选择采集地址")" TitleIcon="bi-list-check" OnClose="() => _showAddressPicker = false">
+        <div class="form-field">
+            <div class="picker-toolbar">
+                <span class="spacer"></span>
+                <span class="picker-count">@T("已选") @_pickedAddresses.Count</span>
+                <button class="btn btn-sm" @onclick="SelectAllPicked"><i class="bi bi-check2-square"></i>@T("全选")</button>
+                <button class="btn btn-sm" @onclick="InversePicked"><i class="bi bi-square-half"></i>@T("反选")</button>
+            </div>
+            <div class="picker-list">
+                @foreach (var a in _addressCandidates)
+                {
+                    <label class="picker-item">
+                        <input type="checkbox" checked="@_pickedAddresses.Contains(a.Guid)" @onchange="(e) => TogglePick(a.Guid, e)" />
+                        <span class="mono">@a.Address</span>
+                        <span class="tag">@a.AnotherName</span>
+                        <span class="tag tag-primary">@a.Type</span>
+                    </label>
+                }
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="() => _showAddressPicker = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="ConfirmAddAddressesAsync"><i class="bi bi-check-lg"></i>@T("确定")</button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_showMqDialog)
+{
+    <ModalDialog Title="@(_bulkMq ? T("批量添加 MQ 传输设备") : T("添加 MQ 传输设备"))" TitleIcon="bi-send" OnClose="() => _showMqDialog = false">
+        @if (_mqCandidates.Count == 0)
+        {
+            <div class="empty" style="padding:24px 8px">
+                <span>@T("暂无 Mq 插件配置。请先在「插件设置 → 插件配置」添加 Mq 类型配置")</span>
+                <a href="/plugins/settings" class="btn btn-primary"><i class="bi bi-gear"></i>@T("前往插件设置")</a>
+            </div>
+        }
+        else
+        {
+            @if (_bulkMq)
+            {
+                <div class="form-field form-field-block">
+                    <label>@T("将应用到该设备下的全部采集地址（已有相同 SN 的跳过）")</label>
+                </div>
+            }
+            <div class="form-field">
+                <label>@T("MQ 传输设备")</label>
+                <select @bind="_selectedMq">
+                    @foreach (var c in _mqCandidates)
+                    {
+                        <option value="@c.Guid">@c.Name (@c.SN)</option>
+                    }
+                </select>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" @onclick="() => _showMqDialog = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
+                <button class="btn btn-primary" @onclick="@(_bulkMq ? ConfirmAddAllMqAsync : ConfirmAddMqAsync)"><i class="bi bi-check-lg"></i>@T("保存")</button>
+            </div>
+        }
+    </ModalDialog>
+}
+
+@if (_showRenameDialog)
+{
+    <ModalDialog Title="@T("重命名")" TitleIcon="bi-pencil" OnClose="() => _showRenameDialog = false">
+        <div class="form-field">
+            <label>@T("名称")</label>
+            <input @bind="_renameName" />
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="() => _showRenameDialog = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="ConfirmRenameAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_confirmRemoveNode)
+{
+    <ConfirmDialog Title="@T("温馨提示")" Message="@string.Format(T("确认删除 {0} 及其全部子项？"), _removeTarget?.Name)" ConfirmText="@T("删除")" CancelText="@T("取消")"
+                   OnCancel="() => _confirmRemoveNode = false" OnConfirm="DoRemoveNodeAsync" />
+}
+
+@if (_confirmRemoveDetail)
+{
+    <ConfirmDialog Title="@T("温馨提示")" Message="@string.Format(T("确认删除 {0}？"), _detailRemoveTarget?.Name)" ConfirmText="@T("删除")" CancelText="@T("取消")"
+                   OnCancel="() => _confirmRemoveDetail = false" OnConfirm="DoRemoveDetailAsync" />
+}
+
+@if (_confirmRemoveAll)
+{
+    <ConfirmDialog Title="@T("温馨提示")" Message="@T("确认移除该设备下所有地址与传输设备？")" ConfirmText="@T("移除所有")" CancelText="@T("取消")"
+                   OnCancel="() => _confirmRemoveAll = false" OnConfirm="DoRemoveAllAsync" />
+}
+
+@if (_writeTarget is not null)
+{
+    <ModalDialog Title="@T("写入")" TitleIcon="bi-pencil-square" OnClose="() => _writeTarget = null">
+        <div class="form-field">
+            <label>@T("地址")</label>
+            <span class="mono config-summary-value">@_writeTarget.AddressDetails?.Address</span>
+        </div>
+        <div class="form-field">
+            <label>@T("类型")</label>
+            <span class="tag tag-primary">@_writeTarget.AddressDetails?.Type</span>
+        </div>
+        <div class="form-field">
+            <label>@T("值")</label>
+            <input @bind="_writeValue" />
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="() => _writeTarget = null"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="WriteAddressAsync"><i class="bi bi-check-lg"></i>@T("确定")</button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_testResult is not null)
+{
+    <ModalDialog Title="@T("测试结果")" TitleIcon="bi-clipboard-check" OnClose="CloseTestResult">
+        <div class="form-field">
+            <span class="tag @(_testResult.Status ? "tag-success" : "tag-danger")">
+                @(_testResult.Status ? T("成功") : T("失败"))
+            </span>
+        </div>
+        <div class="form-field">
+            <label>@T("消息")</label>
+            <div class="mono result-message">@_testResult.Message</div>
+        </div>
+        @if (!string.IsNullOrEmpty(_testResult.Data))
+        {
+            <div class="form-field">
+                <label>@T("数据")</label>
+                <pre class="mono">@_testResult.Data</pre>
+            </div>
+        }
+        <div class="modal-footer">
+            <button class="btn btn-primary" @onclick="CloseTestResult"><i class="bi bi-check-lg"></i>@T("关闭")</button>
+</div>
+    </ModalDialog>
+}
+
+    <Toast />
+@code {
+    private bool _showAddDialog;
+    private bool _showDeviceDialog;
+    private bool _showAddressPicker;
+    private bool _showMqDialog;
+    private bool _showRenameDialog;
+    private bool _confirmRemoveNode;
+    private bool _confirmRemoveDetail;
+    private string _newProjectName = "";
+    private string _renameName = "";
+    private IProjectTreeViewModel? _targetParent;
+    private IProjectTreeViewModel? _renameTarget;
+    private IProjectTreeViewModel? _removeTarget;
+    private IProjectTreeViewModel? _selectedDevice;
+    /// <summary>详情树地址分页（超过 50 条分页）</summary>
+    private int _detailPage = 1;
+    private List<PluginConfigModel> _deviceCandidates = new();
+    private string _selectedDeviceConfig = "";
+    private List<IAddressModel> _addressCandidates = new();
+    private HashSet<string> _pickedAddresses = new();
+    private List<PluginConfigModel> _mqCandidates = new();
+    private string _selectedMq = "";
+    private IProjectDetailsTreeViewModel? _mqTarget;
+    private IProjectDetailsTreeViewModel? _detailRemoveTarget;
+    private bool _bulkMq;
+    private sealed record TestResult(bool Status, string Message, string? Data);
+    private TestResult? _testResult;
+
+    /// <summary>详情工具栏操作按钮：⋯ 点击展开，区域外点击收起</summary>
+    private bool _detailActionsOpen;
+    private DotNetObjectReference<ProjectSettingsPage>? _jsRef;
+
+    private async Task ToggleDetailActions()
+    {
+        MenuCoordinator.CloseAllOthers();
+        _detailActionsOpen = !_detailActionsOpen;
+        if (_detailActionsOpen)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    [JSInvokable]
+    public void CloseAllActions()
+    {
+        _detailActionsOpen = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    protected override void OnInitialized()
+    {
+        AppState.EntityChanged += OnEntityChanged;
+        MenuCoordinator.Register(CloseMenu);
+        base.OnInitialized();
+    }
+
+    /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
+    private void CloseMenu()
+    {
+        if (_detailActionsOpen)
+        {
+            _detailActionsOpen = false;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>感知更新：地址/插件信息变更后刷新树与详情区显示</summary>
+    private void OnEntityChanged() => InvokeAsync(StateHasChanged);
+
+    public override void Dispose()
+    {
+        AppState.EntityChanged -= OnEntityChanged;
+        MenuCoordinator.Unregister(CloseMenu);
+        if (_jsRef is not null)
+        {
+            _jsRef.Dispose();
+            _jsRef = null;
+        }
+        base.Dispose();
+    }
+
+    private RenderFragment<IProjectTreeViewModel> NodeActions => node => @<span>
+        @if (node.NodeType == ProjectNodeType.Describe)
+        {
+            <button class="btn btn-sm" @onclick="() => AddChildAsync(node)"><i class="bi bi-plus-lg"></i>@T("添加项")</button>
+            <button class="btn btn-sm btn-primary" @onclick="() => AddDeviceAsync(node)"><i class="bi bi-plus-square"></i>@T("添加设备")</button>
+            <button class="btn btn-sm" @onclick="() => RenameNodeAsync(node)"><i class="bi bi-pencil"></i>@T("重命名")</button>
+            <button class="btn btn-sm btn-danger" @onclick="() => ConfirmRemoveNode(node)"><i class="bi bi-trash"></i>@T("删除")</button>
+        }
+        else if (node.NodeType == ProjectNodeType.Device)
+        {
+            <button class="btn btn-sm btn-danger" @onclick="() => ConfirmRemoveNode(node)"><i class="bi bi-trash"></i>@T("删除")</button>
+        }
+    </span>;
+
+    private RenderFragment<IProjectDetailsTreeViewModel> DetailActions => node => @<span>
+        @if (node.NodeType == ProjectDetailsNodeType.Address)
+        {
+            <button class="btn btn-sm btn-primary" @onclick="() => AddMqAsync(node)"><i class="bi bi-send"></i>@T("添加传输")</button>
+            <button class="btn btn-sm" @onclick="() => ReadAddressAsync(node)"><i class="bi bi-eye"></i>@T("读取")</button>
+            <button class="btn btn-sm" @onclick="() => OpenWriteDialog(node)"><i class="bi bi-pencil-square"></i>@T("写入")</button>
+            <button class="btn btn-sm" @onclick="() => _confirmRemoveAll = true"><i class="bi bi-trash"></i>@T("移除所有")</button>
+            <button class="btn btn-sm btn-danger" @onclick="() => ConfirmRemoveDetail(node)"><i class="bi bi-trash"></i>@T("删除")</button>
+        }
+        else if (node.NodeType == ProjectDetailsNodeType.Mq)
+        {
+            <button class="btn btn-sm btn-danger" @onclick="() => ConfirmRemoveDetail(node)"><i class="bi bi-trash"></i>@T("删除")</button>
+        }
+    </span>;
+
+    private void OnNodeClick(IProjectTreeViewModel node)
+    {
+        AppState.ProjectDict.EnsureSingleSelection(node);
+        if (node.NodeType == ProjectNodeType.Device)
+        {
+            _selectedDevice = node;
+            _detailPage = 1; // 切换设备重置详情分页
+            if (node.Details is null)
+                node.Details = new ObservableCollection<IProjectDetailsTreeViewModel>();
+            node.Details.InitChildrenParent();
+        }
+        else
+        {
+            _selectedDevice = null;
+        }
+    }
+
+    private void OnDetailNodeClick(IProjectDetailsTreeViewModel node)
+    {
+        if (node.NodeType == ProjectDetailsNodeType.Address && node.AddressDetails is not null)
+        {
+            var rt = RuntimeManager.Get(_selectedDevice?.DaqDetails?.Guid ?? "");
+            ToastSvc.Info(rt is not null
+                ? $"{node.AddressDetails.AnotherName}：{T("状态")} {rt.CollectStatus}"
+                : $"{node.AddressDetails.AnotherName}：{T("未注册运行时")}");
+        }
+    }
+
+    private void CloseAddDialog()
+    {
+        _showAddDialog = false;
+        _targetParent = null;
+    }
+
+    private void AddTopProjectAsync()
+    {
+        _targetParent = null;
+        _newProjectName = "";
+        _showAddDialog = true;
+    }
+
+    /// <summary>导出项目树（对齐 WPF ExportProjectAsync：完整树 JSON，WPF 端可直接导入）</summary>
+    private async Task ExportProjectAsync()
+    {
+        try
+        {
+            var json = AppState.ProjectDict.ToJson(true);
+            await JS.InvokeVoidAsync("snet.download", $"Project[{DateTime.Now:yyyyMMddHHmmss}].json", json);
+            ToastSvc.Success(string.Format(T("导出成功：{0} 个项目"), AppState.ProjectDict.Count));
+        }
+        catch (Exception ex)
+        {
+            ToastSvc.Error(T("导出失败") + ": " + ex.Message);
+        }
+    }
+
+    private async Task TriggerProjectImport() => await JS.InvokeVoidAsync("snet.clickFileInput");
+
+    /// <summary>导入项目树（对齐 WPF ImportProjectAsync：解析 → 初始化父子/回灌 → 清空重填 → 立即保存）</summary>
+    private async Task OnImportProjectAsync(InputFileChangeEventArgs e)
+    {
+        try
+        {
+            var file = e.File;
+            if (file is null || file.Size > 100 * 1024 * 1024)
+            {
+                ToastSvc.Error(T("文件过大或不合法"));
+                return;
+            }
+            string json;
+            using (var reader = new StreamReader(file.OpenReadStream()))
+                json = await reader.ReadToEndAsync();
+
+            var projects = json.ToJsonEntity<ObservableCollection<IProjectTreeViewModel>>();
+            if (projects is null || projects.Count == 0)
+            {
+                ToastSvc.Error(T("导入失败：未识别到项目数据"));
+                return;
+            }
+            AppState.PrepareImportedProjects(projects);
+            // 替换整棵树并立即保存（对齐 WPF 清空重填语义）
+            AppState.ProjectDict.Clear();
+            foreach (var node in projects)
+                AppState.ProjectDict.Add(node);
+            await AppState.SaveProjectsAsync();
+            RuntimeManager.SyncFromProjects(AppState);
+            ToastSvc.Success(string.Format(T("导入成功：{0} 个项目"), projects.Count));
+        }
+        catch (Exception ex)
+        {
+            ToastSvc.Error(T("导入失败") + ": " + ex.Message);
+        }
+    }
+
+    private void AddChildAsync(IProjectTreeViewModel parent)
+    {
+        _targetParent = parent;
+        _newProjectName = "";
+        _showAddDialog = true;
+    }
+
+    private async Task SaveProjectAsync()
+    {
+        if (string.IsNullOrWhiteSpace(_newProjectName))
+        {
+            ToastSvc.Warning(T("项目名称不能为空"));
+            return;
+        }
+        var node = new ProjectTreeViewModelCore { Name = _newProjectName.Trim(), NodeType = ProjectNodeType.Describe };
+        if (_targetParent is not null)
+        {
+            node.Parent = _targetParent;
+            _targetParent.Children.Add(node);
+        }
+        else
+        {
+            AppState.ProjectDict.Add(node);
+        }
+        await AppState.SaveProjectsAsync();
+        ToastSvc.Success(T("添加成功"));
+        CloseAddDialog();
+    }
+
+    private void RenameNodeAsync(IProjectTreeViewModel node)
+    {
+        _renameTarget = node;
+        _renameName = node.Name;
+        _showRenameDialog = true;
+    }
+
+    private async Task ConfirmRenameAsync()
+    {
+        if (_renameTarget is null) return;
+        if (string.IsNullOrWhiteSpace(_renameName))
+        {
+            ToastSvc.Warning(T("名称不能为空"));
+            return;
+        }
+        _renameTarget.Name = _renameName.Trim();
+        await AppState.SaveProjectsAsync();
+        ToastSvc.Success(T("重命名成功"));
+        _showRenameDialog = false;
+        _renameTarget = null;
+    }
+
+    private void AddDeviceAsync(IProjectTreeViewModel parent)
+    {
+        var daqConfigs = AppState.PluginDict.Values
+            .Where(p => p.Type == Snet.Model.@enum.PluginType.Daq)
+            .OrderBy(p => p.Name).ToList();
+        _targetParent = parent;
+        _deviceCandidates = daqConfigs;
+        _selectedDeviceConfig = daqConfigs.FirstOrDefault()?.Guid ?? "";
+        _showDeviceDialog = true;
+    }
+
+    private async Task ConfirmAddDeviceAsync()
+    {
+        var config = _deviceCandidates.FirstOrDefault(c => c.Guid == _selectedDeviceConfig);
+        if (config is null || _targetParent is null) return;
+        if (!AppState.ProjectDict.QueryDeviceUnique(new ProjectTreeViewModelCore { DaqDetails = config }))
+        {
+            ToastSvc.Error(T("该设备已添加到项目中"));
+            return;
+        }
+        var node = new ProjectTreeViewModelCore
+        {
+            Name = config.GetObjSn(),
+            NodeType = ProjectNodeType.Device,
+            DaqDetails = config,
+            Details = new ObservableCollection<IProjectDetailsTreeViewModel>(),
+            IsExpanded = true,
+            Parent = _targetParent
+        };
+        _targetParent.Children.Add(node);
+        await AppState.SaveProjectsAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        _showDeviceDialog = false;
+        _targetParent = null;
+        _selectedDevice = node;
+        ToastSvc.Success(T("设备添加成功"));
+    }
+
+    /// <summary>折叠/展开详情树全部节点（含子节点）</summary>
+    private void CollapseAllDetails()
+    {
+        if (_selectedDevice?.Details is null) return;
+        foreach (var n in _selectedDevice.Details) SetExpandedRecursive(n, false);
+    }
+
+    private void ExpandAllDetails()
+    {
+        if (_selectedDevice?.Details is null) return;
+        foreach (var n in _selectedDevice.Details) SetExpandedRecursive(n, true);
+    }
+
+    private static void SetExpandedRecursive(IProjectDetailsTreeViewModel node, bool expanded)
+    {
+        node.IsExpanded = expanded;
+        foreach (var c in node.Children) SetExpandedRecursive(c, expanded);
+    }
+
+    private void AddAddressAsync()
+    {
+        if (_selectedDevice is null) return;
+        var bound = new HashSet<string>();
+        if (_selectedDevice.Details is not null)
+        {
+            foreach (var d in _selectedDevice.Details)
+                if (d.AddressDetails is not null)
+                    bound.Add(d.AddressDetails.Guid);
+        }
+        _addressCandidates = AppState.AddressDict.Values.OrderBy(a => a.AnotherName).ToList();
+        _pickedAddresses = new HashSet<string>(bound);
+        _showAddressPicker = true;
+    }
+
+    private void TogglePick(string guid, ChangeEventArgs e)
+    {
+        if (e.Value is true) _pickedAddresses.Add(guid);
+        else _pickedAddresses.Remove(guid);
+    }
+
+    private void SelectAllPicked()
+    {
+        _pickedAddresses = new HashSet<string>(_addressCandidates.Select(a => a.Guid));
+    }
+
+    private void InversePicked()
+    {
+        var all = new HashSet<string>(_addressCandidates.Select(a => a.Guid));
+        _pickedAddresses = new HashSet<string>(all.Where(g => !_pickedAddresses.Contains(g)));
+    }
+
+    private async Task ConfirmAddAddressesAsync()
+    {
+        if (_selectedDevice is null) return;
+        if (_selectedDevice.Details is null)
+            _selectedDevice.Details = new ObservableCollection<IProjectDetailsTreeViewModel>();
+        var existingAddresses = new HashSet<string>(_selectedDevice.Details
+            .Where(d => d.AddressDetails is not null).Select(d => d.AddressDetails!.Address));
+        var existingNames = new HashSet<string>(_selectedDevice.Details
+            .Where(d => d.AddressDetails is not null).Select(d => d.AddressDetails!.AnotherName));
+        var added = 0;
+        foreach (var a in _addressCandidates.Where(a => _pickedAddresses.Contains(a.Guid)))
+        {
+            if (existingAddresses.Contains(a.Address) || existingNames.Contains(a.AnotherName))
+                continue;
+            _selectedDevice.Details.Add(new ProjectDetailsTreeViewModelCore(a));
+            existingAddresses.Add(a.Address);
+            existingNames.Add(a.AnotherName);
+            added++;
+        }
+        if (added == 0)
+        {
+            ToastSvc.Warning(T("没有可添加的地址（已全部绑定或重复）"));
+            return;
+        }
+        await AppState.SaveProjectsAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        ToastSvc.Success(string.Format(T("已添加 {0} 个采集地址"), added));
+        _showAddressPicker = false;
+    }
+
+    private void AddMqAsync(IProjectDetailsTreeViewModel addressNode)
+    {
+        var mqConfigs = AppState.PluginDict.Values
+            .Where(p => p.Type == Snet.Model.@enum.PluginType.Mq)
+            .OrderBy(p => p.Name).ToList();
+        _bulkMq = false;
+        _mqTarget = addressNode;
+        _mqCandidates = mqConfigs;
+        _selectedMq = mqConfigs.FirstOrDefault()?.Guid ?? "";
+        _showMqDialog = true;
+    }
+
+    private void AddAllMqAsync()
+    {
+        var mqConfigs = AppState.PluginDict.Values
+            .Where(p => p.Type == Snet.Model.@enum.PluginType.Mq)
+            .OrderBy(p => p.Name).ToList();
+        _bulkMq = true;
+        _mqTarget = null;
+        _mqCandidates = mqConfigs;
+        _selectedMq = mqConfigs.FirstOrDefault()?.Guid ?? "";
+        _showMqDialog = true;
+    }
+
+    private async Task ConfirmAddAllMqAsync()
+    {
+        var config = _mqCandidates.FirstOrDefault(c => c.Guid == _selectedMq);
+        if (config is null || _selectedDevice?.Details is null) return;
+        var added = 0;
+        foreach (var addr in _selectedDevice.Details)
+        {
+            if (addr.Children.Any(c => c.MqDetails is not null && c.MqDetails.SN == config.SN))
+                continue;
+            addr.Children.Add(new ProjectDetailsTreeViewModelCore(config));
+            addr.UpdateSpecialData();
+            added++;
+        }
+        if (added == 0)
+        {
+            ToastSvc.Warning(T("所有地址已添加该传输设备"));
+            return;
+        }
+        await AppState.SaveProjectsAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        ToastSvc.Success(string.Format(T("已为 {0} 个地址添加传输设备"), added));
+        _showMqDialog = false;
+        _bulkMq = false;
+    }
+
+    private async Task ConfirmAddMqAsync()
+    {
+        var config = _mqCandidates.FirstOrDefault(c => c.Guid == _selectedMq);
+        if (config is null || _mqTarget is null) return;
+        if (_mqTarget.Children.Any(c => c.MqDetails is not null && c.MqDetails.SN == config.SN))
+        {
+            ToastSvc.Error(T("该传输设备已添加到此地址"));
+            return;
+        }
+        _mqTarget.Children.Add(new ProjectDetailsTreeViewModelCore(config));
+        _mqTarget.UpdateSpecialData();
+        await AppState.SaveProjectsAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        ToastSvc.Success(T("传输设备添加成功"));
+        _showMqDialog = false;
+        _mqTarget = null;
+    }
+
+    private async Task ReadAddressAsync(IProjectDetailsTreeViewModel node)
+    {
+        var daq = _selectedDevice?.DaqDetails;
+        if (daq is null || node.AddressDetails is null) return;
+        try
+        {
+            var r = await node.AddressDetails.TestReadAddressAsync(daq);
+            ShowTestResult(r);
+        }
+        catch (Exception ex)
+        {
+            _testResult = new TestResult(false, ex.Message, null);
+        }
+    }
+
+    private void CloseTestResult() => _testResult = null;
+
+    // ================= 写入 / 移除所有（对齐 WPF ProjectDetailsModel.WriteAsync / RemoveAllAsync） =================
+    private IProjectDetailsTreeViewModel? _writeTarget;
+    private string _writeValue = "";
+    private bool _confirmRemoveAll;
+
+    private void OpenWriteDialog(IProjectDetailsTreeViewModel node)
+    {
+        _writeTarget = node;
+        _writeValue = "";
+    }
+
+    private async Task WriteAddressAsync()
+    {
+        var node = _writeTarget;
+        if (node is null || node.AddressDetails is null) return;
+        var daq = _selectedDevice?.DaqDetails;
+        if (daq is null) return;
+        if (string.IsNullOrWhiteSpace(_writeValue))
+        {
+            ToastSvc.Warning(T("值不能为空"));
+            return;
+        }
+        var addr = node.AddressDetails;
+        var write = new DaqPluginOperateModel.WriteModel
+        {
+            Address = addr.Address,
+            Value = ParseWriteValue(_writeValue, addr.Type),
+            AddressDataType = addr.Type,
+            EncodingType = addr.EncodingType
+        };
+        try
+        {
+            var r = await addr.TestWriteAddressAsync(daq, write);
+            ShowTestResult(r);
+            if (r.Status) ToastSvc.Success($"{T("写入成功")}: {r.Message}");
+            else ToastSvc.Error($"{T("写入失败")}: {r.Message}");
+        }
+        catch (Exception ex)
+        {
+            _testResult = new TestResult(false, ex.Message, null);
+            ToastSvc.Error($"{T("写入失败")}: {ex.Message}");
+        }
+        _writeTarget = null;
+    }
+
+    private async Task DoRemoveAllAsync()
+    {
+        _confirmRemoveAll = false;
+        if (_selectedDevice?.Details is null) return;
+        _selectedDevice.Details.Clear();
+        await AppState.SaveProjectsAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        ToastSvc.Success(T("已移除全部地址与传输设备"));
+    }
+
+    /// <summary>按地址数据类型把用户输入字符串转换为对应 CLR 类型（失败回退字符串）</summary>
+    private static object ParseWriteValue(string s, Snet.Model.@enum.DataType t)
+    {
+        try
+        {
+            var dotnetType = t switch
+            {
+                Snet.Model.@enum.DataType.Byte => typeof(byte),
+                Snet.Model.@enum.DataType.Short or Snet.Model.@enum.DataType.Int16 => typeof(short),
+                Snet.Model.@enum.DataType.Ushort or Snet.Model.@enum.DataType.UInt16 => typeof(ushort),
+                Snet.Model.@enum.DataType.Int or Snet.Model.@enum.DataType.Int32 => typeof(int),
+                Snet.Model.@enum.DataType.Uint or Snet.Model.@enum.DataType.UInt32 => typeof(uint),
+                Snet.Model.@enum.DataType.Long or Snet.Model.@enum.DataType.Int64 => typeof(long),
+                Snet.Model.@enum.DataType.Ulong or Snet.Model.@enum.DataType.UInt64 => typeof(ulong),
+                Snet.Model.@enum.DataType.Float or Snet.Model.@enum.DataType.Single => typeof(float),
+                Snet.Model.@enum.DataType.Double => typeof(double),
+                Snet.Model.@enum.DataType.Bool => typeof(bool),
+                _ => null
+            };
+            if (dotnetType is not null) return Convert.ChangeType(s, dotnetType);
+        }
+        catch { }
+        return s;
+    }
+
+    /// <summary>Parent 引用丢失时按引用递归查找并移除目标节点</summary>
+    private static bool RemoveNodeRecursive(ObservableCollection<IProjectTreeViewModel> roots, IProjectTreeViewModel target)
+    {
+        if (roots.Remove(target))
+            return true;
+        foreach (var node in roots)
+        {
+            if (node.Children.Contains(target))
+            {
+                node.Children.Remove(target);
+                node.UpdateSpecialData();
+                return true;
+            }
+            if (RemoveNodeRecursive(node.Children, target))
+                return true;
+        }
+        return false;
+    }
+
+    private static string? FormatResultData(object? data)
+    {
+        if (data is null) return null;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Serialize(data, new System.Text.Json.JsonSerializerOptions
+            {
+                WriteIndented = true,
+                Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+            });
+        }
+        catch
+        {
+            return data.ToString();
+        }
+    }
+
+    private void ShowTestResult(OperateResult r)
+        => _testResult = new TestResult(r.Status, string.IsNullOrWhiteSpace(r.Message) ? T("无消息") : r.Message, FormatResultData(r.ResultData));
+
+    private void ConfirmRemoveNode(IProjectTreeViewModel node)
+    {
+        _removeTarget = node;
+        _confirmRemoveNode = true;
+    }
+
+    private async Task DoRemoveNodeAsync()
+    {
+        var target = _removeTarget;
+        _confirmRemoveNode = false;
+        _removeTarget = null;
+        if (target is null) return;
+        // 用 Core RemoveNode（内部处理 Parent 链）；Parent 引用丢失时递归兜底查找
+        if (!AppState.ProjectDict.RemoveNode(target))
+            RemoveNodeRecursive(AppState.ProjectDict, target);
+        if (_selectedDevice == target)
+            _selectedDevice = null;
+        await AppState.SaveProjectsAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        ToastSvc.Success(T("删除成功"));
+    }
+
+    private void ConfirmRemoveDetail(IProjectDetailsTreeViewModel node)
+    {
+        _detailRemoveTarget = node;
+        _confirmRemoveDetail = true;
+    }
+
+    private async Task DoRemoveDetailAsync()
+    {
+        var target = _detailRemoveTarget;
+        _confirmRemoveDetail = false;
+        _detailRemoveTarget = null;
+        if (target is null) return;
+        if (_selectedDevice?.Details is null) return;
+        var removed = target.Parent is not null
+            ? target.Parent.Children.Remove(target)
+            : _selectedDevice.Details.Remove(target);
+        if (removed && target.Parent is not null)
+            target.Parent.UpdateSpecialData();
+        await AppState.SaveProjectsAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        ToastSvc.Success(T("删除成功"));
+    }
+}

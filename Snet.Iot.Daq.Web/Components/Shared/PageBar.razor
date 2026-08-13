@@ -1,0 +1,78 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Iot.Daq.Web.Services
+@inject LocalizationService Localization
+
+@if (Total > 0)
+{
+    <nav class="pagebar-nav" aria-label="@T("分页")">
+        <ul class="pagination justify-content-center mb-0">
+            <li class="page-item @(PageIndex <= 1 ? "disabled" : "")">
+                <a class="page-link" @onclick="() => OnPageChange.InvokeAsync(PageIndex - 1)" aria-label="Previous">
+                    <i class="bi bi-chevron-double-left"></i>
+                </a>
+            </li>
+            @foreach (var item in PageItems)
+            {
+                <li class="page-item @(item == PageIndex ? "active" : "")">
+                    <a class="page-link" @onclick="() => OnPageChange.InvokeAsync(item)">@item</a>
+                </li>
+            }
+            <li class="page-item @(PageIndex >= TotalPages ? "disabled" : "")">
+                <a class="page-link" @onclick="() => OnPageChange.InvokeAsync(PageIndex + 1)" aria-label="Next">
+                    <i class="bi bi-chevron-double-right"></i>
+                </a>
+            </li>
+        </ul>
+        <div class="pagebar-meta">
+            <span>@string.Format(T("共 {0} 条"), Total)</span>
+            <span>@string.Format(T("第 {0} / {1} 页"), PageIndex, TotalPages)</span>
+            <select class="pagebar-size" value="@PageSize" @onchange="OnSizeChangeSelect">
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="200">200</option>
+            </select>
+        </div>
+    </nav>
+}
+
+@code {
+    protected override void OnInitialized()
+    {
+        Localization.LanguageChanged += OnLanguageChanged;
+    }
+
+    private void OnLanguageChanged() => InvokeAsync(StateHasChanged);
+
+    public void Dispose()
+    {
+        Localization.LanguageChanged -= OnLanguageChanged;
+        GC.SuppressFinalize(this);
+    }
+
+    [Parameter] public int Total { get; set; }
+    [Parameter] public int PageIndex { get; set; } = 1;
+    [Parameter] public int PageSize { get; set; } = 50;
+    [Parameter] public EventCallback<int> OnPageChange { get; set; }
+    [Parameter] public EventCallback<int> OnSizeChange { get; set; }
+
+    private string T(string key) => Localization.T(key);
+
+    private int TotalPages => Total == 0 ? 1 : (int)Math.Ceiling(Total / (double)PageSize);
+
+    /// <summary>页码窗口：当前页前后各 2 页（对齐 Snet.Blog PageSplit 分块思想）</summary>
+    private IEnumerable<int> PageItems
+    {
+        get
+        {
+            var start = Math.Max(1, PageIndex - 2);
+            var end = Math.Min(TotalPages, PageIndex + 2);
+            return Enumerable.Range(start, end - start + 1);
+        }
+    }
+
+    private async Task OnSizeChangeSelect(ChangeEventArgs e)
+    {
+        if (int.TryParse(e.Value?.ToString(), out var size))
+            await OnSizeChange.InvokeAsync(size);
+    }
+}

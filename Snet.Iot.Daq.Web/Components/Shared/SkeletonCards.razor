@@ -1,0 +1,16 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+
+<div class="empty">
+    @for (var i = 0; i < Count; i++)
+    {
+        <div class="item-card" style="width:100%">
+            <div class="skeleton" style="height:16px;width:60%"></div>
+            <div class="skeleton" style="height:12px;width:90%;margin-top:8px"></div>
+            <div class="skeleton" style="height:12px;width:40%;margin-top:6px"></div>
+        </div>
+    }
+</div>
+
+@code {
+    [Parameter] public int Count { get; set; } = 4;
+}

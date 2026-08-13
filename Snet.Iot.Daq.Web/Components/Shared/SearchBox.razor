@@ -1,0 +1,49 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+
+<div class="toolbar">
+    <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+            <circle cx="11" cy="11" r="7" />
+            <path d="M21 21l-4.3-4.3" />
+        </svg>
+        <input value="@Value" @oninput="OnInput" @onkeydown="OnKeyDown" placeholder="@Placeholder" />
+        @if (!string.IsNullOrEmpty(Value))
+        {
+            <button type="button" class="btn btn-icon clear-btn" @onclick="ClearSearch" tabindex="-1">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+            </button>
+        }
+    </div>
+    @ChildContent
+</div>
+
+@code {
+    [Parameter] public string? Value { get; set; }
+    [Parameter] public EventCallback<string?> ValueChanged { get; set; }
+    [Parameter] public string Placeholder { get; set; } = "搜索";
+    [Parameter] public EventCallback OnSearch { get; set; }
+    [Parameter] public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>输入实时回传页面（双向绑定），否则页面拿不到搜索词</summary>
+    private async Task OnInput(ChangeEventArgs e)
+    {
+        Value = e.Value?.ToString();
+        if (ValueChanged.HasDelegate)
+            await ValueChanged.InvokeAsync(Value);
+    }
+
+    private async Task ClearSearch()
+    {
+        Value = "";
+        if (ValueChanged.HasDelegate)
+            await ValueChanged.InvokeAsync(Value);
+        await OnSearch.InvokeAsync();
+    }
+
+    private async Task OnKeyDown(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter") await OnSearch.InvokeAsync();
+    }
+}

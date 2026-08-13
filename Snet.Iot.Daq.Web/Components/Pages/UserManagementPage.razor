@@ -1,0 +1,199 @@
+@page "/users"
+@rendermode InteractiveServer
+@inherits LocalizedComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Iot.Daq.Web.Services
+@attribute [Authorize(Policy = AuthService.AdminPolicy)]
+@inject AuthService Auth
+@inject ToastService Toast
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="bi bi-people me-2"></i>@T("用户管理")</div>
+        <button class="btn btn-primary btn-sm" @onclick="OpenAdd"><i class="bi bi-person-plus"></i>@T("添加用户")</button>
+    </div>
+
+    <div class="snet-table-wrap">
+        <table class="snet-table">
+            <thead>
+                <tr>
+                    <th><i class="bi bi-person"></i>@T("用户名")</th>
+                    <th><i class="bi bi-shield-check"></i>@T("角色")</th>
+                    <th><i class="bi bi-key"></i>@T("状态")</th>
+                    <th><i class="bi bi-tools"></i>@T("操作")</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var u in _users)
+                {
+                    <tr>
+                        <td>@u.Username</td>
+                        <td><span class="tag @(u.Role == AuthService.RoleAdmin ? "tag-primary" : "")">@(u.Role == AuthService.RoleAdmin ? T("管理员") : T("普通用户"))</span></td>
+                        <td><span class="tag @(u.MustChangePassword ? "tag-warning" : "tag-success")">@(u.MustChangePassword ? T("需修改密码") : T("正常"))</span></td>
+                        <td>
+                            @if (u.Username == _currentUser)
+                            {
+                                <span class="tag tag-primary">@T("当前登录")</span>
+                            }
+                            else
+                            {
+                                <button class="btn btn-sm" @onclick="() => ToggleRoleAsync(u)"><i class="bi @(u.Role == AuthService.RoleAdmin ? "bi-person-down" : "bi-person-check")"></i>@(u.Role == AuthService.RoleAdmin ? T("设为普通用户") : T("设为管理员"))</button>
+                            }
+                            <button class="btn btn-sm" @onclick="() => OpenReset(u)"><i class="bi bi-key"></i>@T("重置密码")</button>
+                            @if (u.Username != _currentUser)
+                            {
+                                <button class="btn btn-sm btn-danger" @onclick="() => RemoveUserAsync(u)"><i class="bi bi-trash"></i>@T("删除")</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+</div>
+
+@if (_showAdd)
+{
+    <ModalDialog Title="@T("添加用户")" TitleIcon="bi-person-plus" OnClose="() => _showAdd = false">
+        <div class="form-field">
+            <label>@T("用户名")</label>
+            <input @bind="_newUsername" />
+        </div>
+        <div class="form-field">
+            <label>@T("密码")</label>
+            <input type="password" @bind="_newPassword" />
+        </div>
+        <div class="form-field">
+            <label>@T("角色")</label>
+            <select @bind="_newRole">
+                <option value="@AuthService.RoleUser">@T("普通用户")</option>
+                <option value="@AuthService.RoleAdmin">@T("管理员")</option>
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="() => _showAdd = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="AddUserAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_resetUser is not null)
+{
+    <ModalDialog Title="@T("重置密码")" TitleIcon="bi-key" OnClose="() => _resetUser = null">
+        <div class="form-field">
+            <label>@T("用户名")</label>
+            <span class="config-summary-value">@_resetUser</span>
+        </div>
+        <div class="form-field">
+            <label>@T("新密码")</label>
+            <input type="password" @bind="_resetPassword" />
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="() => _resetUser = null"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="ResetPasswordAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+    <Toast />
+@code {
+    private List<AuthService.UserInfo> _users = new();
+    private string _currentUser = "";
+    private bool _showAdd;
+    private string _newUsername = "";
+    private string _newPassword = "";
+    private string _newRole = AuthService.RoleUser;
+    private string? _resetUser;
+    private string _resetPassword = "";
+
+    [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthState is not null)
+        {
+            var state = await AuthState;
+            _currentUser = state.User.Identity?.Name ?? "";
+        }
+        _users = Auth.ListUsers();
+    }
+
+    private void OpenAdd()
+    {
+        _newUsername = "";
+        _newPassword = "";
+        _newRole = AuthService.RoleUser;
+        _showAdd = true;
+    }
+
+    private async Task AddUserAsync()
+    {
+        var (ok, err) = await Auth.AddUserAsync(_newUsername, _newPassword, _newRole);
+        if (!ok)
+        {
+            Toast.Error(T(ErrorKey(err)));
+            return;
+        }
+        _showAdd = false;
+        _users = Auth.ListUsers();
+        Toast.Success(T("用户已添加"));
+    }
+
+    private async Task RemoveUserAsync(AuthService.UserInfo u)
+    {
+        var (ok, err) = await Auth.RemoveUserAsync(u.Username, _currentUser);
+        if (!ok)
+        {
+            Toast.Error(T(ErrorKey(err)));
+            return;
+        }
+        _users = Auth.ListUsers();
+        Toast.Success(T("用户已删除"));
+    }
+
+    private async Task ToggleRoleAsync(AuthService.UserInfo u)
+    {
+        var target = u.Role == AuthService.RoleAdmin ? AuthService.RoleUser : AuthService.RoleAdmin;
+        var (ok, err) = await Auth.SetRoleAsync(u.Username, target);
+        if (!ok)
+        {
+            Toast.Error(T(ErrorKey(err)));
+            return;
+        }
+        _users = Auth.ListUsers();
+        Toast.Success(T("角色已更新"));
+    }
+
+    private void OpenReset(AuthService.UserInfo u)
+    {
+        _resetUser = u.Username;
+        _resetPassword = "";
+    }
+
+    private async Task ResetPasswordAsync()
+    {
+        var username = _resetUser;
+        if (username is null) return;
+        var (ok, err) = await Auth.ResetPasswordAsync(username, _resetPassword);
+        if (!ok)
+        {
+            Toast.Error(T(ErrorKey(err)));
+            return;
+        }
+        _resetUser = null;
+        _users = Auth.ListUsers();
+        Toast.Success(T("密码已重置"));
+    }
+
+    private static string ErrorKey(string? err) => err switch
+    {
+        "InvalidUsername" => "用户名不合法",
+        "PasswordTooShort" => "至少 6 位",
+        "UserExists" => "用户名已存在",
+        "UserNotFound" => "用户不存在",
+        "LastAdmin" => "至少保留一个管理员",
+        "CannotRemoveSelf" => "不能删除当前登录用户",
+        _ => err ?? "操作失败"
+    };
+}

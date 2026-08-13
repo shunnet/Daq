@@ -1,0 +1,26 @@
+<div class="modal-overlay">
+    <div class="modal" role="alertdialog" aria-modal="true">
+        <div class="modal-header">
+            <span class="modal-title-text"><i class="bi bi-question-circle"></i>@Title</span>
+        </div>
+        <div class="modal-body">
+            @Message
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="Cancel"><i class="bi bi-x-lg"></i>@CancelText</button>
+            <button class="btn btn-danger" @onclick="Confirm"><i class="bi bi-trash"></i>@ConfirmText</button>
+        </div>
+    </div>
+</div>
+
+@code {
+    [Parameter] public string Title { get; set; } = "确认";
+    [Parameter] public string Message { get; set; } = "";
+    [Parameter] public string CancelText { get; set; } = "取消";
+    [Parameter] public string ConfirmText { get; set; } = "确认";
+    [Parameter] public EventCallback OnCancel { get; set; }
+    [Parameter] public EventCallback OnConfirm { get; set; }
+
+    private Task Cancel() => OnCancel.InvokeAsync();
+    private Task Confirm() => OnConfirm.InvokeAsync();
+}

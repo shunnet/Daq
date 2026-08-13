@@ -1,0 +1,45 @@
+@namespace Snet.Iot.Daq.Web.Components.Shared
+
+<div class="log-view" @ref="_element" @onscroll="OnScroll">
+    @foreach (var line in Lines.TakeLast(MaxLines))
+    {
+        <div class="@Classify(line)">@line</div>
+    }
+</div>
+
+@inject IJSRuntime JS
+@code {
+    [Parameter] public List<string> Lines { get; set; } = new();
+    [Parameter] public int MaxLines { get; set; } = 2000;
+
+    private ElementReference _element;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // 新日志到达时自动滚到底部（默认跟随最新消息；用户上滚回溯时暂停跟随，回到底部恢复）
+        if (firstRender)
+            await JS.InvokeVoidAsync("snet.logScroll.init");
+        await JS.InvokeVoidAsync("snet.logScroll.stick", _element);
+    }
+
+    private async Task OnScroll()
+    {
+        await JS.InvokeVoidAsync("snet.logScroll.onScroll", _element);
+    }
+
+    /// <summary>日志着色规则（与 WPF TextEditorControl 对齐）：[Info]→绿 / Error→红 / Mq·Daq·Service→蓝 / TRUE→绿 / FALSE→红</summary>
+    private static string Classify(string line)
+    {
+        if (line.Contains("[Info]", StringComparison.OrdinalIgnoreCase)) return "info";
+        if (line.Contains("Error", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("Exception", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("失败", StringComparison.Ordinal)) return "error";
+        if (line.Contains("[Mq", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("[Daq", StringComparison.OrdinalIgnoreCase)
+            || line.Contains("Service", StringComparison.OrdinalIgnoreCase)) return "mq";
+        if (line.Contains("TRUE", StringComparison.OrdinalIgnoreCase)) return "info";
+        if (line.Contains("FALSE", StringComparison.OrdinalIgnoreCase)) return "error";
+        if (line.Contains(">", StringComparison.Ordinal) || line.Contains("<", StringComparison.Ordinal)) return "warn";
+        return "";
+    }
+}

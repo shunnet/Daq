@@ -1,0 +1,2054 @@
+@page "/plugins/settings"
+@rendermode InteractiveServer
+@inherits LocalizedComponentBase
+@using Microsoft.AspNetCore.Authorization
+@using System.Collections.ObjectModel
+@using System.Globalization
+@using System.IO.Compression
+@using System.Text.Json
+@using System.Text.Json.Nodes
+@using System.Text.RegularExpressions
+@using Microsoft.AspNetCore.Components.Forms
+@using Snet.Iot.Daq.Core.data
+@using Snet.Iot.Daq.Core.handler
+@using Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Model.data
+@using Snet.Utility
+@attribute [Authorize(Policy = AuthService.AdminPolicy)]
+@inject AppStateService AppState
+@inject ToastService Toast
+@inject DeviceRuntimeManager RuntimeManager
+@inject IJSRuntime JS
+
+<div class="card">
+    <div class="card-header">
+        <div class="card-title"><i class="bi bi-sliders me-2"></i>@T("插件设置")</div>
+        <div class="segmented plugin-tabs">
+            <button class="@(_tab == 0 ? "active" : "")" @onclick="() => { _tab = 0; StateHasChanged(); }"><i class="bi bi-box-seam"></i>@T("已装插件")</button>
+            <button class="@(_tab == 1 ? "active" : "")" @onclick="() => { _tab = 1; StateHasChanged(); }"><i class="bi bi-gear"></i>@T("插件配置")</button>
+        </div>
+    </div>
+
+    @if (_tab == 0)
+    {
+        <div class="toolbar" style="margin-bottom:10px">
+            <select class="form-select" style="width:120px" @bind="_uploadType">
+                <option value="Daq">Daq</option>
+                <option value="Mq">Mq</option>
+            </select>
+            <button class="btn btn-primary" @onclick="TriggerUploadAsync" disabled="@_uploading">
+                <i class="bi bi-cloud-arrow-up"></i>@(_uploading ? @T("上传中...") : @T("上传插件"))
+            </button>
+            <InputFile OnChange="@OnUploadAsync" accept=".zip" multiple="false" disabled="@_uploading"
+                       class="upload-input-hidden" />
+            <span class="spacer"></span>
+            <button class="btn" @onclick="RefreshPluginList"><i class="bi bi-arrow-clockwise"></i>@T("刷新")</button>
+        </div>
+        @if (_uploadStatus is not null)
+        {
+            <div class="upload-status @(_uploadStatus.IsError ? "error" : "success")">@_uploadStatus.Message</div>
+        }
+
+        @if (_plugins.Count == 0)
+        {
+            <Empty Text="@T("暂无已安装插件。可在插件浏览页下载（自动安装）或在此上传 .zip 包")" />
+        }
+        else
+        {
+            <div class="item-cards">
+                @foreach (var item in _plugins)
+                {
+                    <div class="item-card">
+                        <div class="item-head">
+                            <span class="tag @(item.Type == PluginType.Daq ? "tag-primary" : "tag-success")">@item.Type</span>
+                            <span class="item-name cfg-item-name">@item.Name</span>
+                            <span class="tag">v@(item.Version)</span>
+                            <span class="item-time-tip">
+                                <span class="tip-text">@T("添加时间")：@item.Time.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                            </span>
+                            <span class="spacer"></span>
+                            <span class="tree-actions">
+                                <span class="tree-actions-expand @(IsPluginActionsOpen(item) ? "open" : "")">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => AddConfigForPluginAsync(item)"><i class="bi bi-plus-circle"></i>@T("添加配置")</button>
+                                    <button class="btn btn-sm btn-danger" @onclick="() => RemovePluginAsync(item)"><i class="bi bi-trash"></i>@T("移除")</button>
+                                </span>
+                                <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="() => TogglePluginActions(item)" title="@T("操作")">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                                    </svg>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+    else
+    {
+        <div class="toolbar" style="margin-bottom:10px">
+            <span class="spacer"></span>
+            <button class="btn btn-primary" @onclick="VerifyStatusAsync" disabled="@_verifying">
+                <i class="bi bi-check2-circle"></i>@(_verifying ? T("验证中...") : T("状态验证"))
+            </button>
+        </div>
+
+        @if (AppState.PluginDict.Count == 0)
+        {
+            <Empty Text="@T("暂无插件配置")" />
+        }
+        else
+        {
+            <div class="item-cards">
+                @foreach (var item in AppState.PluginDict.Values.OrderBy(p => p.Index))
+                {
+                    <div class="item-card">
+                        <div class="item-head">
+                            <span class="tag @(item.Status ? "tag-success" : "tag-danger")">@(item.Status ? T("正常") : T("异常"))</span>
+                            <span class="tag @(item.Type == PluginType.Daq ? "tag-primary" : "tag-success")">@item.Type</span>
+                            <span class="item-name cfg-item-name">@item.Name</span>
+                            <span class="tag mono">@item.SN</span>
+                            <span class="item-time-tip">
+                                <span class="tip-text">@T("更新时间")：@item.Time.ToString("yyyy-MM-dd HH:mm:ss")</span>
+                            </span>
+                            <span class="spacer"></span>
+                            <span class="tree-actions">
+                                <span class="tree-actions-expand @(IsConfigActionsOpen(item) ? "open" : "")">
+                                    <button class="btn btn-sm btn-primary" @onclick="() => EditConfigAsync(item)"><i class="bi bi-pencil"></i>@T("修改")</button>
+                                    @if (item.Type == PluginType.Daq)
+                                    {
+                                        <button class="btn btn-sm" @onclick="@(() => OpenDaqTest(item, "read"))"><i class="bi bi-eye"></i>@T("读取")</button>
+                                        <button class="btn btn-sm" @onclick="@(() => OpenDaqTest(item, "write"))"><i class="bi bi-pen"></i>@T("写入")</button>
+                                    }
+                                    @if (item.Type == PluginType.Mq)
+                                    {
+                                        <button class="btn btn-sm" @onclick="() => OpenMqTest(item)"><i class="bi bi-send"></i>@T("生产")</button>
+                                    }
+                                    @if (item.Type == PluginType.Daq)
+                                    {
+                                        <button class="btn btn-sm" @onclick="() => OpenAutoPack(item)"><i class="bi bi-boxes"></i>@T("组包")</button>
+                                        <button class="btn btn-sm" @onclick="() => OpenWebApi(item)"><i class="bi bi-globe"></i>WebApi</button>
+                                    }
+                                    <button class="btn btn-sm btn-danger" @onclick="() => RemoveConfigAsync(item)"><i class="bi bi-trash"></i>@T("移除")</button>
+                                </span>
+                                <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="() => ToggleConfigActions(item)" title="@T("操作")">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                                    </svg>
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    }
+</div>
+
+@if (_configEditing)
+{
+    <ModalDialog Title="@(_editingConfig is null ? T("添加插件配置") : T("修改插件配置"))"
+                 TitleIcon="@(_editingConfig is null ? "bi-plus-circle" : "bi-pencil-square")" OnClose="CloseConfigDialog">
+        <div class="config-summary">
+            <span class="config-summary-item"><i class="bi bi-tag"></i><span class="config-summary-label">@T("类型")</span><span class="config-summary-value">@_newConfigType</span></span>
+            <span class="config-summary-item"><i class="bi bi-puzzle"></i><span class="config-summary-label">@T("插件")</span><span class="config-summary-value">@_newConfigPluginName</span></span>
+            @if (_protocolField is not null)
+            {
+                <span class="config-summary-item" title="@_protocolField.DetailsTips">
+                    <i class="bi bi-diagram-3"></i>
+                    <span class="config-summary-label">@_protocolField.Description</span>
+                    @if (_editingConfig is null)
+                    {
+                        // 添加：协议类型可选择
+                        <select class="config-summary-select" value="@_protocolType" @onchange="OnProtocolChange">
+                            @foreach (var o in _protocolField.Options)
+                            {
+                                <option value="@o.Key">@o.Key</option>
+                            }
+                        </select>
+                    }
+                    else
+                    {
+                        // 修改：协议类型只读展示（已确定的配置不允许切换）
+                        <span class="config-summary-value">@_protocolType</span>
+                    }
+                </span>
+            }
+        </div>
+        <div class="param-card">
+            <div class="param-card-header">
+                <div class="param-card-title"><i class="bi bi-sliders"></i>@T("参数")</div>
+                <div class="segmented">
+                    <button class="@(_paramTab == "form" ? "active" : "")" @onclick="ShowParamForm"><i class="bi bi-input-cursor-text"></i>@T("表单")</button>
+                    <button class="@(_paramTab == "json" ? "active" : "")" @onclick="ShowParamJson"><i class="bi bi-braces"></i>@T("JSON")</button>
+                </div>
+            </div>
+            <div class="param-card-body">
+                @if (_loadingParam)
+                {
+                    <div class="upload-status">@T("正在加载插件默认参数...")</div>
+                }
+                @if (_paramTab == "form")
+                {
+                    <div class="param-form">
+                        @if (_paramFields.Count == 0)
+                        {
+                            <div class="param-empty">@T("未获取到参数定义，可切换到 JSON 视图编辑")</div>
+                        }
+                        @foreach (var f in _paramFields)
+                        {
+                            <div class="param-row">
+                                    <label class="param-label" title="@f.DetailsTips">@f.Description</label>
+                                    @if (f.Cate is "select" or "radio")
+                                    {
+                                        <select class="param-input" @bind="f.Value" @bind:event="onchange" @bind:after="() => OnFieldChanged(f)">
+                                            @foreach (var o in f.Options)
+                                            {
+                                                <option value="@o.Value">@o.Key</option>
+                                            }
+                                        </select>
+                                    }
+                                    else if (f.Cate == "unmber")
+                                    {
+                                        <input class="param-input" type="number" step="any" @bind="f.Value" @bind:event="oninput" @bind:after="() => OnFieldChanged(f)" />
+                                    }
+                                    else
+                                    {
+                                        <input class="param-input" @bind="f.Value" @bind:event="oninput" @bind:after="() => OnFieldChanged(f)" />
+                                    }
+                                    @if (f.Error is not null)
+                                    {
+                                        <div class="param-error-inline">@f.Error</div>
+                                    }
+                            </div>
+                        }
+                    </div>
+                }
+                else
+                {
+                    <textarea value="@_configParam" @oninput="OnJsonInput" rows="10" class="mono param-json" placeholder="{ }"></textarea>
+                    @if (_paramJsonError is not null)
+                    {
+                        <div class="param-error">@_paramJsonError</div>
+                    }
+                }
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="CloseConfigDialog"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="SaveConfigAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_mqTestConfig is not null)
+{
+    <ModalDialog Title="@T("生产测试")" TitleIcon="bi-send" OnClose="CloseMqTest">
+        <div class="form-field">
+            <label>@T("插件")</label>
+            <input value="@_mqTestConfig.Name" disabled />
+        </div>
+        <div class="form-field">
+            <label>@T("Topic")</label>
+            <input @bind="_mqTestTopic" placeholder="topic/test" />
+        </div>
+        <div class="form-field">
+            <label>@T("内容")</label>
+            <textarea @bind="_mqTestContent" rows="3" placeholder="{ }"></textarea>
+        </div>
+        <div class="modal-footer">
+            <button class="btn" @onclick="CloseMqTest"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="RunMqTestAsync" disabled="@_mqTestRunning">
+                <i class="bi bi-play"></i>@(_mqTestRunning ? @T("测试中...") : @T("测试"))
+            </button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_daqTestConfig is not null)
+{
+    <ModalDialog Title="@(_daqTestMode == "read" ? T("读取测试") : T("写入测试"))" TitleIcon="bi-arrow-down-up" OnClose="CloseDaqTest">
+        <div class="form-field">
+            <label>@T("插件")</label>
+            <input value="@_daqTestConfig.Name" disabled />
+        </div>
+        <div class="form-field">
+            <label>@T("地址")</label>
+            <input @bind="_daqTestAddress" placeholder="3!40001 / DB5.DBW0" />
+        </div>
+        <div class="form-field">
+            <label>@T("类型")</label>
+            <select @bind="_daqTestType">
+                @foreach (var name in Enum.GetNames<DataType>())
+                {
+                    <option value="@name">@name</option>
+                }
+            </select>
+        </div>
+        <div class="form-field">
+            <label>@T("长度")</label>
+            <input type="number" min="1" max="65535" @bind="_daqTestLength" />
+        </div>
+        <div class="form-field">
+            <label>@T("编码")</label>
+            <select @bind="_daqTestEncoding">
+                @foreach (var name in Enum.GetNames<EncodingType>())
+                {
+                    <option value="@name">@name</option>
+                }
+            </select>
+        </div>
+        @if (_daqTestMode == "write")
+        {
+            <div class="form-field">
+                <label>@T("值")</label>
+                <input @bind="_daqTestValue" placeholder="0" />
+            </div>
+        }
+        <div class="modal-footer">
+            <button class="btn" @onclick="CloseDaqTest"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="RunDaqTestAsync" disabled="@_daqTestRunning">
+                <i class="bi bi-play"></i>@(_daqTestRunning ? @T("测试中...") : @T("测试"))
+            </button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_testResult is not null)
+{
+    <ModalDialog Title="@T("测试结果")" TitleIcon="bi-clipboard-check" OnClose="CloseTestResult">
+        <div class="form-field">
+            <span class="tag @(_testResult.Status ? "tag-success" : "tag-danger")">
+                @(_testResult.Status ? T("成功") : T("失败"))
+            </span>
+        </div>
+        <div class="form-field">
+            <label>@T("消息")</label>
+            <div class="mono result-message">@_testResult.Message</div>
+        </div>
+        @if (!string.IsNullOrEmpty(_testResult.Data))
+        {
+            <div class="form-field">
+                <label>@T("数据")</label>
+                <pre class="mono">@_testResult.Data</pre>
+            </div>
+        }
+        <div class="modal-footer">
+            <button class="btn btn-primary" @onclick="CloseTestResult"><i class="bi bi-check-lg"></i>@T("关闭")</button>
+</div>
+    </ModalDialog>
+}
+
+@if (_confirmRemove && _removingPlugin is not null)
+{
+    <ConfirmDialog Title="@T("温馨提示")"
+                   Message="@(_removingSharedCount > 0
+                       ? string.Format(T("确认移除插件 {0}？该插件包内还有 {1} 个插件将一并移除"), _removingPlugin.Name, _removingSharedCount)
+                       : string.Format(T("确认移除插件 {0}？"), _removingPlugin.Name))"
+                   ConfirmText="@T("移除")" CancelText="@T("取消")"
+                   OnCancel="() => _confirmRemove = false" OnConfirm="@ConfirmRemoveAsync" />
+}
+
+@if (_confirmHotUpdate)
+{
+    <ConfirmDialog Title="@T("温馨提示")" Message="@T("同名插件已存在，是否执行热更新？运行中的设备将暂停后恢复")" ConfirmText="@T("确定")" CancelText="@T("取消")"
+                   OnCancel="CancelHotUpdate" OnConfirm="@ConfirmHotUpdateAsync" />
+}
+
+@if (_autoPackConfig is not null)
+{
+    <ModalDialog Title="@T("组包设置")" TitleIcon="bi-boxes" OnClose="CloseAutoPack">
+        <div class="form-field">
+            <label>@T("单次批量读取的最大字节数")</label>
+            <input type="number" @bind="_autoPackMaxByteLength" />
+        </div>
+        <div class="form-field">
+            <label>@T("数据字节序格式")</label>
+            <select @bind="_autoPackFormat">
+                @foreach (var fmt in Enum.GetNames(typeof(DataFormat)))
+                {
+                    <option value="@fmt">@fmt</option>
+                }
+            </select>
+        </div>
+        <div class="modal-footer">
+            @if (_autoPackConfig.AutoPack is not null)
+            {
+                <button class="btn btn-danger" @onclick="RemoveAutoPackAsync"><i class="bi bi-trash"></i>@T("移除组包")</button>
+            }
+            <span class="spacer"></span>
+            <button class="btn" @onclick="CloseAutoPack"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="SaveAutoPackAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+@if (_webApiConfig is not null)
+{
+    <ModalDialog Title="@T("WebApi 设置")" TitleIcon="bi-globe" OnClose="CloseWebApi">
+        <div class="form-field">
+            <label>@T("Ip 地址")</label>
+            <input @bind="_webApiIp" />
+        </div>
+        <div class="form-field">
+            <label>@T("端口")</label>
+            <input type="number" @bind="_webApiPort" />
+        </div>
+        <div class="form-field">
+            <label>@T("跨域")</label>
+            <input type="checkbox" @bind="_webApiCrossDomain" />
+        </div>
+        <div class="modal-footer">
+            @if (_webApiConfig.WebApi is not null)
+            {
+                <button class="btn btn-danger" @onclick="RemoveWebApiAsync"><i class="bi bi-trash"></i>@T("移除 WebApi")</button>
+            }
+            <span class="spacer"></span>
+            <button class="btn" @onclick="CloseWebApi"><i class="bi bi-x-lg"></i>@T("取消")</button>
+            <button class="btn btn-primary" @onclick="SaveWebApiAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
+        </div>
+    </ModalDialog>
+}
+
+    <Toast />
+@code {
+    private int _tab;
+    private string _uploadType = "Daq";
+    private bool _uploading;
+    private bool _verifying;
+    private bool _confirmRemove;
+    private PluginListModel? _removingPlugin;
+    /// <summary>待移除插件同 dll 目录的其他条目数（确认框提示"一并移除"）</summary>
+    private int _removingSharedCount;
+    private bool _confirmHotUpdate;
+    /// <summary>热更新确认挂起状态（临时目录 + 探测结果），确认/取消路径消费</summary>
+    private (string TempPath, PluginType Type, string ZipName, List<(PluginModel Model, object? Param)> Probe)? _pendingHotUpdate;
+    private List<PluginListModel> _plugins = new();
+    private bool _configEditing;
+    private PluginConfigModel? _editingConfig;
+    /// <summary>编辑保存落盘失败时的回滚快照（旧 SN/参数/时间）</summary>
+    private (string Sn, string Param, DateTime Time)? _editRollback;
+    private string _newConfigType = "Daq";
+    private string _newConfigPluginName = "";
+    private string _configParam = "{}";
+    private sealed record UploadStatus(string Message, bool IsError);
+    private UploadStatus? _uploadStatus;
+    private sealed record TestResult(bool Status, string Message, string? Data);
+    private TestResult? _testResult;
+    /// <summary>组包设置弹窗状态（对齐 WPF SettingsAutoPack/UpdateAutoPack/RemoveAutoPack）</summary>
+    private PluginConfigModel? _autoPackConfig;
+    private int _autoPackMaxByteLength = 200;
+    private string _autoPackFormat = "ABCD";
+    /// <summary>WebApi 设置弹窗状态（对齐 WPF SettingsWebApi/UpdateWebApi/RemoveWebApi）</summary>
+    private PluginConfigModel? _webApiConfig;
+    private string _webApiIp = "";
+    private int _webApiPort = 80;
+    private bool _webApiCrossDomain;
+
+    private PluginConfigModel? _mqTestConfig;
+    private string _mqTestTopic = "";
+    private string _mqTestContent = "";
+    private bool _mqTestRunning;
+    private PluginConfigModel? _daqTestConfig;
+    private string _daqTestMode = "read";
+    private string _daqTestAddress = "";
+    private DataType _daqTestType = DataType.Int16;
+    private ushort _daqTestLength = 1;
+    private EncodingType _daqTestEncoding = EncodingType.UTF8;
+    private string _daqTestValue = "";
+    private bool _daqTestRunning;
+    private bool _loadingParam;
+
+    /// <summary>参数编辑视图：form = GetArgsAsync 动态表单，json = 原始 JSON 文本</summary>
+    private void ShowParamForm() { _paramTab = "form"; StateHasChanged(); }
+    private void ShowParamJson() { _paramTab = "json"; StateHasChanged(); }
+    private string _paramTab = "form";
+    private List<ParamField> _paramFields = new();
+    private string? _paramJsonError;
+    /// <summary>协议类型选择器：参数定义中 select 且选项与 subset 名对应的字段（如 Modbus 的 ProtocolType）</summary>
+    private ParamField? _protocolField;
+    private string _protocolType = "";
+    /// <summary>参数定义缓存：协议切换重建表单字段时复用，避免重复创建插件实例</summary>
+    private ParamModel? _paramDef;
+    /// <summary>插件自动分配返回的当前协议 subset（GetAutoAllocatingArgsAsync，属性名列表由插件决定）</summary>
+    private ParamModel.subsetSimplify? _autoSubset;
+
+    /// <summary>GetArgsAsync 参数定义中的单个可编辑属性（Show 且 Use 的字段渲染为输入框）</summary>
+    private sealed class ParamField
+    {
+        public string PropertyName = "";
+        public string Description = "";
+        public string Cate = "text";
+        public string Value = "";
+        public bool MustFillIn;
+        public string? DetailsTips;
+        public string? Pattern;
+        public string? FailTips;
+        public List<ParamOption> Options = new();
+        public string? Error;
+        public string Group = "";
+    }
+
+    private sealed class ParamOption
+    {
+        /// <summary>显示文案（插件定义，如 "Content(内容)"）</summary>
+        public string Key = "";
+        /// <summary>真实值（插件定义，枚举为底层数值；写入 JSON 用 Value，显示用 Key）</summary>
+        public string Value = "";
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        _plugins = LoadPluginList();
+        _newConfigPluginName = _plugins.FirstOrDefault(p => p.Type.ToString() == _newConfigType)?.Name ?? "";
+        MenuCoordinator.Register(CloseMenu);
+        await Task.CompletedTask;
+    }
+
+    /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
+    private void CloseMenu()
+    {
+        if (_pluginActionsOpen.Count > 0 || _configActionsOpen.Count > 0)
+        {
+            _pluginActionsOpen.Clear();
+            _configActionsOpen.Clear();
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    /// <summary>语言切换：参数表单标签（中文用描述/英文用属性名）随语言重建</summary>
+    protected override void OnLanguageChangedCore()
+    {
+        if (_paramDef is null) return;
+        _ = RebuildParamLabelsAsync();
+    }
+
+    private async Task RebuildParamLabelsAsync()
+    {
+        await RefreshAutoSubsetAsync();
+        BuildParamFields();
+        FromJsonToForm();
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public override void Dispose()
+    {
+        base.Dispose();
+        MenuCoordinator.Unregister(CloseMenu);
+        // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
+        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
+        if (_jsRef is not null)
+        {
+            _jsRef.Dispose();
+            _jsRef = null;
+        }
+        // 页面销毁时清理热更新挂起的临时目录（切页放弃上传）
+        var pending = _pendingHotUpdate;
+        _pendingHotUpdate = null;
+        _confirmHotUpdate = false;
+        if (pending is { } p && Directory.Exists(p.TempPath))
+        {
+            try { Directory.Delete(p.TempPath, true); } catch { /* 清理失败不影响主流程 */ }
+        }
+    }
+
+    /// <summary>配置卡片操作按钮展开状态（⋯ 点击展开，区域外点击收起，移出不关闭）</summary>
+    private readonly Dictionary<string, bool> _configActionsOpen = new();
+    private readonly Dictionary<string, bool> _pluginActionsOpen = new();
+    private DotNetObjectReference<PluginSettingsPage>? _jsRef;
+
+    private bool IsConfigActionsOpen(PluginConfigModel item) => _configActionsOpen.GetValueOrDefault(item.Guid);
+
+    private async Task ToggleConfigActions(PluginConfigModel item)
+    {
+        // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
+        MenuCoordinator.CloseAllOthers();
+        // 互斥：展开新项前先收起其他项（含插件卡片菜单）
+        var open = !_configActionsOpen.GetValueOrDefault(item.Guid);
+        _configActionsOpen.Clear();
+        _pluginActionsOpen.Clear();
+        if (open) _configActionsOpen[item.Guid] = true;
+        if (open)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    private bool IsPluginActionsOpen(PluginListModel item) => _pluginActionsOpen.GetValueOrDefault(item.Name);
+
+    private async Task TogglePluginActions(PluginListModel item)
+    {
+        // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
+        MenuCoordinator.CloseAllOthers();
+        // 互斥：展开新项前先收起其他项（含配置卡片菜单）
+        var open = !_pluginActionsOpen.GetValueOrDefault(item.Name);
+        _pluginActionsOpen.Clear();
+        _configActionsOpen.Clear();
+        if (open) _pluginActionsOpen[item.Name] = true;
+        if (open)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    [JSInvokable]
+    public void CloseAllActions()
+    {
+        _configActionsOpen.Clear();
+        _pluginActionsOpen.Clear();
+        InvokeAsync(StateHasChanged);
+    }
+
+    private List<PluginListModel> LoadPluginList()
+    {
+        if (!File.Exists(WebPaths.PluginListConfigPath)) return new();
+        try
+        {
+            var list = PluginHandlerCore.GetPluginUIConfig<ObservableCollection<PluginListModel>>(WebPaths.PluginListConfigPath)?.ToList() ?? new();
+            // 路径规范化：旧数据目录（data/）迁移或 WPF 互拷后 Path 可能失效，回退到本数据目录 lib/{type}/{原目录名}
+            foreach (var p in list)
+            {
+                var path = p.PluginDetails?.Path;
+                if (!string.IsNullOrEmpty(path) && !Directory.Exists(path))
+                {
+                    var dirName = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+                    var fallback = Path.Combine(WebPaths.FilePath, p.Type.ToString().ToLower(), dirName);
+                    if (Directory.Exists(fallback)) p.PluginDetails.Path = fallback;
+                }
+            }
+            // 加载去重（历史热更新可能遗留同名条目）
+            return list.GroupBy(p => p.Name).Select(g => g.Last()).ToList();
+        }
+        catch
+        {
+            return new();
+        }
+    }
+
+    /// <summary>参数 JSON 序列化：中文不转义（UnsafeRelaxedJsonEscaping），UTF-8 原文存储</summary>
+    private static readonly System.Text.Json.JsonSerializerOptions JsonIndented = new()
+    {
+        WriteIndented = true,
+        Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+    };
+    private static readonly System.Text.RegularExpressions.Regex PluginNameRegex = new(@"^[A-Za-z0-9_\-\.]+$");
+    private const long MaxExtractBytes = 200L * 1024 * 1024;
+    private const int MaxExtractEntries = 5000;
+
+    /// <summary>点击"上传插件"按钮 → 触发隐藏的文件选择框</summary>
+    private async Task TriggerUploadAsync()
+    {
+        _uploadStatus = null;
+        await JS.InvokeVoidAsync("snet.clickFileInput");
+    }
+
+    private async Task OnUploadAsync(InputFileChangeEventArgs e)
+    {
+        var file = e.File;
+        if (file is null) return;
+        _uploadStatus = new UploadStatus(string.Format(T("正在上传 {0} ..."), file.Name), false);
+        if (!file.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            _uploadStatus = new UploadStatus(T("仅支持 .zip 插件包"), true);
+            Toast.Error(T("仅支持 .zip 插件包"));
+            return;
+        }
+        if (file.Size > 100 * 1024 * 1024)
+        {
+            _uploadStatus = new UploadStatus(T("插件包超过 100MB 限制"), true);
+            Toast.Error(T("插件包超过 100MB 限制"));
+            return;
+        }
+        var type = Enum.Parse<PluginType>(_uploadType);
+        var zipName = Path.GetFileNameWithoutExtension(file.Name);
+        // 安全：插件名白名单（防 ".." / "." / 空名 等路径穿越），并对齐 NuGet 包名规则
+        if (string.IsNullOrEmpty(zipName) || zipName is "." or ".." || !PluginNameRegex.IsMatch(zipName))
+        {
+            Toast.Error(T("插件包名不合法"));
+            return;
+        }
+        var typePath = Path.Combine(WebPaths.FilePath, _uploadType.ToLower());
+        var libPath = Path.Combine(typePath, zipName);
+        if (!Path.GetFullPath(libPath).StartsWith(Path.GetFullPath(typePath) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+        {
+            Toast.Error(T("插件路径不合法"));
+            return;
+        }
+
+        _uploading = true;
+        var tempPath = Path.Combine(Path.GetTempPath(), "snet-upload-" + Guid.NewGuid().ToString("N"));
+        try
+        {
+            // 1. 先解压到临时目录（ZipSlip 校验 + zip 炸弹防护）
+            Directory.CreateDirectory(tempPath);
+            await using (var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024))
+            {
+                var zipPath = Path.Combine(tempPath, "plugin.zip");
+                await using (var fs = File.Create(zipPath))
+                    await stream.CopyToAsync(fs);
+                using var zip = ZipFile.OpenRead(zipPath);
+                long totalBytes = 0;
+                if (zip.Entries.Count > MaxExtractEntries)
+                    throw new InvalidDataException(T("压缩包条目过多"));
+                foreach (var entry in zip.Entries)
+                {
+                    totalBytes += entry.Length;
+                    if (totalBytes > MaxExtractBytes)
+                        throw new InvalidDataException(T("解压后体积超过限制"));
+                    var dest = Path.GetFullPath(Path.Combine(tempPath, entry.FullName));
+                    if (!dest.StartsWith(Path.GetFullPath(tempPath), StringComparison.OrdinalIgnoreCase))
+                        throw new InvalidDataException("非法的压缩包路径");
+                }
+                ZipFile.ExtractToDirectory(zipPath, tempPath, true);
+            }
+
+            // 2. 在临时目录先 InitPlugin 探测验证，成功后才进入 lib 目录
+            var iName = string.Format("Snet.Model.interface.I{0}", type);
+            var result = PluginHandlerCore.PluginOperate.InitPlugin(tempPath, iName);
+            if (result.Count == 0)
+            {
+                _uploadStatus = new UploadStatus(T("插件上传失败，未检索到对应接口"), true);
+                Toast.Error(T("插件上传失败，未检索到对应接口"));
+                return;
+            }
+
+            // 3. 验证通过：同名插件执行热更新前需用户确认（对齐 WPF 询问流程）
+            if (Directory.Exists(libPath))
+            {
+                _pendingHotUpdate = (tempPath, type, zipName, result);
+                _confirmHotUpdate = true;
+                return; // tempPath 与 _uploading 保持，由确认/取消路径收尾
+            }
+
+            await InstallUploadedAsync(tempPath, type, zipName, result, hotUpdate: false);
+        }
+        catch (Exception ex)
+        {
+            _uploadStatus = new UploadStatus(T("插件上传失败") + ": " + ex.Message, true);
+            Toast.Error(T("插件上传失败") + ": " + ex.Message);
+        }
+        finally
+        {
+            if (_pendingHotUpdate is null)
+            {
+                if (Directory.Exists(tempPath))
+                {
+                    try { Directory.Delete(tempPath, true); } catch { /* 清理失败不影响主流程 */ }
+                }
+                _uploading = false;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 安装已探测验证的插件包：停设备 → 旧目录原子让位 → 新包就位 → 卸载旧程序集/清备份 → 更新清单。
+    /// 让位失败立即恢复旧目录；本次停掉的设备在 finally 中恢复（无论清单保存成败）。
+    /// </summary>
+    private async Task InstallUploadedAsync(string tempPath, PluginType type, string zipName,
+        List<(PluginModel Model, object? Param)> result, bool hotUpdate)
+    {
+        var typePath = Path.Combine(WebPaths.FilePath, type.ToString().ToLower());
+        var libPath = Path.Combine(typePath, zipName);
+        var stoppedDevices = new List<DeviceRuntime>();
+        string? backupPath = null;
+        try
+        {
+            if (hotUpdate)
+            {
+                stoppedDevices = await StopDevicesUsingPluginAsync(type, zipName);
+                // 旧目录先原子让位（同盘 rename）：新包 Move 失败时立即恢复，旧插件不毁
+                backupPath = libPath + ".old-" + Guid.NewGuid().ToString("N")[..8];
+                Directory.Move(libPath, backupPath);
+                try
+                {
+                    Directory.Move(tempPath, libPath);
+                }
+                catch
+                {
+                    Directory.Move(backupPath, libPath); // 恢复旧目录后向上抛
+                    backupPath = null;
+                    throw;
+                }
+                Toast.Info(T("同名插件已存在，执行热更新"));
+            }
+            else
+            {
+                Directory.Move(tempPath, libPath);
+            }
+
+            var names = new List<string>();
+            foreach (var (model, _) in result)
+            {
+                model.Path = libPath;
+                // 热更新/重复上传时先移除同名旧列表项，避免重复显示
+                _plugins.RemoveAll(p => p.Name == model.Name);
+                _plugins.Add(new PluginListModel(model.Name, type, model.Version, DateTime.Now, model));
+                names.Add(model.Name);
+            }
+            await SavePluginListAsync();
+            // 与文件强制同步（防内存/文件漂移），并确保列表区渲染
+            _plugins = LoadPluginList();
+            _tab = 0; // 强制切回"已装插件"Tab，让上传结果立即可见
+            _uploadStatus = new UploadStatus(string.Format(T("上传成功：{0}，已安装 {1}，见下方「已安装插件」列表"), zipName + ".zip", string.Join("、", names)), false);
+            Toast.Success(string.Format(T("插件上传成功：{0}"), zipName + ".zip"));
+            StateHasChanged();
+
+            // 新包就位后卸载旧插件程序集并清理备份（对齐 WPF PrivateRemovalPlugin：卸载 + GC，避免文件锁）
+            if (backupPath is not null)
+            {
+                foreach (var old in _plugins.Where(p => Path.GetFullPath(p.PluginDetails.Path) == Path.GetFullPath(libPath)).ToList())
+                {
+                    try { PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
+                }
+                GC.Collect();
+                GC.WaitForPendingFinalizers();
+                try { Directory.Delete(backupPath, true); } catch { /* 备份清理失败不影响主流程 */ }
+            }
+        }
+        finally
+        {
+            // 恢复热更新前正在运行的设备（只恢复本次停掉的，不复活用户手动停止的）
+            foreach (var rt in stoppedDevices)
+                await rt.CollectAsync();
+        }
+    }
+
+    private async Task ConfirmHotUpdateAsync()
+    {
+        var pending = _pendingHotUpdate;
+        _confirmHotUpdate = false;
+        _pendingHotUpdate = null;
+        if (pending is not { } p) return;
+        try
+        {
+            await InstallUploadedAsync(p.TempPath, p.Type, p.ZipName, p.Probe, hotUpdate: true);
+        }
+        catch (Exception ex)
+        {
+            _uploadStatus = new UploadStatus(T("插件上传失败") + ": " + ex.Message, true);
+            Toast.Error(T("插件上传失败") + ": " + ex.Message);
+        }
+        finally
+        {
+            if (Directory.Exists(p.TempPath))
+            {
+                try { Directory.Delete(p.TempPath, true); } catch { /* 清理失败不影响主流程 */ }
+            }
+            _uploading = false;
+        }
+    }
+
+    private void CancelHotUpdate()
+    {
+        _confirmHotUpdate = false;
+        var pending = _pendingHotUpdate;
+        _pendingHotUpdate = null;
+        if (pending is { } p && Directory.Exists(p.TempPath))
+        {
+            try { Directory.Delete(p.TempPath, true); } catch { /* 清理失败不影响主流程 */ }
+        }
+        _uploading = false;
+    }
+
+    /// <summary>停用使用该插件的运行设备并返回列表（MQ 插件影响所有转发设备，全部暂停）</summary>
+    private async Task<List<DeviceRuntime>> StopDevicesUsingPluginAsync(PluginType type, string pluginName)
+    {
+        var stopped = new List<DeviceRuntime>();
+        foreach (var rt in RuntimeManager.Runtimes)
+        {
+            var match = type == PluginType.Daq
+                ? rt.DeviceType == pluginName
+                : rt.IsRun; // MQ 插件与设备关联在地址转发中，简化：全部停止
+            if (match && rt.IsRun)
+            {
+                await rt.StopAsync();
+                stopped.Add(rt);
+            }
+        }
+        return stopped;
+    }
+
+    /// <summary>保存插件清单（写门串行 + 重试写，对齐 ProjectConfig 落盘方式）。失败抛 IOException（调用方 catch 提示）</summary>
+    private async Task SavePluginListAsync()
+    {
+        Directory.CreateDirectory(WebPaths.UiConfigPath);
+        await AppState.ConfigSaveGate.WaitAsync();
+        try
+        {
+            var list = new ObservableCollection<PluginListModel>(_plugins);
+            if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginListConfigPath, list.ToJson(true)))
+                throw new IOException($"写入失败: {WebPaths.PluginListConfigPath}");
+        }
+        finally
+        {
+            AppState.ConfigSaveGate.Release();
+        }
+    }
+
+    private Task RefreshPluginList()
+    {
+        _plugins = LoadPluginList();
+        StateHasChanged();
+        return Task.CompletedTask;
+    }
+
+    /// <summary>卡片"移除"按钮：记录待移除插件并弹出确认</summary>
+    private void RemovePluginAsync(PluginListModel item)
+    {
+        _removingPlugin = item;
+        // 同 dll 目录（PluginDetails.Path 一致）的其他插件条目将一并移除（对齐 WPF PrivateRemovalPlugin）
+        _removingSharedCount = Math.Max(0, _plugins.Count(p => SamePluginPath(p.PluginDetails?.Path, item.PluginDetails?.Path)) - 1);
+        _confirmRemove = true;
+    }
+
+    private async Task ConfirmRemoveAsync()
+    {
+        var selected = _removingPlugin;
+        _confirmRemove = false;
+        _removingPlugin = null;
+        var sharedCount = _removingSharedCount;
+        _removingSharedCount = 0;
+        if (selected is null) return;
+        var path = selected.PluginDetails?.Path;
+        // 同 dll 目录（Path 一致）的全部插件条目（对齐 WPF PrivateRemovalPlugin：删目录后一并清列表，不留幽灵条目）
+        var sharedNames = _plugins
+            .Where(p => SamePluginPath(p.PluginDetails?.Path, path))
+            .Select(p => p.Name)
+            .ToList();
+        var coreOk = false;
+        try
+        {
+            // 停用相关设备（对齐 WPF 按 Path 停设备：同包内所有插件名的设备都受影响）
+            if (selected.Type == PluginType.Daq)
+            {
+                foreach (var name in sharedNames)
+                    await StopDevicesUsingPluginAsync(PluginType.Daq, name);
+            }
+            else
+            {
+                await StopDevicesUsingPluginAsync(PluginType.Mq, selected.Name);
+            }
+            // 传 className（Core 按插件名实时扫描 lib 目录定位），传路径会查不到导致永远失败
+            coreOk = await PluginHandlerCore.PluginOperate.RemovePluginAsync(selected.Name);
+            if (coreOk && !string.IsNullOrEmpty(path) && Directory.Exists(path))
+            {
+                try
+                {
+                    Directory.Delete(path, true);
+                }
+                catch (Exception ex)
+                {
+                    Toast.Warning(T("插件目录清理失败") + ": " + ex.Message + "，" + T("重启服务器后可彻底清理"));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(T("插件移除失败") + ": " + ex.Message);
+        }
+        // 无论 Core 调用结果如何，列表与配置文件都要同步（目录可能已删，避免残留幽灵条目）：
+        // 同 Path 的其余插件一并移除（对齐 WPF 倒序删除同路径条目）
+        var removedCount = _plugins.RemoveAll(p => SamePluginPath(p.PluginDetails?.Path, path));
+        try { await SavePluginListAsync(); } catch { /* 文件写失败下次刷新纠正 */ }
+        _uploadStatus = new UploadStatus(coreOk
+            ? string.Format(T("插件已移除：{0}"), removedCount > 1 ? $"{selected.Name} 等 {removedCount} 个插件" : selected.Name)
+            : string.Format(T("插件目录移除失败（列表已清理）：{0}"), selected.Name), !coreOk);
+        Toast.Success(coreOk ? T("插件移除成功") : T("插件已从列表移除，目录清理失败"));
+        // 感知更新：使用该插件的设备配置可能已失效，刷新项目树引用
+        AppState.NotifyEntityChanged();
+        StateHasChanged();
+    }
+
+    /// <summary>同 dll 目录判定（对齐 WPF PluginDetails.Path 一致即同包），忽略大小写与尾分隔符差异</summary>
+    private static bool SamePluginPath(string? a, string? b)
+    {
+        if (string.IsNullOrEmpty(a) || string.IsNullOrEmpty(b)) return false;
+        return string.Equals(
+            a.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            b.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    private async Task VerifyStatusAsync()
+    {
+        _verifying = true;
+        try
+        {
+            var failed = new List<string>();
+            foreach (var item in AppState.PluginDict.Values)
+            {
+                var iName = string.Format("Snet.Model.interface.I{0}", item.Type);
+                var result = await PluginHandlerCore.PluginOperate.StatusVerifyAsync(iName, item.Name, item.Param);
+                item.Status = result.Status;
+                if (!result.Status) failed.Add(item.Name);
+            }
+            // 状态变化也感知同步（树中设备/MQ 名称包含 SN，状态不影响名称但保持引用一致）
+            AppState.NotifyEntityChanged();
+            Toast.Success(failed.Count == 0 ? T("状态验证通过") : $"{T("验证完成")}，{failed.Count} 个异常");
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(T("状态验证失败") + ": " + ex.Message);
+        }
+        finally
+        {
+            _verifying = false;
+        }
+    }
+
+    /// <summary>从已装插件卡片添加配置：保持当前 tab 打开弹窗（取消/关闭不跳转），保存成功后切到「插件配置」展示新配置</summary>
+    private async Task AddConfigForPluginAsync(PluginListModel item)
+    {
+        _editingConfig = null;
+        _newConfigType = item.Type.ToString();
+        _newConfigPluginName = _plugins.Any(p => p.Name == item.Name && p.Type == item.Type)
+            ? item.Name
+            : _plugins.FirstOrDefault(p => p.Type == item.Type)?.Name ?? "";
+        _configParam = "{}";
+        _paramTab = "form";
+        _paramJsonError = null;
+        _configEditing = true;
+        await LoadBasicsParamAsync();
+        await LoadParamDefAsync();
+    }
+
+    /// <summary>类型切换时联动更新插件下拉（@bind 状态下 select 仅浏览器选中、组件状态不更新），并加载默认参数</summary>
+    private async Task OnConfigTypeChange(ChangeEventArgs e)
+    {
+        _newConfigType = e.Value?.ToString() ?? "Daq";
+        _newConfigPluginName = _plugins.FirstOrDefault(p => p.Type.ToString() == _newConfigType)?.Name ?? "";
+        await LoadBasicsParamAsync();
+        await LoadParamDefAsync();
+    }
+
+    /// <summary>插件下拉切换时加载该插件的默认基础参数（IArgs.GetBasicsArgsAsync）</summary>
+    private async Task OnPluginNameChange(ChangeEventArgs e)
+    {
+        _newConfigPluginName = e.Value?.ToString() ?? "";
+        await LoadBasicsParamAsync();
+        await LoadParamDefAsync();
+    }
+
+    private async Task LoadBasicsParamAsync()
+    {
+        var plugin = _plugins.FirstOrDefault(p => p.Name == _newConfigPluginName && p.Type.ToString() == _newConfigType);
+        if (plugin is null) return;
+        _loadingParam = true;
+        try
+        {
+            var json = await GetBasicsArgsJsonAsync(plugin.Name, plugin.Type);
+            if (!string.IsNullOrEmpty(json))
+                _configParam = FormatParam(json);
+        }
+        catch
+        {
+            // 加载失败保持现有输入，不打断用户
+        }
+        finally
+        {
+            _loadingParam = false;
+        }
+    }
+
+    /// <summary>创建临时插件实例读取默认基础参数，返回 JSON 文本</summary>
+    private static async Task<string?> GetBasicsArgsJsonAsync(string name, PluginType type)
+    {
+        try
+        {
+            if (type == PluginType.Daq)
+            {
+                var d = await PluginHandlerCore.PluginOperate.CreateAsync<IDaq>(name, "{}", PluginType.Daq);
+                if (d is null) return null;
+                var r = await d.GetBasicsArgsAsync(CancellationToken.None);
+                await SafeReleaseInstanceAsync(d);
+                return r.Status && r.ResultData is not null
+                    ? System.Text.Json.JsonSerializer.Serialize(r.ResultData, JsonIndented)
+                    : null;
+            }
+            var m = await PluginHandlerCore.PluginOperate.CreateAsync<IMq>(name, "{}", PluginType.Mq);
+            if (m is null) return null;
+            var rm = await m.GetBasicsArgsAsync(CancellationToken.None);
+            await SafeReleaseInstanceAsync(m);
+            return rm.Status && rm.ResultData is not null
+                ? System.Text.Json.JsonSerializer.Serialize(rm.ResultData, JsonIndented)
+                : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>创建临时插件实例读取参数定义（GetArgsAsync(false) → ParamModel），用于动态渲染表单</summary>
+    private static async Task<ParamModel?> GetArgsDefAsync(string name, PluginType type)
+    {
+        try
+        {
+            if (type == PluginType.Daq)
+            {
+                var d = await PluginHandlerCore.PluginOperate.CreateAsync<IDaq>(name, "{}", PluginType.Daq);
+                if (d is null) return null;
+                var r = await d.GetArgsAsync(false, CancellationToken.None);
+                await SafeReleaseInstanceAsync(d);
+                return r.Status ? r.ResultData as ParamModel : null;
+            }
+            var m = await PluginHandlerCore.PluginOperate.CreateAsync<IMq>(name, "{}", PluginType.Mq);
+            if (m is null) return null;
+            var rm = await m.GetArgsAsync(false, CancellationToken.None);
+            await SafeReleaseInstanceAsync(m);
+            return rm.Status ? rm.ResultData as ParamModel : null;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>加载参数定义构建表单字段（初值取 Default），并用现有 JSON 回填</summary>
+    private async Task LoadParamDefAsync()
+    {
+        var plugin = _plugins.FirstOrDefault(p => p.Name == _newConfigPluginName && p.Type.ToString() == _newConfigType);
+        if (plugin is null)
+        {
+            _paramDef = null;
+            _protocolField = null;
+            _autoSubset = null;
+            _paramFields = new();
+            return;
+        }
+        try
+        {
+            // 重置协议状态：插件切换后无协议的插件不应残留上一个插件的协议选择器
+            _protocolField = null;
+            _autoSubset = null;
+            _paramDef = await GetArgsDefAsync(plugin.Name, plugin.Type);
+            await RefreshAutoSubsetAsync();
+            BuildParamFields();
+            FromJsonToForm();
+        }
+        catch
+        {
+            _paramDef = null;
+            _protocolField = null;
+            _autoSubset = null;
+            _paramFields = new();
+        }
+    }
+
+    /// <summary>通过插件自动分配机制（用当前参数 JSON 实例化）获取协议属性名与当前协议 subset；失败时回退 subset 名匹配</summary>
+    private async Task RefreshAutoSubsetAsync()
+    {
+        _autoSubset = null;
+        var plugin = _plugins.FirstOrDefault(p => p.Name == _newConfigPluginName && p.Type.ToString() == _newConfigType);
+        if (plugin is null || _paramDef is null) return;
+        var (propName, subset) = await GetAutoSubsetAsync(plugin.Name, plugin.Type, _configParam);
+        if (string.IsNullOrEmpty(propName) || subset is null) return;
+        _autoSubset = subset;
+        // 协议选择器：字段名取插件声明的自动分配属性名，选项取全量定义的 subset 名
+        var desc = _paramDef.Subset.SelectMany(s => s.Propertie)
+            .FirstOrDefault(p => p.PropertyName.Equals(propName, StringComparison.OrdinalIgnoreCase))?.Description;
+        _protocolField = new ParamField
+        {
+            PropertyName = propName!,
+            // 标签语言自适应：英文界面用属性名，中文界面用插件描述；描述不存在时回退属性名
+            Description = Localization.CurrentLanguage == "en" || string.IsNullOrWhiteSpace(desc)
+                ? propName!
+                : desc,
+            Cate = "select",
+            Options = _paramDef.Subset.Where(s => !string.IsNullOrEmpty(s.Name)).Select(s => new ParamOption { Key = s.Name!, Value = s.Name! }).ToList()
+        };
+    }
+
+    /// <summary>创建临时插件实例（传入当前参数 JSON 完成基础数据实例化），
+    /// ExistsAutoAllocatingArgsAsync 检测协议属性名，GetAutoAllocatingArgsAsync 返回当前协议 subset 的属性集合</summary>
+    private static async Task<(string? PropName, ParamModel.subsetSimplify? Subset)> GetAutoSubsetAsync(
+        string name, PluginType type, string paramJson)
+    {
+        try
+        {
+            if (type == PluginType.Daq)
+            {
+                var d = await PluginHandlerCore.PluginOperate.CreateAsync<IDaq>(name, paramJson, PluginType.Daq);
+                if (d is null) return (null, null);
+                var exists = await d.ExistsAutoAllocatingArgsAsync(CancellationToken.None);
+                // ResultData 为 Tuple<Type, string, LibInstanceParam>（Snet.Core 内部类型），反射读 Item2 属性名
+                string? propName = null;
+                if (exists.Status && exists.ResultData is { } tuple)
+                    propName = tuple.GetType().GetProperty("Item2")?.GetValue(tuple)?.ToString();
+                ParamModel.subsetSimplify? subset = null;
+                if (!string.IsNullOrEmpty(propName))
+                {
+                    var auto = await d.GetAutoAllocatingArgsAsync(CancellationToken.None);
+                    if (auto.Status && auto.ResultData is ParamModel.subsetSimplify ss) subset = ss;
+                }
+                await SafeReleaseInstanceAsync(d);
+                return (propName, subset);
+            }
+            var m = await PluginHandlerCore.PluginOperate.CreateAsync<IMq>(name, paramJson, PluginType.Mq);
+            if (m is null) return (null, null);
+            var mexists = await m.ExistsAutoAllocatingArgsAsync(CancellationToken.None);
+            string? mpropName = null;
+            if (mexists.Status && mexists.ResultData is { } mtuple)
+                mpropName = mtuple.GetType().GetProperty("Item2")?.GetValue(mtuple)?.ToString();
+            ParamModel.subsetSimplify? msubset = null;
+            if (!string.IsNullOrEmpty(mpropName))
+            {
+                var mauto = await m.GetAutoAllocatingArgsAsync(CancellationToken.None);
+                if (mauto.Status && mauto.ResultData is ParamModel.subsetSimplify mss) msubset = mss;
+            }
+            await SafeReleaseInstanceAsync(m);
+            return (mpropName, msubset);
+        }
+        catch
+        {
+            return (null, null);
+        }
+    }
+
+    /// <summary>按当前协议类型从参数定义构建表单字段；无协议字段时全量合并去重</summary>
+    private void BuildParamFields()
+    {
+        var def = _paramDef;
+        if (def is null)
+        {
+            _protocolField = null;
+            _paramFields = new();
+            return;
+        }
+        var allProps = def.Subset.SelectMany(s => s.Propertie
+            .Where(p => !string.IsNullOrEmpty(p.PropertyName))
+            .Select(p => (p, s))).ToList();
+        if (_protocolField is not null)
+        {
+            // 协议初值：JSON 存协议名；历史数据可能存数字，用各 subset 的 ProtocolType.Default 数值映射回协议名
+            var jsonProto = ReadJsonText(_protocolField.PropertyName);
+            if (!string.IsNullOrEmpty(jsonProto) && _protocolField.Options.Any(o => o.Key.Equals(jsonProto, StringComparison.OrdinalIgnoreCase)))
+            {
+                _protocolType = jsonProto;
+            }
+            else
+            {
+                var byNum = def.Subset
+                    .Where(s => !string.IsNullOrEmpty(s.Name))
+                    .ToDictionary(s => s.Propertie.FirstOrDefault(p => p.PropertyName.Equals(_protocolField.PropertyName, StringComparison.OrdinalIgnoreCase))?.Default?.ToString() ?? "", s => s.Name!);
+                _protocolType = !string.IsNullOrEmpty(jsonProto) && byNum.TryGetValue(jsonProto, out var name)
+                    ? name
+                    : def.Subset.FirstOrDefault(s => !string.IsNullOrEmpty(s.Name))?.Name ?? "";
+            }
+            // 当前协议 subset：优先插件自动分配结果（GetAutoAllocatingArgsAsync 按 ProtocolType 值返回，
+            // 仅在协议一致时生效），回退 subset 名匹配，再回退全量
+            var matched = new List<ParamModel.subset>();
+            if (_autoSubset is { Name: { } autoName } && autoName.Equals(_protocolType, StringComparison.OrdinalIgnoreCase))
+            {
+                var full = def.Subset.FirstOrDefault(s => string.Equals(s.Name, autoName, StringComparison.OrdinalIgnoreCase));
+                if (full is not null) matched.Add(full);
+            }
+            if (matched.Count == 0)
+                matched = def.Subset.Where(s => string.Equals(s.Name, _protocolType, StringComparison.OrdinalIgnoreCase)).ToList();
+            var source = matched.Count > 0 ? matched : def.Subset;
+            // 协议属性本身作为上方独立选择器，不在表单字段中重复显示。
+            // SN 为唯一标识符，即使插件参数定义 Show=false 也必须显示（对齐 WPF 属性面板行为）
+            _paramFields = source
+                .SelectMany(s => s.Propertie
+                    .Where(p => !string.IsNullOrEmpty(p.PropertyName)
+                                && (p.Show || p.PropertyName.Equals("SN", StringComparison.OrdinalIgnoreCase))
+                                && (p.Use || p.PropertyName.Equals("SN", StringComparison.OrdinalIgnoreCase))
+                                && !p.PropertyName.Equals(_protocolField.PropertyName, StringComparison.OrdinalIgnoreCase)
+                                && !IsMqExcludedField(p.PropertyName))
+                    .Select(p => ToParamField(p, s)))
+                .GroupBy(f => f.PropertyName)
+                .Select(g => g.First())
+                .ToList();
+        }
+        else
+        {
+            _protocolType = "";
+            // 多个 subset 可能重复声明同一属性（重复字段同名覆盖导致表单修改被旧值冲掉），按 PropertyName 去重保留首个。
+            // SN 不受 Show/Use 过滤（对齐 WPF 属性面板始终显示唯一标识符）
+            _paramFields = allProps
+                .Where(x => !string.IsNullOrEmpty(x.p.PropertyName)
+                            && (x.p.Show || x.p.PropertyName.Equals("SN", StringComparison.OrdinalIgnoreCase))
+                            && (x.p.Use || x.p.PropertyName.Equals("SN", StringComparison.OrdinalIgnoreCase))
+                            && !IsMqExcludedField(x.p.PropertyName))
+                .Select(x => ToParamField(x.p, x.s))
+                .GroupBy(f => f.PropertyName)
+                .Select(g => g.First())
+                .ToList();
+        }
+    }
+
+    /// <summary>IMq 表单隐藏字段：Topic 实际不参与传输（MQ 主题取自地址的 Topic，插件配置里的 Topic 用不到）</summary>
+    private bool IsMqExcludedField(string propertyName)
+        => _newConfigType == PluginType.Mq.ToString()
+           && propertyName.Equals("Topic", StringComparison.OrdinalIgnoreCase);
+
+    private ParamField ToParamField(ParamModel.propertie p, ParamModel.subset s)
+    {
+        var f = new ParamField
+        {
+            PropertyName = p.PropertyName,
+            // 标签语言自适应：中文界面用插件描述，英文界面用属性名
+            Description = Localization.CurrentLanguage == "en" || string.IsNullOrWhiteSpace(p.Description)
+                ? p.PropertyName
+                : p.Description,
+            Cate = p.DataCate?.ToString() ?? "text",
+            Value = p.Default?.ToString() ?? "",
+            MustFillIn = p.MustFillIn,
+            DetailsTips = p.DetailsTips,
+            Pattern = p.Pattern,
+            FailTips = p.FailTips,
+            Options = (p.Options ?? new()).Select(o => new ParamOption { Key = o.Key, Value = o.Value?.ToString() ?? o.Key }).ToList(),
+            Group = string.IsNullOrWhiteSpace(s.Name) ? "" : s.Name
+        };
+        // 布尔选项保持按 Key 绑定（下方「是/否」↔ true/false 映射依赖 Key 匹配）
+        if (IsBooleanOptions(f))
+        {
+            foreach (var o in f.Options) o.Value = o.Key;
+        }
+        // 布尔默认值映射：插件声明 Default=true/false，选项是「是/否」，需映射到选项文案否则下拉框显示空
+        if (f.Cate is "select" or "radio" && p.Default is bool b && IsBooleanOptions(f))
+            f.Value = b ? f.Options[0].Key : f.Options[1].Key;
+        return f;
+    }
+
+    /// <summary>协议类型切换：更新 JSON 的协议字段值，用新 JSON 重新获取插件自动分配的 subset，重建表单并回填</summary>
+    private async Task OnProtocolChange(ChangeEventArgs e)
+    {
+        _protocolType = e.Value?.ToString() ?? "";
+        if (_protocolField is not null &&
+            TryParseJsonObject(_configParam, out var root, out _) && root is JsonObject jo)
+        {
+            jo[_protocolField.PropertyName] = JsonValue.Create(_protocolType);
+            _configParam = jo.ToJsonString(JsonIndented);
+        }
+        await RefreshAutoSubsetAsync();
+        BuildParamFields();
+        FromJsonToForm();
+    }
+
+    /// <summary>解析参数 JSON（根节点必须是对象），失败时返回带行列位置的错误描述</summary>
+    private static bool TryParseJsonObject(string json, out JsonNode? root, out string? error)
+    {
+        root = null;
+        error = null;
+        if (string.IsNullOrWhiteSpace(json))
+        {
+            root = new JsonObject();
+            return true;
+        }
+        try
+        {
+            root = JsonNode.Parse(json);
+            if (root is null || root is JsonObject) return true;
+            error = "根节点必须是 JSON 对象 { }";
+            return false;
+        }
+        catch (JsonException ex)
+        {
+            var line = ex.LineNumber is { } ln ? ln + 1 : 1;
+            var col = ex.BytePositionInLine is { } bp ? bp + 1 : 0;
+            error = $"第 {line} 行 第 {col} 列：{ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>JSON → 表单回填（解析失败只报错，不动表单）</summary>
+    private void FromJsonToForm()
+    {
+        if (!TryParseJsonObject(_configParam, out var root, out var err) || root is not JsonObject jo)
+        {
+            _paramJsonError = err;
+            return;
+        }
+        _paramJsonError = null;
+        // 协议类型联动：JSON 中协议值变化时按新协议重建表单字段
+        if (_protocolField is not null)
+        {
+            var jsonProto = ReadJsonText(_protocolField.PropertyName);
+            if (jsonProto is not null && jsonProto != _protocolType)
+            {
+                _protocolType = jsonProto;
+                BuildParamFields();
+            }
+        }
+        foreach (var f in _paramFields)
+        {
+            var node = jo.FirstOrDefault(p => p.Key.Equals(f.PropertyName, StringComparison.OrdinalIgnoreCase)).Value;
+            f.Value = SelectOptionText(f, node);
+            f.Error = ValidateField(f);
+        }
+    }
+
+    /// <summary>JSON 节点 → 控件值。布尔 select（选项为「是/否」或 true/false）按选项顺序映射；其余 select/radio 解析为选项真实值</summary>
+    private static string SelectOptionText(ParamField f, JsonNode? node)
+    {
+        if (f.Cate is "select" or "radio" && node is JsonValue v && v.TryGetValue(out bool b) && IsBooleanOptions(f))
+            return b ? f.Options[0].Key : f.Options[1].Key;
+        var text = NodeToText(node);
+        return f.Cate is "select" or "radio" ? ResolveSelectOption(f, text) : text;
+    }
+
+    /// <summary>JSON 文本 → 选项真实值（Value）。
+    /// 兼容三种存量格式：数值（枚举底层值）、枚举名（"Content"）、旧表单污染的选项文案（"Content(内容)"）→ 下次保存自动修复</summary>
+    private static string ResolveSelectOption(ParamField f, string text)
+    {
+        foreach (var o in f.Options)
+        {
+            if (o.Value == text) return o.Value;
+            if (o.Key == text) return o.Value;
+            // 选项文案格式为 "枚举名(描述)"，JSON 里只存了枚举名
+            if (o.Key.StartsWith(text + "(", StringComparison.Ordinal)) return o.Value;
+        }
+        return text;
+    }
+
+    /// <summary>是否为布尔选项集：恰好两项且为「是/否」或 true/false（大小写不敏感）</summary>
+    private static bool IsBooleanOptions(ParamField f)
+    {
+        if (f.Options.Count != 2) return false;
+        var a = f.Options[0].Key.ToLowerInvariant();
+        var b = f.Options[1].Key.ToLowerInvariant();
+        return (a == "是" && b == "否") || (a == "true" && b == "false");
+    }
+
+    /// <summary>JSON 节点 → 表单文本（字符串去引号、数字/布尔保原文，嵌套节点按 JSON 文本）</summary>
+    private static string NodeToText(JsonNode? node) => node switch
+    {
+        null => "",
+        JsonValue v when v.TryGetValue(out string? s) => s,
+        JsonValue v when v.TryGetValue(out bool b) => b ? "true" : "false",
+        JsonValue v => v.ToString(),
+        _ => node.ToJsonString()
+    };
+
+    /// <summary>从当前参数 JSON 顶层按属性名（大小写不敏感）读取文本值</summary>
+    private string? ReadJsonText(string propertyName)
+    {
+        if (TryParseJsonObject(_configParam, out var root, out _) && root is JsonObject jo)
+        {
+            var node = jo.FirstOrDefault(p => p.Key.Equals(propertyName, StringComparison.OrdinalIgnoreCase)).Value;
+            return node is null ? null : NodeToText(node);
+        }
+        return null;
+    }
+
+    /// <summary>表单 → JSON 合并：保留 JSON 中未被表单展示的字段，按字段名更新表单值（数字/布尔保持类型）</summary>
+    private void SyncFormToJson()
+    {
+        if (!TryParseJsonObject(_configParam, out var root, out _) || root is not JsonObject jo)
+            jo = new JsonObject();
+        foreach (var f in _paramFields)
+        {
+            var key = jo.FirstOrDefault(p => p.Key.Equals(f.PropertyName, StringComparison.OrdinalIgnoreCase)).Key;
+            if (key is null) key = f.PropertyName;
+            jo[key] = ParseFieldValue(f);
+        }
+        // IMq 表单移除 Topic：表单不展示，保存时从 JSON 剔除（历史数据一并清理）
+        if (_newConfigType == PluginType.Mq.ToString())
+        {
+            var topicKey = jo.FirstOrDefault(p => p.Key.Equals("Topic", StringComparison.OrdinalIgnoreCase)).Key;
+            if (topicKey is not null) jo.Remove(topicKey);
+        }
+        _configParam = jo.ToJsonString(JsonIndented);
+        _paramJsonError = null;
+    }
+
+    /// <summary>控件文本 → JSON 值：布尔 select（「是/否」或 true/false）映射回布尔，其余走 ParseParamValue</summary>
+    private static JsonNode? ParseFieldValue(ParamField f)
+    {
+        if (f.Cate is "select" or "radio" && IsBooleanOptions(f))
+        {
+            if (f.Value == f.Options[0].Key) return JsonValue.Create(true);
+            if (f.Value == f.Options[1].Key) return JsonValue.Create(false);
+        }
+        return ParseParamValue(f.Value);
+    }
+
+    /// <summary>表单文本 → JSON 值：数字/布尔保持原类型，其余按字符串写入</summary>
+    private static JsonNode? ParseParamValue(string text)
+    {
+        if (bool.TryParse(text, out var b)) return JsonValue.Create(b);
+        if (long.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var l)) return JsonValue.Create(l);
+        if (double.TryParse(text, NumberStyles.Float, CultureInfo.InvariantCulture, out var d)) return JsonValue.Create(d);
+        return JsonValue.Create(text);
+    }
+
+    /// <summary>字段级校验：Pattern 正则（失败提示取插件定义的 FailTips；必填不强制，由插件自身兜底）</summary>
+    private string? ValidateField(ParamField f)
+    {
+        if (!string.IsNullOrEmpty(f.Pattern))
+        {
+            try
+            {
+                if (!Regex.IsMatch(f.Value ?? "", f.Pattern))
+                    return f.FailTips ?? T("格式有误");
+            }
+            catch
+            {
+                // 插件提供的正则不可用时不校验
+            }
+        }
+        return null;
+    }
+
+    /// <summary>表单字段变更：即时校验 → 合并进 JSON（左侧改右侧同步）</summary>
+    private void OnFieldChanged(ParamField f)
+    {
+        f.Error = ValidateField(f);
+        SyncFormToJson();
+    }
+
+    /// <summary>JSON 输入：实时解析校验（错误立即提示位置），合法则回填表单（右侧改左侧同步）</summary>
+    private void OnJsonInput(ChangeEventArgs e)
+    {
+        _configParam = e.Value?.ToString() ?? "";
+        FromJsonToForm();
+    }
+
+    /// <summary>安全释放临时插件实例（未 On 的实例 Off 可能抛异常，Core 同路径吞掉）</summary>
+    private static async Task SafeReleaseInstanceAsync(object instance)
+    {
+        try
+        {
+            switch (instance)
+            {
+                case IDaq d: await d.OffAsync(); break;
+                case IMq m: await m.OffAsync(); break;
+            }
+        }
+        catch { }
+        try
+        {
+            if (instance is IAsyncDisposable ad) await ad.DisposeAsync();
+        }
+        catch { }
+    }
+
+    private async Task EditConfigAsync(PluginConfigModel item)
+    {
+        _editingConfig = item;
+        _newConfigType = item.Type.ToString();
+        _newConfigPluginName = item.Name;
+        _configParam = FormatParam(item.Param);
+        _paramTab = "form";
+        _paramJsonError = null;
+        _configEditing = true;
+        await LoadParamDefAsync();
+    }
+
+    /// <summary>从参数 JSON 顶层读取 SN 字段（大小写不敏感）</summary>
+    // ================= 组包 / WebApi 设置（对齐 WPF SettingsAutoPack/UpdateAutoPack/RemoveAutoPack + SettingsWebApi 系列） =================
+
+    private void OpenAutoPack(PluginConfigModel item)
+    {
+        _autoPackConfig = item;
+        _autoPackMaxByteLength = item.AutoPack?.MaxByteLength ?? 200;
+        _autoPackFormat = (item.AutoPack?.Format ?? DataFormat.ABCD).ToString();
+    }
+
+    private void CloseAutoPack() => _autoPackConfig = null;
+
+    private async Task SaveAutoPackAsync()
+    {
+        var item = _autoPackConfig;
+        if (item is null) return;
+        _autoPackConfig = null;
+        if (!Enum.TryParse<DataFormat>(_autoPackFormat, out var format))
+        {
+            Toast.Error(T("数据字节序格式不合法"));
+            return;
+        }
+        item.AutoPack = new AddressAutoPackModel { MaxByteLength = _autoPackMaxByteLength, Format = format };
+        await SavePluginConfigFileAsync();
+        Toast.Success(T("组包设置已保存"));
+    }
+
+    private async Task RemoveAutoPackAsync()
+    {
+        var item = _autoPackConfig;
+        if (item is null) return;
+        _autoPackConfig = null;
+        item.AutoPack = null;
+        await SavePluginConfigFileAsync();
+        Toast.Success(T("组包已移除"));
+    }
+
+    private void OpenWebApi(PluginConfigModel item)
+    {
+        _webApiConfig = item;
+        _webApiIp = item.WebApi?.IpAddress ?? "";
+        _webApiPort = item.WebApi?.Port ?? 80;
+        _webApiCrossDomain = item.WebApi?.CrossDomain ?? false;
+    }
+
+    private void CloseWebApi() => _webApiConfig = null;
+
+    private async Task SaveWebApiAsync()
+    {
+        var item = _webApiConfig;
+        if (item is null) return;
+        _webApiConfig = null;
+        if (string.IsNullOrWhiteSpace(_webApiIp))
+        {
+            Toast.Warning(T("Ip 地址不能为空"));
+            return;
+        }
+        item.WebApi = new WAModel(_webApiIp, _webApiPort, _webApiCrossDomain);
+        await SavePluginConfigFileAsync();
+        Toast.Success(T("WebApi 设置已保存"));
+    }
+
+    private async Task RemoveWebApiAsync()
+    {
+        var item = _webApiConfig;
+        if (item is null) return;
+        _webApiConfig = null;
+        item.WebApi = null;
+        await SavePluginConfigFileAsync();
+        Toast.Success(T("WebApi 已移除"));
+    }
+
+    /// <summary>落盘 PluginConfig.json（写门串行 + 重试写，供组包/WebApi 等轻量更新复用）</summary>
+    private async Task SavePluginConfigFileAsync()
+    {
+        await AppState.ConfigSaveGate.WaitAsync();
+        try
+        {
+            var list = new ObservableCollection<PluginConfigModel>(AppState.PluginDict.Values.OrderBy(p => p.Index));
+            if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath, list.ToJson(true)))
+                Toast.Error(T("插件配置写入失败"));
+        }
+        finally
+        {
+            AppState.ConfigSaveGate.Release();
+        }
+    }
+
+    /// <summary>使用检查（对齐 DAQ UseCheck）：ProjectConfig.json 全文包含 Guid 即视为被项目引用。读失败视为未使用，不阻断操作也不击穿电路</summary>
+    private static bool IsConfigUsedByProject(string guid)
+    {
+        if (!File.Exists(WebPaths.ProjectConfigPath)) return false;
+        try
+        {
+            return File.ReadAllText(WebPaths.ProjectConfigPath).Contains(guid);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>插件配置文件名 = ConfigFormat 模板格式化 SN（对齐 WPF AddPluginConfigAsync），无模板时回退原始 SN</summary>
+    private static string BuildConfigFileName(PluginListModel? plugin, string sn)
+    {
+        var format = plugin?.PluginDetails.ConfigFormat;
+        if (string.IsNullOrWhiteSpace(format)) return sn;
+        try
+        {
+            return string.Format(format, sn);
+        }
+        catch (FormatException)
+        {
+            // 插件清单 ConfigFormat 异常（多占位符/不配对花括号）：回退原始 SN，不让外部数据中断保存
+            return sn;
+        }
+    }
+
+    /// <summary>插件参数文件目录 config/{daq|mq}（对齐 WPF GlobalConfigModel.ConfigPath 布局）</summary>
+    private static string TypeConfigDir(PluginType type) =>
+        type == PluginType.Daq ? WebPaths.DaqPluginConfigPath : WebPaths.MqPluginConfigPath;
+
+    private static string? ExtractSnFromParam(string param)
+    {
+        if (string.IsNullOrWhiteSpace(param)) return null;
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(param);
+            if (doc.RootElement.ValueKind != System.Text.Json.JsonValueKind.Object) return null;
+            foreach (var prop in doc.RootElement.EnumerateObject())
+            {
+                if (prop.Name.Equals("SN", StringComparison.OrdinalIgnoreCase))
+                    return prop.Value.ValueKind == System.Text.Json.JsonValueKind.String
+                        ? prop.Value.GetString()
+                        : prop.Value.ToString();
+            }
+        }
+        catch
+        {
+            return null;
+        }
+        return null;
+    }
+
+    private static string FormatParam(string param)
+    {
+        if (string.IsNullOrWhiteSpace(param)) return "{}";
+        try
+        {
+            using var doc = System.Text.Json.JsonDocument.Parse(param);
+            // 中文不转义（与 JsonIndented 一致）
+            return System.Text.Json.JsonSerializer.Serialize(doc.RootElement, JsonIndented);
+        }
+        catch
+        {
+            return param;
+        }
+    }
+
+    private void CloseConfigDialog() => _configEditing = false;
+
+    private async Task SaveConfigAsync()
+    {
+        // 表单视图保存前先合并进 JSON（与实时同步同一路径）
+        if (_paramTab == "form") SyncFormToJson();
+        var param = string.IsNullOrWhiteSpace(_configParam) ? "" : _configParam;
+        // JSON 语法校验：错误带行列位置，立即提示"哪里错了"
+        if (!TryParseJsonObject(param, out _, out var jsonError))
+        {
+            _paramJsonError = jsonError;
+            _paramTab = "json";
+            Toast.Error($"{T("参数 JSON 错误")}：{jsonError}");
+            return;
+        }
+        _paramJsonError = null;
+        // 字段级校验（必填 / 正则），有错切到表单视图定位
+        foreach (var f in _paramFields) f.Error = ValidateField(f);
+        var invalid = _paramFields.FirstOrDefault(f => f.Error is not null);
+        if (invalid is not null)
+        {
+            _paramTab = "form";
+            Toast.Error($"{T("参数校验失败")}：{invalid.Description} {invalid.Error}");
+            return;
+        }
+        var sn = ExtractSnFromParam(param);
+        if (string.IsNullOrWhiteSpace(sn))
+        {
+            Toast.Warning(T("参数中缺少 SN，请在参数 JSON 中填写 SN"));
+            return;
+        }
+
+        // 配置写门内完成：冲突检查 → per-SN 文件 → 字典 → PluginConfig.json（重试写，失败回滚内存与文件）
+        PluginConfigModel? newConfig = null;
+        string? newConfigFile = null;
+        await AppState.ConfigSaveGate.WaitAsync();
+        try
+        {
+            if (_editingConfig is not null)
+            {
+                var plugin = _plugins.FirstOrDefault(p => p.Name == _editingConfig.Name && p.Type == _editingConfig.Type);
+                AppStateService.NormalizeConfigPath(_editingConfig);
+                if (string.IsNullOrWhiteSpace(_editingConfig.ConfigPath))
+                    _editingConfig.ConfigPath = TypeConfigDir(_editingConfig.Type);
+                // 对齐 WPF UpdatePluginConfigAsync 子串替换语义（不依赖 ConfigFormat）：
+                // 旧 SN 从原参数提取后在既有文件名中替换；参数中无旧 SN 时回退 ConfigFormat 模板
+                var oldRawSn = ExtractSnFromParam(_editingConfig.Param);
+                var oldFileName = _editingConfig.SN;
+                var newFileName = !string.IsNullOrWhiteSpace(oldRawSn) && oldFileName.Contains(oldRawSn)
+                    ? oldFileName.Replace(oldRawSn, sn)
+                    : BuildConfigFileName(plugin, sn);
+                if (AppState.PluginDict.Values.Any(p => p.Guid != _editingConfig.Guid && p.SN == newFileName))
+                {
+                    Toast.Error(T("SN 已存在"));
+                    return;
+                }
+                if (!_editingConfig.Check(newFileName, oldFileName))
+                {
+                    Toast.Error(T("修改失败，插件配置文件名称已经存在，请修改SN"));
+                    return;
+                }
+                var rollbackSn = _editingConfig.SN;
+                var rollbackParam = _editingConfig.Param;
+                var rollbackTime = _editingConfig.Time;
+                _editingConfig.Param = param;
+                _editingConfig.Time = DateTime.Now;
+                // 先写新参数文件成功后再删旧文件（Core UpdateSnAndFileName 内部回滚）
+                if (!_editingConfig.UpdateSnAndFileName(newFileName, oldFileName))
+                {
+                    _editingConfig.SN = rollbackSn;
+                    _editingConfig.Param = rollbackParam;
+                    _editingConfig.Time = rollbackTime;
+                    Toast.Error(T("插件配置写入失败"));
+                    return;
+                }
+                _editRollback = (rollbackSn, rollbackParam, rollbackTime);
+            }
+            else
+            {
+                var plugin = _plugins.FirstOrDefault(p => p.Name == _newConfigPluginName && p.Type.ToString() == _newConfigType);
+                if (plugin is null)
+                {
+                    Toast.Warning(T("请选择插件"));
+                    return;
+                }
+                // 对齐 WPF AddPluginConfigAsync：SN = 文件名，同步写入 per-SN 参数文件
+                var configDir = TypeConfigDir(plugin.Type);
+                var fileName = BuildConfigFileName(plugin, sn);
+                if (File.Exists(Path.Combine(configDir, fileName)) || AppState.PluginDict.Values.Any(p => p.SN == fileName))
+                {
+                    Toast.Error(T("添加失败，插件配置文件已经存在"));
+                    return;
+                }
+                var config = new PluginConfigModel
+                {
+                    Guid = Guid.NewGuid().ToString(),
+                    Index = AppState.PluginDict.Count + 1, // 对齐 WPF：新增序号 = 当前数量 + 1
+                    SN = fileName,
+                    Type = plugin.Type,
+                    Name = plugin.Name,
+                    Param = param,
+                    Time = DateTime.Now,
+                    ConfigPath = configDir,
+                    Status = false
+                };
+                if (!config.UpdateLocalConfig())
+                {
+                    Toast.Error(T("插件配置写入失败"));
+                    return;
+                }
+                AppState.PluginDict[config.Guid] = config;
+                newConfig = config;
+                newConfigFile = Path.Combine(configDir, fileName);
+            }
+            var list = new ObservableCollection<PluginConfigModel>(AppState.PluginDict.Values.OrderBy(p => p.Index));
+            // 重试写（对齐 ProjectConfig 落盘方式）：注意 Core 该方法失败返回 false 而不抛异常，必须检查返回值
+            var saved = await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath, list.ToJson(true));
+            if (!saved)
+            {
+                // 落盘失败：回滚内存与 per-SN 文件，保持内存/磁盘一致
+                if (newConfig is not null)
+                {
+                    AppState.PluginDict.Remove(newConfig.Guid, out _);
+                    if (newConfigFile is not null && File.Exists(newConfigFile))
+                    {
+                        try { File.Delete(newConfigFile); } catch { }
+                    }
+                }
+                else if (_editingConfig is not null && _editRollback is { } rb)
+                {
+                    _editingConfig.Param = rb.Param;
+                    _editingConfig.Time = rb.Time;
+                    _editingConfig.UpdateSnAndFileName(rb.Sn, _editingConfig.SN);
+                }
+                Toast.Error(T("插件配置写入失败"));
+                return;
+            }
+            _editRollback = null;
+            // 感知更新：项目树中引用该插件配置的节点（设备 SN / MQ 传输名）同步刷新
+            AppState.NotifyEntityChanged();
+            Toast.Success(_editingConfig is null ? T("配置添加成功") : T("配置修改成功"));
+            _configEditing = false;
+            _editingConfig = null;
+            // 从已装插件入口添加的配置：保存成功才切到「插件配置」展示新配置列表
+            _tab = 1;
+        }
+        finally
+        {
+            AppState.ConfigSaveGate.Release();
+        }
+    }
+
+    private async Task RemoveConfigAsync(PluginConfigModel item)
+    {
+        // 删除保护（对齐 DAQ RemovePluginConfigAsync.UseCheck）：项目配置引用了该配置则不能移除
+        if (IsConfigUsedByProject(item.Guid))
+        {
+            Toast.Warning(T("该插件配置在项目设置中有使用"));
+            return;
+        }
+        await AppState.ConfigSaveGate.WaitAsync();
+        try
+        {
+            AppStateService.NormalizeConfigPath(item);
+            // 对齐 WPF RemovePluginConfigAsync：连同 per-SN 参数文件一起删除
+            var configDir = string.IsNullOrWhiteSpace(item.ConfigPath) ? TypeConfigDir(item.Type) : item.ConfigPath;
+            var configFile = Path.Combine(configDir, item.SN);
+            AppState.PluginDict.Remove(item.Guid, out _);
+            var list = new ObservableCollection<PluginConfigModel>(AppState.PluginDict.Values.OrderBy(p => p.Index));
+            var saved = await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath, list.ToJson(true));
+            if (!saved)
+            {
+                AppState.PluginDict[item.Guid] = item; // 回滚内存
+                Toast.Error(T("插件配置写入失败"));
+                return;
+            }
+            // JSON 落盘成功后再删参数文件
+            if (File.Exists(configFile)) File.Delete(configFile);
+            // 感知更新：树中 MQ 传输节点保持引用但名称不再变化；设备节点引用移除后不复活（Refresh 不塞回）
+            AppState.NotifyEntityChanged();
+            Toast.Success(T("配置已移除"));
+        }
+        finally
+        {
+            AppState.ConfigSaveGate.Release();
+        }
+    }
+
+    private void OpenDaqTest(PluginConfigModel item, string mode)
+    {
+        _daqTestConfig = item;
+        _daqTestMode = mode;
+        _daqTestAddress = "";
+        _daqTestValue = "";
+        _daqTestRunning = false;
+    }
+
+    private void CloseDaqTest() => _daqTestConfig = null;
+
+    private async Task RunDaqTestAsync()
+    {
+        var item = _daqTestConfig;
+        if (item is null) return;
+        if (string.IsNullOrWhiteSpace(_daqTestAddress))
+        {
+            Toast.Warning(T("地址不能为空"));
+            return;
+        }
+        if (_daqTestMode == "write" && string.IsNullOrWhiteSpace(_daqTestValue))
+        {
+            Toast.Warning(T("值不能为空"));
+            return;
+        }
+        _daqTestRunning = true;
+        try
+        {
+            var model = new AddressModelCore
+            {
+                Address = _daqTestAddress,
+                Type = _daqTestType,
+                Length = _daqTestLength,
+                EncodingType = _daqTestEncoding
+            };
+            if (_daqTestMode == "read")
+            {
+                var r = await model.TestReadAddressAsync(item);
+                CloseDaqTest();
+                ShowTestResult(r);
+                if (r.Status) Toast.Success($"{T("读取成功")}: {r.Message}");
+                else Toast.Error($"{T("读取失败")}: {r.Message}");
+            }
+            else
+            {
+                var write = new DaqPluginOperateModel.WriteModel
+                {
+                    Address = _daqTestAddress,
+                    Value = ParseWriteValue(_daqTestValue, _daqTestType),
+                    AddressDataType = _daqTestType,
+                    EncodingType = _daqTestEncoding
+                };
+                var r = await model.TestWriteAddressAsync(item, write);
+                CloseDaqTest();
+                ShowTestResult(r);
+                if (r.Status) Toast.Success($"{T("写入成功")}: {r.Message}");
+                else Toast.Error($"{T("写入失败")}: {r.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            CloseDaqTest();
+            _testResult = new TestResult(false, ex.Message, null);
+            Toast.Error($"{T("测试失败")}: {ex.Message}");
+        }
+        finally
+        {
+            _daqTestRunning = false;
+        }
+    }
+
+    /// <summary>按地址数据类型把用户输入字符串转换为对应 CLR 类型（失败回退字符串）</summary>
+    private static object ParseWriteValue(string s, DataType t)
+    {
+        try
+        {
+            var dotnetType = t switch
+            {
+                DataType.Byte => typeof(byte),
+                DataType.Short or DataType.Int16 => typeof(short),
+                DataType.Ushort or DataType.UInt16 => typeof(ushort),
+                DataType.Int or DataType.Int32 => typeof(int),
+                DataType.Uint or DataType.UInt32 => typeof(uint),
+                DataType.Long or DataType.Int64 => typeof(long),
+                DataType.Ulong or DataType.UInt64 => typeof(ulong),
+                DataType.Float or DataType.Single => typeof(float),
+                DataType.Double => typeof(double),
+                DataType.Bool => typeof(bool),
+                _ => null
+            };
+            if (dotnetType is not null) return Convert.ChangeType(s, dotnetType);
+        }
+        catch { }
+        return s;
+    }
+
+    private void OpenMqTest(PluginConfigModel item)
+    {
+        _mqTestConfig = item;
+        _mqTestTopic = "";
+        _mqTestContent = "";
+        _mqTestRunning = false;
+    }
+
+    private void CloseMqTest() => _mqTestConfig = null;
+
+    private void CloseTestResult() => _testResult = null;
+
+    /// <summary>OperateResult.ResultData → 缩进 JSON 文本（失败/不可序列化时回退 ToString）</summary>
+    private static string? FormatResultData(object? data)
+    {
+        if (data is null) return null;
+        try
+        {
+            return System.Text.Json.JsonSerializer.Serialize(data, JsonIndented);
+        }
+        catch
+        {
+            return data.ToString();
+        }
+    }
+
+    private void ShowTestResult(OperateResult r)
+        => _testResult = new TestResult(r.Status, string.IsNullOrWhiteSpace(r.Message) ? T("无消息") : r.Message, FormatResultData(r.ResultData));
+
+    private async Task RunMqTestAsync()
+    {
+        var item = _mqTestConfig;
+        if (item is null) return;
+        if (string.IsNullOrWhiteSpace(_mqTestTopic))
+        {
+            Toast.Warning(T("Topic 不能为空"));
+            return;
+        }
+        _mqTestRunning = true;
+        try
+        {
+            var r = await PluginHandlerCore.TestProduceAsync(item, _mqTestTopic, _mqTestContent);
+            CloseMqTest();
+            ShowTestResult(r);
+            if (r.Status) Toast.Success($"{T("生产成功")}: {r.Message}");
+            else Toast.Error($"{T("生产失败")}: {r.Message}");
+        }
+        catch (Exception ex)
+        {
+            CloseMqTest();
+            _testResult = new TestResult(false, ex.Message, null);
+            Toast.Error($"{T("测试失败")}: {ex.Message}");
+        }
+        finally
+        {
+            _mqTestRunning = false;
+        }
+    }
+}
