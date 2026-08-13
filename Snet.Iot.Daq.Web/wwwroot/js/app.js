@@ -47,6 +47,9 @@ window.snet = {
         document.documentElement.setAttribute('lang', lang);
         try { localStorage.setItem('snet-lang', lang); } catch (e) { }
     },
+    getLang: function () {
+        try { return localStorage.getItem('snet-lang') || ''; } catch (e) { return ''; }
+    },
     /* 日志自动跟随滚动：新日志到达时滚到底部；用户上滚回溯时暂停跟随 */
     logScroll: {
         _auto: true,

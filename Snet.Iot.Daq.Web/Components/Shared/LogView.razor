@@ -13,6 +13,13 @@
     [Parameter] public int MaxLines { get; set; } = 2000;
 
     private ElementReference _element;
+    private List<string>? _renderedLines;
+
+    /// <summary>日志文本不随语言变化：仅当日志快照引用变化时才重渲染，隔离语言切换/父组件无关重渲染
+    /// （2000 条日志全量渲染是页面最大开销，父组件每次 StateHasChanged 都会级联触发，ShouldRender 拦截后大幅提速）</summary>
+    protected override bool ShouldRender() => !ReferenceEquals(_renderedLines, Lines);
+
+    protected override void OnAfterRender(bool firstRender) => _renderedLines = Lines;
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {

@@ -11,6 +11,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/.NET-10.0-blue?logo=dotnet"/>
   <img src="https://img.shields.io/badge/platform-Windows-success?logo=windows"/>
+  <img src="https://img.shields.io/badge/Web-Linux%20x64%20%2F%20ARM64-blue?logo=linux"/>
   <img src="https://img.shields.io/badge/license-MIT-green"/>
   <img src="https://img.shields.io/badge/Core-cross--platform-lightgrey"/>
   <img src="https://img.shields.io/github/stars/shunnet/Daq?style=social"/>
@@ -33,16 +34,18 @@
 **Snet.Iot.Daq** 是依托 **Snet.cn 工业通信库** 开发的插件化数采工具，专为工业设备数据采集场景设计。
 
 ```
-┌─────────────────────────────────┐
-│   Snet.Iot.Daq (WPF 桌面应用)    │  ← UI 层：MVVM + 现代化界面
-├─────────────────────────────────┤
-│   Snet.Iot.Daq.Core (类库)       │  ← 核心层：业务逻辑 / 数据模型 / 服务
-├─────────────────────────────────┤
-│   Snet.cn 工业通信库          │  ← 底层：插件框架 / 通信协议 / 工具
-└─────────────────────────────────┘
+┌────────────────────────────────────────┐
+│  Snet.Iot.Daq (WPF 桌面应用 / Windows)  │  ← UI 层：MVVM + 现代化界面
+├────────────────────────────────────────┤
+│  Snet.Iot.Daq.Web (Web 应用 / Linux)    │  ← UI 层：Blazor Server，浏览器访问
+├────────────────────────────────────────┤
+│  Snet.Iot.Daq.Core (类库)               │  ← 核心层：业务逻辑 / 数据模型 / 服务
+├────────────────────────────────────────┤
+│  Snet.cn 工业通信库                  │  ← 底层：插件框架 / 通信协议 / 工具
+└────────────────────────────────────────┘
 ```
 
-> 💡 Core 层不依赖 WPF，可被 Avalonia 等跨平台框架复用（已有适配器预留）
+> 💡 Core 层不依赖 WPF，桌面版（Windows）与 Web 跨平台版（Linux / ARM64）共用同一核心业务逻辑
 
 ## 🚀 功能总览
 
@@ -60,6 +63,7 @@
 | ⚡ **设备软启动** | 软件启动时自动开始采集，无需手动干预 |
 | 🔔 **系统托盘** | 最小化后台运行，托盘右键直接启停设备，单实例保护 |
 | 🌐 **多语言 / 🌓 主题** | 中英文切换 · 暗 / 亮主题，图表跟随变色 |
+| 🌐 **Web 跨平台版** | Blazor Server 浏览器访问，与桌面版共享 Core，支持 Linux x64 / ARM64 部署 |
 
 ### 🎯 适用场景
 
@@ -92,6 +96,38 @@
 
 > 🤖 **AI 辅助开发**：推荐使用 [Snet.SKILLS](https://github.com/shunnet/SKILLS) —— 针对 SNET 架构的 AI 技能集合，加速插件开发。
 
+## 🌐 WEB 跨平台版本（Snet.Iot.Daq.Web）
+
+Snet.Iot.Daq 的 **Blazor Server Web 版**，与桌面版共用 `Snet.Iot.Daq.Core` 全部业务能力，浏览器访问即可使用，无需安装客户端。
+
+- **平台支持**：Windows / Linux x64 / Linux ARM64（树莓派、飞腾、鲲鹏等）
+- **部署方式**：Docker 多架构镜像 / Ubuntu systemd / 裸机运行
+- **功能对齐**：插件热插拔、OPC UA 服务端、MQTT Broker、WebAPI、自动组包、设备软启动、多用户与权限管理
+- **差异项**：无桌面版专属的 ScottPlot 图表、系统托盘与 GPU 监控
+
+### 🐳 Docker 部署（推荐，支持多架构）
+
+```bash
+git clone https://github.com/shunnet/Daq.git && cd Daq
+docker compose -f Snet.Iot.Daq.Web/docker-compose.yml up -d --build
+# 浏览器访问 http://<服务器IP>:5051
+```
+
+多架构镜像（linux/amd64 + linux/arm64）由 GitHub Actions 自动构建并推送到 `ghcr.io`。
+
+### 🐧 Ubuntu 裸机部署
+
+```bash
+sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh          # 自动装运行时 → 发布 → systemd 服务
+sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh --port 8080 --data /srv/snet-daq
+```
+
+### 📦 GitHub Actions 多平台打包
+
+推送 `v*` tag 自动触发：产出 **linux-x64 / linux-arm64 / win-x64** 发布包（附 systemd 部署脚本）与 **ghcr.io 双架构 Docker 镜像**，并发布到 [GitHub Releases](https://github.com/shunnet/Daq/releases)。
+
+📄 完整部署细节（数据持久化 / 端口 / 安全加固）见 [Snet.Iot.Daq.Web/README.DEPLOY.md](Snet.Iot.Daq.Web/README.DEPLOY.md)。
+
 ## 📦 安装与使用
 
 ### 📋 环境要求
@@ -120,7 +156,30 @@ cd Daq
 
 > 💡 **无需编译？** 前往 [GitHub Releases](https://github.com/shunnet/Daq/releases) 下载预编译 ZIP 包，解压即用。
 
+## 👥 账号与权限（仅 WEB 跨平台版）
+
+> 💡 桌面版（WPF）为单机使用，无登录与权限体系；以下权限模型仅适用于 **WEB 跨平台版（Snet.Iot.Daq.Web）**。
+
+系统采用管理员 / 普通用户两级权限：
+
+| 角色 | 权限 |
+|------|------|
+| **管理员** | 全部功能：插件浏览与设置、地址管理、项目配置、采集启停、WebApi / 组包设置、服务端管理、用户管理 |
+| **普通用户** | **只读访问**：仅可查看控制台（设备状态、系统监控、运行日志），无任何操作按钮 |
+
+**默认管理员账号**：`snet` / `123456`
+
+**首次登录修改密码**（系统强制）：
+
+1. 使用 `snet` / `123456` 登录，系统自动进入修改密码页面
+2. 输入当前密码 `123456`、新密码（至少 6 位）并确认
+3. 保存后使用新密码重新登录
+
+> ⚠️ 生产部署后请立即修改默认密码；普通用户由管理员在「用户管理」页面创建。
+
 ## 🖥️ 界面展示
+
+### 🖥️ 桌面版（WPF / Windows）
 
 <p align="center">
   <img src="images/home.png" width="900"/>
@@ -130,6 +189,18 @@ cd Daq
   <img src="images/prs.png" width="900"/>
   <img src="images/cs.png" width="900"/>
   <img src="images/ccs.png" width="900"/>
+</p>
+
+### 🌐 Web 跨平台版（浏览器访问）
+
+<p align="center">
+  <img src="images/w1.png" width="900"/>
+  <img src="images/w2.png" width="900"/>
+  <img src="images/w3.png" width="900"/>
+  <img src="images/w4.png" width="900"/>
+  <img src="images/w5.png" width="900"/>
+  <img src="images/w6.png" width="900"/>
+  <img src="images/w7.png" width="900"/>
 </p>
 
 ## 📚 资源与社区

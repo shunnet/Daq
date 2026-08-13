@@ -1206,6 +1206,7 @@ html[lang^="zh"] .config-summary-label::after { content: "：" }
 select.pagebar-size, select.form-select {
     width: auto;
     padding: 6px 10px;
+    padding-right: 34px; /* 保留自定义箭头空间（全局 select 的 34px 被上方 padding 简写覆盖，数字会与箭头重叠） */
 }
 
 /* ============================================================

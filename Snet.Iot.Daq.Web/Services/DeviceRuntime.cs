@@ -1,4 +1,4 @@
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.Threading.Channels;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
@@ -55,6 +55,7 @@ public class DeviceRuntime : IAsyncDisposable
     private readonly Action<string> _pushLog;
     private readonly Action<DeviceRuntime> _pushState;
     private readonly Func<OpcUaServiceOperate?> _uaService;
+    private readonly LocalizationService _localization;
 
     private DqaHandler? _daqHandler;
     private Channel<EventDataResult>? _dataChannel;
@@ -82,7 +83,7 @@ public class DeviceRuntime : IAsyncDisposable
     public string UpdateTime { get; private set; } = "-";
     public int CollectTimeSeconds => (int)_runtime.TotalSeconds;
 
-    public DeviceRuntime(IProjectTreeViewModel deviceNode, Func<OpcUaServiceOperate?> uaService, Action<string> pushLog, Action<DeviceRuntime> pushState)
+    public DeviceRuntime(IProjectTreeViewModel deviceNode, Func<OpcUaServiceOperate?> uaService, Action<string> pushLog, Action<DeviceRuntime> pushState, LocalizationService localization)
     {
         _daqConfig = deviceNode.DaqDetails!;
         _deviceNode = deviceNode;
@@ -93,8 +94,11 @@ public class DeviceRuntime : IAsyncDisposable
         _uaService = uaService;
         _pushLog = pushLog;
         _pushState = pushState;
+        _localization = localization;
         DeviceName = deviceNode.Name;
     }
+
+    private string T(string key) => _localization.T(key);
 
     /// <summary>
     /// 刷新配置快照（对齐 WPF 每次刷新重读设备配置）：参数/地址集/层级/名称同步到最新项目树。
@@ -144,7 +148,7 @@ public class DeviceRuntime : IAsyncDisposable
                 LedGreen = false;
                 LedRed = true;
                 _pushState(this);
-                _pushLog($"[{DeviceName}] 启动采集失败: {result.Message}");
+                _pushLog(string.Format(T("[{0}] 启动采集失败: {1}"), DeviceName, result.Message));
                 return;
             }
 
@@ -154,7 +158,7 @@ public class DeviceRuntime : IAsyncDisposable
             LedRed = false;
             _runtime.Start();
             _pushState(this);
-            _pushLog($"[{DeviceName}] 启动采集成功，地址数 {AddressCount}");
+            _pushLog(string.Format(T("[{0}] 启动采集成功，地址数 {1}"), DeviceName, AddressCount));
 
             if (_daqConfig.WebApi is not null)
             {
@@ -162,11 +166,11 @@ public class DeviceRuntime : IAsyncDisposable
                 {
                     var waResult = await _daqHandler.WAOnAsync(_daqConfig.Guid, _daqConfig.WebApi);
                     // 对齐 WPF CollectAsync 的 WASatrtAsync 提示：无论成败都反馈
-                    _pushLog($"[{DeviceName}] WebApi 启动{(waResult.Status ? "成功" : "失败")}: {waResult.Message}");
+                    _pushLog(string.Format(T("[{0}] WebApi 启动{1}: {2}"), DeviceName, waResult.Status ? T("成功") : T("失败"), waResult.Message));
                 }
                 catch (Exception ex)
                 {
-                    _pushLog($"[{DeviceName}] WebApi 启动异常: {ex.Message}");
+                    _pushLog(string.Format(T("[{0}] WebApi 启动异常: {1}"), DeviceName, ex.Message));
                 }
             }
         }
@@ -175,7 +179,7 @@ public class DeviceRuntime : IAsyncDisposable
             CollectStatus = "异常";
             LedRed = true;
             _pushState(this);
-            _pushLog($"[{DeviceName}] 启动采集异常: {ex.Message}");
+            _pushLog(string.Format(T("[{0}] 启动采集异常: {1}"), DeviceName, ex.Message));
         }
         finally
         {
@@ -205,7 +209,7 @@ public class DeviceRuntime : IAsyncDisposable
                 }
                 catch (Exception ex)
                 {
-                    _pushLog($"[{DeviceName}] 退订异常: {ex.Message}");
+                    _pushLog(string.Format(T("[{0}] 退订异常: {1}"), DeviceName, ex.Message));
                 }
                 // 对齐 WPF StopAsync：停止设备时同步关闭 WebApi
                 if (_daqConfig.WebApi is not null)
@@ -216,7 +220,7 @@ public class DeviceRuntime : IAsyncDisposable
                     }
                     catch (Exception ex)
                     {
-                        _pushLog($"[{DeviceName}] WebApi 关闭异常: {ex.Message}");
+                        _pushLog(string.Format(T("[{0}] WebApi 关闭异常: {1}"), DeviceName, ex.Message));
                     }
                 }
                 _daqHandler.OnDataEventAsync -= OnDataEvent;
@@ -236,7 +240,7 @@ public class DeviceRuntime : IAsyncDisposable
             LedGreen = false;
             LedRed = false;
             _pushState(this);
-            _pushLog($"[{DeviceName}] 停止采集");
+            _pushLog(string.Format(T("[{0}] 停止采集"), DeviceName));
         }
         finally
         {
@@ -259,7 +263,7 @@ public class DeviceRuntime : IAsyncDisposable
     public void SetSoftCollect(bool on)
     {
         _deviceNode.IsSoftStart = on;
-        _pushLog($"[{DeviceName}] {(on ? "添加软启采集" : "取消软启采集")}");
+        _pushLog(string.Format(T("[{0}] {1}"), DeviceName, on ? T("添加软启采集") : T("取消软启采集")));
     }
 
     /// <summary>WebApi 启动（对齐 WPF WASatrtAsync：状态预检 → 未设置参数/未运行提示失败 → WAOnAsync）</summary>
@@ -267,15 +271,15 @@ public class DeviceRuntime : IAsyncDisposable
     {
         var handler = _daqHandler;
         if (handler is null)
-            return OperateResult.CreateFailureResult($"[{DeviceName}] 采集未启动，无法操作 WebApi");
+            return OperateResult.CreateFailureResult(string.Format(T("[{0}] 采集未启动，无法操作 WebApi"), DeviceName));
         if (_daqConfig.WebApi is null)
-            return OperateResult.CreateFailureResult($"[{DeviceName}] 未设置 WebApi 参数");
+            return OperateResult.CreateFailureResult(string.Format(T("[{0}] 未设置 WebApi 参数"), DeviceName));
         // 对齐 WPF WASatrtAsync：先查状态，失败（设备未连接等）则提示并停止
         var status = await handler.WAStatusAsync(_daqConfig.Guid);
         if (!status.Status)
-            return OperateResult.CreateFailureResult($"[{DeviceName}] {status.Message}");
+            return OperateResult.CreateFailureResult(string.Format(T("[{0}] {1}"), DeviceName, status.Message));
         var result = await handler.WAOnAsync(_daqConfig.Guid, _daqConfig.WebApi);
-        _pushLog($"[{DeviceName}] WebApi 启动{(result.Status ? "成功" : "失败")}: {result.Message}");
+        _pushLog(string.Format(T("[{0}] WebApi 启动{1}: {2}"), DeviceName, result.Status ? T("成功") : T("失败"), result.Message));
         return result;
     }
 
@@ -284,9 +288,9 @@ public class DeviceRuntime : IAsyncDisposable
     {
         var handler = _daqHandler;
         if (handler is null)
-            return OperateResult.CreateFailureResult($"[{DeviceName}] 采集未启动，无法操作 WebApi");
+            return OperateResult.CreateFailureResult(string.Format(T("[{0}] 采集未启动，无法操作 WebApi"), DeviceName));
         var result = await handler.WAOffAsync(_daqConfig.Guid);
-        _pushLog($"[{DeviceName}] WebApi 停止{(result.Status ? "成功" : "失败")}: {result.Message}");
+        _pushLog(string.Format(T("[{0}] WebApi 停止{1}: {2}"), DeviceName, result.Status ? T("成功") : T("失败"), result.Message));
         return result;
     }
 
@@ -295,7 +299,7 @@ public class DeviceRuntime : IAsyncDisposable
     {
         var handler = _daqHandler;
         if (handler is null)
-            return OperateResult.CreateFailureResult($"[{DeviceName}] 采集未启动，无法操作 WebApi");
+            return OperateResult.CreateFailureResult(string.Format(T("[{0}] 采集未启动，无法操作 WebApi"), DeviceName));
         return await handler.WARequestExampleAsync(_daqConfig.Guid);
     }
 
@@ -314,7 +318,7 @@ public class DeviceRuntime : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _pushLog($"[{DeviceName}] 数据入队异常: {ex.Message}");
+            _pushLog(string.Format(T("[{0}] 数据入队异常: {1}"), DeviceName, ex.Message));
         }
     }
 
@@ -357,7 +361,7 @@ public class DeviceRuntime : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            _pushLog($"[{DeviceName}] 数据通道异常: {ex.Message}");
+            _pushLog(string.Format(T("[{0}] 数据通道异常: {1}"), DeviceName, ex.Message));
         }
         finally
         {
@@ -385,12 +389,12 @@ public class DeviceRuntime : IAsyncDisposable
                     var mq = _mqHandlers.GetOrAdd(mqConfig.Guid, _ => new MqHandler(mqConfig));
                     var result = await mq.ProduceAsync(mqConfig.Guid, address, value);
                     if (!result.Status)
-                        ThrottledLog($"MQ 转发失败 {address.Address}: {result.Message}", address.Address);
+                        ThrottledLog(string.Format(T("MQ 转发失败 {0}: {1}"), address.Address, result.Message), address.Address);
                 }
             }
             catch (Exception ex)
             {
-                ThrottledLog($"地址 {addressKey} 处理异常: {ex.Message}", addressKey);
+                ThrottledLog(string.Format(T("地址 {0} 处理异常: {1}"), addressKey, ex.Message), addressKey);
             }
         }
     }
@@ -433,7 +437,7 @@ public class DeviceRuntime : IAsyncDisposable
                 {
                     // 标记失败，避免每个数据事件重复创建并刷屏
                     _uaFailedAddresses.Add(addressName);
-                    ThrottledLog($"UA 地址创建失败 {addressName}: {createResult.Message}", "ua:" + addressName);
+                    ThrottledLog(string.Format(T("UA 地址创建失败 {0}: {1}"), addressName, createResult.Message), "ua:" + addressName);
                     return;
                 }
 
@@ -467,11 +471,11 @@ public class DeviceRuntime : IAsyncDisposable
             };
             var writeResult = await service.WriteAsync(writeDict, CancellationToken.None);
             if (!writeResult.Status)
-                ThrottledLog($"UA 写入失败 {addressName}: {writeResult.Message}", "ua:" + addressName);
+                ThrottledLog(string.Format(T("UA 写入失败 {0}: {1}"), addressName, writeResult.Message), "ua:" + addressName);
         }
         catch (Exception ex)
         {
-            ThrottledLog($"UA 转发异常 {addressKey}: {ex.Message}", "ua:" + addressKey);
+            ThrottledLog(string.Format(T("UA 转发异常 {0}: {1}"), addressKey, ex.Message), "ua:" + addressKey);
         }
     }
 
@@ -498,7 +502,7 @@ public class DeviceRuntime : IAsyncDisposable
                 }
                 else
                 {
-                    ThrottledLog($"UA 层级创建失败 {item}: {result.Message}", "uafolder:" + item);
+                    ThrottledLog(string.Format(T("UA 层级创建失败 {0}: {1}"), item, result.Message), "uafolder:" + item);
                 }
             }
             _uaFolder = folder;
@@ -506,7 +510,7 @@ public class DeviceRuntime : IAsyncDisposable
         }
         catch (Exception ex)
         {
-            ThrottledLog($"UA 层级创建异常: {ex.Message}", "uafolder");
+            ThrottledLog(string.Format(T("UA 层级创建异常: {0}"), ex.Message), "uafolder");
             return null;
         }
     }

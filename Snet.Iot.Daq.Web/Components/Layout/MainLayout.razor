@@ -102,6 +102,15 @@
             _isAdmin = state.User.Identity?.IsAuthenticated == true
                 && state.User.IsInRole(AuthService.RoleAdmin);
         }
+        // 同步服务端语言：UI 语言持久化在 localStorage（JS），服务器重启后服务端 Localization 回到默认 zh，
+        // 不恢复会导致服务层消息（设备日志/Toast）始终中文
+        try
+        {
+            var saved = await JS.InvokeAsync<string>("snet.getLang");
+            if (saved is "en" or "zh" && Localization.CurrentLanguage != saved)
+                await Localization.SetLanguageAsync(saved);
+        }
+        catch { }
     }
 
     private Task SetZhAsync() => SetLangAsync("zh");

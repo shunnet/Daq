@@ -70,7 +70,7 @@ public class AuthService
             }
             catch (Exception ex)
             {
-                // 凭据文件损坏：自愈重建为默认账号（admin/admin + 强制改密），避免登录接口持续 500
+                // 凭据文件损坏：自愈重建为默认账号（snet/123456 + 强制改密），避免登录接口持续 500
                 Console.Error.WriteLine($"[AuthService] User.json 损坏，已重建默认账号: {ex.Message}");
             }
         }
@@ -83,8 +83,8 @@ public class AuthService
     {
         var salt = RandomNumberGenerator.GetBytes(SaltSize);
         return new UserRecord(
-            Username: "admin",
-            PasswordHash: HashPassword("admin", salt),
+            Username: "snet",
+            PasswordHash: HashPassword("123456", salt),
             Salt: Convert.ToBase64String(salt),
             MustChangePassword: true,
             FailedAttempts: 0,

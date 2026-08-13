@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Mqtt.service;
@@ -48,12 +48,12 @@ public class DaqHostedService : BackgroundService
             // 启动内嵌服务端（对齐 WPF ConsoleModel.InitAsync：读 config/server/*.json 自动启动 UA/MQTT）
             await InitServerServicesAsync();
             _sampler.Start();
-            _loggerBuffer.Push($"[Info] Daq 宿主启动完成，设备 {_runtimeManager.Runtimes.Count()} 台");
+            _loggerBuffer.Push(string.Format(T("[Info] Daq 宿主启动完成，设备 {0} 台"), _runtimeManager.Runtimes.Count()));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Daq 宿主初始化失败");
-            _loggerBuffer.Push($"[Error] Daq 宿主初始化失败: {ex.Message}");
+            _loggerBuffer.Push(string.Format(T("[Error] Daq 宿主初始化失败: {0}"), ex.Message));
         }
 
         while (!stoppingToken.IsCancellationRequested)
@@ -172,7 +172,7 @@ public class DaqHostedService : BackgroundService
         }
         catch (Exception ex)
         {
-            _loggerBuffer.Push($"[Error] 服务停止异常: {ex.Message}");
+            _loggerBuffer.Push(string.Format(T("[Error] 服务停止异常: {0}"), ex.Message));
             return (false, ex.Message);
         }
         return (false, T("未知服务"));
@@ -191,16 +191,16 @@ public class DaqHostedService : BackgroundService
             {
                 service.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
                 await service.DisposeAsync();
-                _loggerBuffer.Push($"[Error] MQTT 服务端启动失败: {result.Message}");
+                _loggerBuffer.Push(string.Format(T("[Error] MQTT 服务端启动失败: {0}"), result.Message));
                 return false;
             }
             _appState.MqttService = service;
-            _loggerBuffer.Push("[Info] MQTT 服务端已启动");
+            _loggerBuffer.Push(T("[Info] MQTT 服务端已启动"));
             return true;
         }
         catch (Exception ex)
         {
-            _loggerBuffer.Push($"[Error] MQTT 服务端启动异常: {ex.Message}");
+            _loggerBuffer.Push(string.Format(T("[Error] MQTT 服务端启动异常: {0}"), ex.Message));
             return false;
         }
     }
@@ -218,16 +218,16 @@ public class DaqHostedService : BackgroundService
             {
                 service.OnInfoEventAsync -= UaService_OnInfoEventAsync;
                 await service.DisposeAsync();
-                _loggerBuffer.Push($"[Error] OPC UA 服务端启动失败: {result.Message}");
+                _loggerBuffer.Push(string.Format(T("[Error] OPC UA 服务端启动失败: {0}"), result.Message));
                 return false;
             }
             _appState.UaService = service;
-            _loggerBuffer.Push("[Info] OPC UA 服务端已启动");
+            _loggerBuffer.Push(T("[Info] OPC UA 服务端已启动"));
             return true;
         }
         catch (Exception ex)
         {
-            _loggerBuffer.Push($"[Error] OPC UA 服务端启动异常: {ex.Message}");
+            _loggerBuffer.Push(string.Format(T("[Error] OPC UA 服务端启动异常: {0}"), ex.Message));
             return false;
         }
     }
@@ -244,7 +244,7 @@ public class DaqHostedService : BackgroundService
                 _appState.MqttService = null;
             }
         }
-        catch (Exception ex) { _loggerBuffer.Push($"[Error] MQTT 服务端停止异常: {ex.Message}"); }
+        catch (Exception ex) { _loggerBuffer.Push(string.Format(T("[Error] MQTT 服务端停止异常: {0}"), ex.Message)); }
         try
         {
             if (_appState.UaService is not null)
@@ -255,7 +255,7 @@ public class DaqHostedService : BackgroundService
                 _appState.UaService = null;
             }
         }
-        catch (Exception ex) { _loggerBuffer.Push($"[Error] OPC UA 服务端停止异常: {ex.Message}"); }
+        catch (Exception ex) { _loggerBuffer.Push(string.Format(T("[Error] OPC UA 服务端停止异常: {0}"), ex.Message)); }
     }
 
     /// <summary>服务端事件 → 控制台信息区（对齐 WPF ShowAsync 的 ToJson 展示）</summary>

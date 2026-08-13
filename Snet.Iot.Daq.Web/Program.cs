@@ -73,6 +73,9 @@ if (!app.Environment.IsDevelopment())
 }
 
 WebPaths.Init(app.Configuration);
+// 对齐 WPF（程序目录即工作目录）：Snet.Opc UA 节点持久化（Opc.Ua.Service.Nodes.Json）与 Core 日志（logs/）
+// 均按相对路径写入当前目录——把 CWD 切到数据目录，避免在启动目录（如代码目录）产生这些文件
+Directory.SetCurrentDirectory(WebPaths.DataDir);
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
@@ -92,8 +95,13 @@ app.Use(async (ctx, next) =>
         || path.StartsWithSegments("/icons")
         || path.StartsWithSegments("/images")
         || path.StartsWithSegments("/_content")
-        || path == "/app.css"
-        || path == "/images/icon.png";
+        // MapStaticAssets 指纹化：静态资源实际 URL 为 /app.{hash}.css 等形式，
+        // StartsWithSegments 按段匹配无法覆盖，改按扩展名放行全部静态资源
+        || path.Value?.EndsWith(".css", StringComparison.OrdinalIgnoreCase) == true
+        || path.Value?.EndsWith(".js", StringComparison.OrdinalIgnoreCase) == true
+        || path.Value?.EndsWith(".png", StringComparison.OrdinalIgnoreCase) == true
+        || path.Value?.EndsWith(".svg", StringComparison.OrdinalIgnoreCase) == true
+        || path.Value?.EndsWith(".ico", StringComparison.OrdinalIgnoreCase) == true;
     if (ctx.User.Identity?.IsAuthenticated == true
         && ctx.User.HasClaim("mustChangePassword", "true")
         && !allowed)

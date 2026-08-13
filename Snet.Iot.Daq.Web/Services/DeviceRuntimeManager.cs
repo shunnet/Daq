@@ -12,14 +12,16 @@ public class DeviceRuntimeManager
 {
     private readonly ConcurrentDictionary<string, DeviceRuntime> _runtimes = new();
     private readonly LoggerBuffer _logger;
+    private readonly LocalizationService _localization;
     private readonly object _syncLock = new();
 
     public event Action? RuntimesChanged;
     public event Action<DeviceRuntime>? RuntimeStateChanged;
 
-    public DeviceRuntimeManager(LoggerBuffer logger, AppStateService appState)
+    public DeviceRuntimeManager(LoggerBuffer logger, AppStateService appState, LocalizationService localization)
     {
         _logger = logger;
+        _localization = localization;
         // 感知更新：插件/地址/项目修改后立即同步设备快照（SN、层级、地址集）
         appState.EntityChanged += () => SyncFromProjects(appState);
     }
@@ -41,7 +43,7 @@ public class DeviceRuntimeManager
                 if (device.DaqDetails is null) continue;
                 valid.Add(device.DaqDetails.Guid);
                 var runtime = _runtimes.GetOrAdd(device.DaqDetails.Guid, guid =>
-                    new DeviceRuntime(device, () => appState.UaService, _logger.Push, rt => RuntimeStateChanged?.Invoke(rt)));
+                    new DeviceRuntime(device, () => appState.UaService, _logger.Push, rt => RuntimeStateChanged?.Invoke(rt), _localization));
                 // 配置快照刷新：参数/地址集变化时运行中设备自动重订阅（对齐 WPF 修改后自动 Retry）
                 var changed = runtime.RefreshSettings(device);
                 // 软启设备（IsSoftStart 持久化于项目树）：宿主启动/配置同步时自动恢复采集

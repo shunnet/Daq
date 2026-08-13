@@ -1,7 +1,9 @@
-using System.Collections;
+﻿using System.Collections;
 using System.Globalization;
 using System.Resources;
+using Snet.Core.handler;
 using Snet.Iot.Daq.Core;
+using Snet.Model.@enum;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -193,6 +195,7 @@ public class LocalizationService
         ["已加入下载队列"] = "Added to download queue",
         ["已停止下载"] = "Download stopped",
         ["服务"] = "Service",
+        ["服务配置"] = "Service config",
         ["服务已启动"] = "Service already running",
         ["服务未启动"] = "Service is not running",
         ["MQTT 服务启动成功"] = "MQTT service started",
@@ -269,6 +272,46 @@ public class LocalizationService
         ["移除所有"] = "Remove All",
         ["已移除全部地址与传输设备"] = "All addresses and transfer devices removed",
         ["确认移除该设备下所有地址与传输设备？"] = "Remove all addresses and transfer devices under this device?",
+        ["JSON"] = "JSON",
+        ["Topic"] = "Topic",
+        ["保存成功"] = "Saved successfully",
+        ["分页"] = "Pagination",
+        ["成功"] = "succeeded",
+        ["失败"] = "failed",
+        ["异常"] = "error",
+        ["启动失败"] = "Failed to start",
+        ["[{0}] 启动采集失败: {1}"] = "[{0}] Failed to start collection: {1}",
+        ["[{0}] 启动采集成功，地址数 {1}"] = "[{0}] Collection started, {1} addresses",
+        ["[{0}] WebApi 启动{1}: {2}"] = "[{0}] WebApi {1}: {2}",
+        ["[{0}] WebApi 停止{1}: {2}"] = "[{0}] WebApi {1}: {2}",
+        ["[{0}] WebApi 启动异常: {1}"] = "[{0}] WebApi start error: {1}",
+        ["[{0}] WebApi 关闭异常: {1}"] = "[{0}] WebApi close error: {1}",
+        ["[{0}] 启动采集异常: {1}"] = "[{0}] Collection start error: {1}",
+        ["[{0}] 退订异常: {1}"] = "[{0}] Unsubscribe error: {1}",
+        ["[{0}] 停止采集"] = "[{0}] Collection stopped",
+        ["[{0}] {1}"] = "[{0}] {1}",
+        ["[{0}] 采集未启动，无法操作 WebApi"] = "[{0}] Collection not running, cannot operate WebApi",
+        ["[{0}] 未设置 WebApi 参数"] = "[{0}] WebApi parameters not set",
+        ["[{0}] 数据入队异常: {1}"] = "[{0}] Data enqueue error: {1}",
+        ["[{0}] 数据通道异常: {1}"] = "[{0}] Data channel error: {1}",
+        ["MQ 转发失败 {0}: {1}"] = "MQ forward failed {0}: {1}",
+        ["地址 {0} 处理异常: {1}"] = "Address {0} error: {1}",
+        ["UA 地址创建失败 {0}: {1}"] = "UA address creation failed {0}: {1}",
+        ["UA 写入失败 {0}: {1}"] = "UA write failed {0}: {1}",
+        ["UA 转发异常 {0}: {1}"] = "UA forward error {0}: {1}",
+        ["UA 层级创建失败 {0}: {1}"] = "UA folder creation failed {0}: {1}",
+        ["UA 层级创建异常: {0}"] = "UA folder creation error: {0}",
+        ["[Info] Daq 宿主启动完成，设备 {0} 台"] = "[Info] Daq host started, {0} devices",
+        ["[Error] Daq 宿主初始化失败: {0}"] = "[Error] Daq host init failed: {0}",
+        ["[Error] 服务停止异常: {0}"] = "[Error] Service stop error: {0}",
+        ["[Error] MQTT 服务端启动失败: {0}"] = "[Error] MQTT server start failed: {0}",
+        ["[Info] MQTT 服务端已启动"] = "[Info] MQTT server started",
+        ["[Error] MQTT 服务端启动异常: {0}"] = "[Error] MQTT server start error: {0}",
+        ["[Error] MQTT 服务端停止异常: {0}"] = "[Error] MQTT server stop error: {0}",
+        ["[Error] OPC UA 服务端启动失败: {0}"] = "[Error] OPC UA server start failed: {0}",
+        ["[Info] OPC UA 服务端已启动"] = "[Info] OPC UA server started",
+        ["[Error] OPC UA 服务端启动异常: {0}"] = "[Error] OPC UA server start error: {0}",
+        ["[Error] OPC UA 服务端停止异常: {0}"] = "[Error] OPC UA server stop error: {0}",
     };
 
     public string CurrentLanguage { get; private set; } = "zh";
@@ -300,9 +343,11 @@ public class LocalizationService
     {
         if (lang == CurrentLanguage) return;
         CurrentLanguage = lang == "en" ? "en" : "zh";
+        // 对齐 WPF：先同步切换 Core 全局语言（LanguageHandler 静态 cultureInfo），
+        // 插件 / 服务端 / 采集错误等底层 GetLanguageValue 消息全部跟随
+        await (CurrentLanguage == "en" ? LanguageType.en : LanguageType.zh).SetLanguageAsync();
         CultureInfo.DefaultThreadCurrentUICulture = CurrentLanguage == "en" ? CultureInfo.GetCultureInfo("en") : _zhCulture;
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
         LanguageChanged?.Invoke();
-        await Task.CompletedTask;
     }
 }
