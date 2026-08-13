@@ -84,8 +84,10 @@
     private bool _navCollapsed;
     private bool _isAdmin;
 
+    /// <summary>程序集版本号（git 构建会附加 +hash 后缀，取 + 之前的部分）</summary>
     private static readonly string _version = typeof(Program).Assembly
-        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? "";
+        .GetCustomAttribute<System.Reflection.AssemblyInformationalVersionAttribute>()?.InformationalVersion
+        ?.Split('+')[0] ?? "";
 
     /// <summary>级联认证状态：从持久化的 AuthState 取角色（SSR 首渲染已由 App 根组件写入）</summary>
     [CascadingParameter] private Task<AuthenticationState>? AuthState { get; set; }

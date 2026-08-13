@@ -417,13 +417,10 @@
 
     private void OnDetailNodeClick(IProjectDetailsTreeViewModel node)
     {
-        if (node.NodeType == ProjectDetailsNodeType.Address && node.AddressDetails is not null)
-        {
-            var rt = RuntimeManager.Get(_selectedDevice?.DaqDetails?.Guid ?? "");
-            ToastSvc.Info(rt is not null
-                ? $"{node.AddressDetails.AnotherName}：{T("状态")} {rt.CollectStatus}"
-                : $"{node.AddressDetails.AnotherName}：{T("未注册运行时")}");
-        }
+        // 对齐 WPF ProjectDetailsModel.TreeView_SelectedItemChanged：只更新选中态，不弹提示
+        node.IsSelected = true;
+        node.UpdateSpecialData();
+        node.ExpandParents();
     }
 
     private void CloseAddDialog()

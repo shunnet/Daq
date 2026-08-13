@@ -1100,6 +1100,9 @@ html[lang^="zh"] .config-summary-label::after { content: "：" }
 /* 项目设置：左树右详情（iot-dc3 布局） */
 .project-card { display: flex; flex-direction: column; }
 .project-card .project-layout { flex: 1; min-height: 0; } /* min-height 0：树/详情多时不撑破卡片，由内部滚动承接 */
+/* 左侧树：名称不撑满，tree-meta 紧跟名称靠左（右侧详情树仍撑满）；⋯ 操作按钮仍贴最右 */
+.project-tree-panel .tree-label { flex: none; }
+.project-tree-panel .tree-actions { margin-left: auto; }
 .project-layout {
     display: flex;
     flex-direction: column;
@@ -1108,7 +1111,7 @@ html[lang^="zh"] .config-summary-label::after { content: "：" }
 @media (min-width: 900px) {
     .project-layout { flex-direction: row; align-items: stretch; position: relative; }
     .project-tree-panel {
-        width: 420px;
+        width: 360px;
         flex: none;
         padding-right: 12px;
         overflow: auto;
@@ -1119,7 +1122,7 @@ html[lang^="zh"] .config-summary-label::after { content: "：" }
         position: absolute;
         top: -12px;   /* header margin-bottom 12px：线与 card-header 分割线精确衔接 */
         bottom: -16px;
-        right: calc(100% - 420px);
+        right: calc(100% - 360px);
         width: 1px;
         background: var(--border);
     }
@@ -1237,8 +1240,8 @@ select.pagebar-size, select.form-select {
     justify-content: center;
 }
 @media (min-width: 768px) {
-    /* 卡片最小宽 330px（较原 4-6 列方案每卡约 +20px），auto-fill 按视口自动排布列数 */
-    .device-wall { grid-template-columns: repeat(auto-fill, minmax(330px, 1fr)); }
+    /* 卡片最小宽 270px，auto-fill 按视口自动排布列数 */
+    .device-wall { grid-template-columns: repeat(auto-fill, minmax(270px, 1fr)); }
 }
 /* 设备卡结构对齐 WPF ConsoleDevice.xaml：头=名称 / 采集操作行(靠右+分隔线) / 信息六行 / 底部=LED+⋯菜单(分隔线) */
 .device-card { padding: 0; display: flex; flex-direction: column; }

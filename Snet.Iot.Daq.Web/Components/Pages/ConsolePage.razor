@@ -10,6 +10,7 @@
 @inject AppStateService AppState
 @inject ToastService Toast
 @inject DaqHostedService Host
+@inject IJSRuntime JS
 
 @code {
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
@@ -266,11 +267,31 @@
 
     // ================= 设备卡操作菜单（对齐 WPF ConsoleDevice.xaml Row2 的 ⋯ 菜单） =================
     private string? _moreOpen;
-    private void ToggleMore(DeviceRuntime rt)
+    private DotNetObjectReference<ConsolePage>? _jsRef;
+
+    private async Task ToggleMore(DeviceRuntime rt)
     {
         // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
         MenuCoordinator.CloseAllOthers();
-        _moreOpen = _moreOpen == rt.Guid ? null : rt.Guid;
+        var open = _moreOpen != rt.Guid;
+        _moreOpen = open ? rt.Guid : null;
+        // 展开后注册「区域外点击收起」；收起时注销
+        if (open)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    [JSInvokable]
+    public void CloseAllActions()
+    {
+        _moreOpen = null;
+        InvokeAsync(StateHasChanged);
     }
 
     /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
@@ -402,5 +423,9 @@
         AppState.EntityChanged -= OnEntityChanged;
         Sampler.Sample -= OnSample;
         LogBuffer.Changed -= OnLogChanged;
+        // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
+        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
+        _jsRef?.Dispose();
+        _jsRef = null;
     }
 }

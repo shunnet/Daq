@@ -1,0 +1,30 @@
+# Snet.Iot.Daq.Web 容器化部署（Linux / Docker 25+，compose v2）
+# 使用：docker compose up -d --build
+# 数据持久化在命名卷 snet-daq-data（config/ db/ lib/ cer/ 全部在此，重建容器不丢数据）
+services:
+  snet-daq-web:
+    build:
+      context: ..          # 构建上下文 = 仓库根（项目引用 ../Snet.Iot.Daq.Core）
+      dockerfile: Snet.Iot.Daq.Web/Dockerfile
+    image: snet-iot-daq-web:latest
+    container_name: snet-daq-web
+    restart: unless-stopped
+    ports:
+      - "5051:5051"   # Web 管理界面
+      - "1883:1883"   # MQTT 服务端（采集设备需连入时映射，否则可注释）
+      - "6688:6688"   # OPC UA 服务端（外部 UA 客户端需连入时映射，否则可注释）
+    environment:
+      SNET_IOT_DAQ_DATA: /data
+      ASPNETCORE_URLS: http://+:5051
+      TZ: Asia/Shanghai
+    volumes:
+      - snet-daq-data:/data
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/5051'"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+volumes:
+  snet-daq-data:

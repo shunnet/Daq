@@ -1,0 +1,151 @@
+name: Web Release
+
+# Snet.Iot.Daq.Web 多平台打包：
+#   - 发布包：linux-x64 / linux-arm64 / win-x64（framework-dependent，需目标机装 .NET 10 运行时；
+#     linux 包内含 deploy/ubuntu-deploy.sh 可直接 systemd 部署）
+#   - Docker 镜像：linux/amd64 + linux/arm64 双架构推送到 ghcr.io
+#     （首次使用需在 GitHub 仓库 Settings → Packages 把包设为 Public 或配置权限）
+# 触发：push v* tag（与 WPF 的 release.yml 并行发版）或手动 workflow_dispatch
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rid: [linux-x64, linux-arm64, win-x64]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version from .csproj
+        id: version
+        shell: bash
+        run: |
+          VER=$(grep -oP '<Version>\K[^<]+' Snet.Iot.Daq.Web/Snet.Iot.Daq.Web.csproj | head -1)
+          [ -z "$VER" ] && VER="1.0.0"
+          echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Publish (${{ matrix.rid }})
+        run: |
+          dotnet publish Snet.Iot.Daq.Web/Snet.Iot.Daq.Web.csproj \
+            -c Release \
+            -r ${{ matrix.rid }} \
+            --self-contained false \
+            -p:Version=${{ steps.version.outputs.VERSION }} \
+            -o publish/${{ matrix.rid }}
+
+      - name: Package deploy assets
+        run: |
+          cp Snet.Iot.Daq.Web/README.DEPLOY.md publish/${{ matrix.rid }}/
+          cp -r Snet.Iot.Daq.Web/deploy publish/${{ matrix.rid }}/deploy
+
+      - name: Create archive (${{ matrix.rid }})
+        run: |
+          cd publish/${{ matrix.rid }}
+          if [[ "${{ matrix.rid }}" == win-* ]]; then
+            zip -qr "../Snet.Iot.Daq.Web-v${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.zip" .
+          else
+            tar -czf "../Snet.Iot.Daq.Web-v${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.tar.gz" .
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Snet.Iot.Daq.Web-${{ matrix.rid }}
+          path: publish/*.tar.gz
+          if-no-files-found: error
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          VER=$(grep -oP '<Version>\K[^<]+' Snet.Iot.Daq.Web/Snet.Iot.Daq.Web.csproj | head -1)
+          [ -z "$VER" ] && VER="1.0.0"
+          echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push multi-arch image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Snet.Iot.Daq.Web/Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/snet-iot-daq-web:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ github.repository }}/snet-iot-daq-web:latest
+
+  release:
+    needs: publish
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Read version
+        id: version
+        shell: bash
+        run: |
+          VER=$(grep -oP '<Version>\K[^<]+' Snet.Iot.Daq.Web/Snet.Iot.Daq.Web.csproj | head -1)
+          [ -z "$VER" ] && VER="1.0.0"
+          echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: Snet.Iot.Daq.Web-*
+          path: publish
+          merge-multiple: true
+
+      # WPF 的 release.yml 也监听同一 v* tag 并创建同名 Release（softprops，name=tag 名）。
+      # 这里必须用 create-or-upload：Release 已存在（WPF 先建）则只追加附件，不覆盖其 name/notes；
+      # 并发竞态（检查与创建之间 WPF 已建）时 create 失败回退 upload。手动触发无 tag 时用 v$VERSION。
+      - name: Create or upload to GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ github.ref_name }}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            TAG="v${{ steps.version.outputs.VERSION }}"
+          fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" publish/* --clobber
+          else
+            gh release create "$TAG" publish/* \
+              --title "Snet.Iot.Daq.Web v${{ steps.version.outputs.VERSION }}" || \
+              gh release upload "$TAG" publish/* --clobber
+          fi

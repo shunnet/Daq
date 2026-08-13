@@ -3,8 +3,11 @@ window.snet = {
     outsideClick: {
         handlers: [],
         register: function (dotnetRef) {
+            // 打开新菜单前清掉旧菜单残留 handler（菜单互斥已先收起旧菜单，其 handler 必须移除，
+            // 否则旧 handler 在下次区域外点击时 unregisterAll 会把新菜单的 handler 一并清掉，导致新菜单关不掉）
+            snet.outsideClick.unregisterAll();
             var fn = function (e) {
-                if (!e.target.closest('.tree-actions')) {
+                if (!e.target.closest('.tree-actions, .device-more')) {
                     snet.outsideClick.unregisterAll();
                     dotnetRef.invokeMethodAsync('CloseAllActions');
                 }

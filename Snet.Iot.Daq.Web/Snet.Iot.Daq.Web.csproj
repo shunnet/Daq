@@ -5,7 +5,6 @@
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<SatelliteResourceLanguages>zh-Hans;en</SatelliteResourceLanguages>
-		<ApplicationIcon>Icon.ico</ApplicationIcon>
 		<Version>1.0.2.6</Version>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
 		<PackageReadmeFile>README.md</PackageReadmeFile>
