@@ -266,6 +266,15 @@ namespace Snet.Iot.Daq.viewModel
         }
 
         /// <summary>
+        /// 底层插件包版本（热更新后一目了然）
+        /// </summary>
+        public string DeviceVersion
+        {
+            get => GetProperty(() => DeviceVersion);
+            set => SetProperty(() => DeviceVersion, value);
+        }
+
+        /// <summary>
         /// 设备层级
         /// </summary>
         public string DeviceHierarchy
@@ -1040,6 +1049,23 @@ namespace Snet.Iot.Daq.viewModel
         /// 配置
         /// </summary>
         /// <param name="model">项目信息</param>
+
+        /// <summary>
+        /// 按插件类名查 PluginList.json 的包版本（与 Web 端 DeviceRuntime 同源逻辑）
+        /// </summary>
+        private static string ResolvePluginVersion(string pluginName)
+        {
+            try
+            {
+                var list = PluginHandlerCore.GetPluginUIConfig<System.Collections.ObjectModel.ObservableCollection<PluginListModel>>(GlobalConfigModel.UI_PluginListConfigPath);
+                return list?.FirstOrDefault(p => p.Name == pluginName)?.Version ?? "-";
+            }
+            catch
+            {
+                return "-";
+            }
+        }
+
         public async Task SettingsAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
             DaqPluginPath = PluginHandlerCore.PluginOperate.GetPluginPath(model.DaqDetails.Name);
@@ -1048,6 +1074,7 @@ namespace Snet.Iot.Daq.viewModel
             Project = model;
             DeviceName = model.Name;
             DeviceType = model.DaqDetails.Name;
+            DeviceVersion = ResolvePluginVersion(model.DaqDetails.Name);
             UpdateTime = model.DaqDetails.Time;
             DeviceHierarchyToolTip = model.GetHierarchyPath();
             DeviceHierarchy = DeviceHierarchyToolTip.TruncateByBytes(36);

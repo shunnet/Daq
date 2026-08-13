@@ -1,9 +1,7 @@
-﻿using System.Collections;
+﻿using Snet.Core.handler;
+using System.Collections;
 using System.Globalization;
 using System.Resources;
-using Snet.Core.handler;
-using Snet.Iot.Daq.Core;
-using Snet.Model.@enum;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -312,6 +310,11 @@ public class LocalizationService
         ["[Info] OPC UA 服务端已启动"] = "[Info] OPC UA server started",
         ["[Error] OPC UA 服务端启动异常: {0}"] = "[Error] OPC UA server start error: {0}",
         ["[Error] OPC UA 服务端停止异常: {0}"] = "[Error] OPC UA server stop error: {0}",
+        ["设备类型"] = "DeviceType",
+        ["插件版本"] = "PluginVersion",
+        ["版本"] = "Version",
+        ["（端口小于 1024 需管理员权限运行或 netsh URLACL 授权）"] = " (Port below 1024 requires admin privileges or netsh URLACL)",
+        ["[{0}] WebApi 状态查询异常: {1}"] = "[{0}] WebApi status query error: {1}",
     };
 
     public string CurrentLanguage { get; private set; } = "zh";

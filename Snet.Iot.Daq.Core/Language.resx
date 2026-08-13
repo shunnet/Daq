@@ -763,4 +763,7 @@
   <data name="地址自动组包失败：" xml:space="preserve">
     <value>地址自动组包失败：</value>
   </data>
+  <data name="插件版本" xml:space="preserve">
+    <value>插件版本</value>
+  </data>
 </root>

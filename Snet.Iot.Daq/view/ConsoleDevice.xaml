@@ -13,7 +13,7 @@
     xmlns:uis="http://schemas.lepo.co/wpfui/2022/xaml"
     xmlns:view="clr-namespace:Snet.Iot.Daq.view"
     Width="323.4"
-    Height="305"
+    Height="325"
     snet:ResxLocalizationProvider.DefaultAssembly="Snet.Iot.Daq.Core"
     snet:ResxLocalizationProvider.DefaultDictionary="Language"
     mc:Ignorable="d">
@@ -84,7 +84,7 @@
             </Border>
             <StackPanel
                 Grid.Row="1"
-                Margin="14,0,14,0"
+                Margin="14,10,14,10"
                 VerticalAlignment="Center"
                 Orientation="Vertical">
                 <StackPanel Orientation="Horizontal">
@@ -95,6 +95,16 @@
                     <Label Content="{snet:Loc 设备类型}" />
                     <Label Content=":" />
                     <Label Grid.Column="1" Content="{Binding DeviceType}" />
+                </StackPanel>
+
+                <StackPanel Orientation="Horizontal">
+                    <Image
+                        Width="16"
+                        Height="16"
+                        Source="{DynamicResource Version}" />
+                    <Label Content="{snet:Loc 插件版本}" />
+                    <Label Content=":" />
+                    <Label Grid.Column="1" Content="{Binding DeviceVersion}" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" ToolTip="{Binding DeviceHierarchyToolTip}">

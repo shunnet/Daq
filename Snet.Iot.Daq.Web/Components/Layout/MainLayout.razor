@@ -26,10 +26,13 @@
             <span class="brand-version">@_version</span>
         </span>
         <div class="spacer"></div>
-        <div class="segmented">
-            <button class="@(Localization.CurrentLanguage == "zh" ? "active" : "")" @onclick="SetZhAsync">中</button>
-            <button class="@(Localization.CurrentLanguage == "en" ? "active" : "")" @onclick="SetEnAsync">EN</button>
-        </div>
+        @if (_isAdmin)
+        {
+            <div class="segmented">
+                <button class="@(Localization.CurrentLanguage == "zh" ? "active" : "")" @onclick="SetZhAsync">中</button>
+                <button class="@(Localization.CurrentLanguage == "en" ? "active" : "")" @onclick="SetEnAsync">EN</button>
+            </div>
+        }
         <button class="btn btn-icon" title="@T("主题")" @onclick="ToggleThemeAsync">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 @if (Theme.IsDark)

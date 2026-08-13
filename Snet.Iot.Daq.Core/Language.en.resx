@@ -763,4 +763,7 @@
   <data name="地址自动组包失败：" xml:space="preserve">
     <value>Address auto packing failed:</value>
   </data>
+  <data name="插件版本" xml:space="preserve">
+    <value>PluginVersion</value>
+  </data>
 </root>

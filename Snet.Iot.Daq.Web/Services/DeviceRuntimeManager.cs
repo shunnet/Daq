@@ -51,6 +51,9 @@ public class DeviceRuntimeManager
                     _ = runtime.CollectAsync();
                 else if (changed && runtime.IsRun)
                     _ = runtime.RetryAsync();
+                else if (changed && !runtime.IsRun)
+                    // 配置变更且未运行：清理旧 handler（插件实例缓存旧参数快照），下次手动采集用最新配置重建
+                    _ = runtime.ResetHandlerAsync();
             }
             foreach (var guid in _runtimes.Keys.Where(g => !valid.Contains(g)).ToList())
             {

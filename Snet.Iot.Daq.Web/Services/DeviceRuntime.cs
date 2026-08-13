@@ -75,6 +75,8 @@ public class DeviceRuntime : IAsyncDisposable
     public bool IsRun { get; private set; }
     public string DeviceName { get; private set; }
     public string DeviceType => _daqConfig.Name;
+    /// <summary>底层插件包版本（热更新后由配置同步刷新，控制台设备卡展示）</summary>
+    public string DeviceVersion { get; private set; } = "-";
     public string DeviceHierarchy => _hierarchyPath;
     public int AddressCount => _addressDatas.Count;
     public string CollectStatus { get; private set; } = "未采集";
@@ -118,7 +120,23 @@ public class DeviceRuntime : IAsyncDisposable
             _addressIndex[address.Address] = address;
         _hierarchyPath = deviceNode.GetHierarchyPath();
         DeviceName = deviceNode.Name;
+        DeviceVersion = ResolvePluginVersion(DeviceType);
         return changed;
+    }
+
+    /// <summary>按插件类名查 PluginList.json 的包版本（热更新后版本号变化，控制台一目了然）</summary>
+    private static string ResolvePluginVersion(string pluginName)
+    {
+        try
+        {
+            if (!File.Exists(WebPaths.PluginListConfigPath)) return "-";
+            var list = PluginHandlerCore.GetPluginUIConfig<System.Collections.ObjectModel.ObservableCollection<Snet.Iot.Daq.Core.data.PluginListModel>>(WebPaths.PluginListConfigPath);
+            return list?.FirstOrDefault(p => p.Name == pluginName)?.Version ?? "-";
+        }
+        catch
+        {
+            return "-";
+        }
     }
 
     /// <summary>启动采集（对齐 WPF CollectAsync：订阅地址 → 起通道 → 计时）。
@@ -149,6 +167,9 @@ public class DeviceRuntime : IAsyncDisposable
                 LedRed = true;
                 _pushState(this);
                 _pushLog(string.Format(T("[{0}] 启动采集失败: {1}"), DeviceName, result.Message));
+                // 对齐 WPF 重采语义：失败即释放 handler（插件实例缓存创建时的参数快照），
+                // 否则下次采集复用旧实例（如改端口后仍连旧端口）
+                await ReleaseHandlerInternalAsync();
                 return;
             }
 
@@ -166,7 +187,10 @@ public class DeviceRuntime : IAsyncDisposable
                 {
                     var waResult = await _daqHandler.WAOnAsync(_daqConfig.Guid, _daqConfig.WebApi);
                     // 对齐 WPF CollectAsync 的 WASatrtAsync 提示：无论成败都反馈
-                    _pushLog(string.Format(T("[{0}] WebApi 启动{1}: {2}"), DeviceName, waResult.Status ? T("成功") : T("失败"), waResult.Message));
+                    var tip = !waResult.Status && _daqConfig.WebApi.Port > 0 && _daqConfig.WebApi.Port < 1024
+                        ? T("（端口小于 1024 需管理员权限运行或 netsh URLACL 授权）")
+                        : "";
+                    _pushLog(string.Format(T("[{0}] WebApi 启动{1}: {2}") + "{3}", DeviceName, waResult.Status ? T("成功") : T("失败"), waResult.Message, tip));
                 }
                 catch (Exception ex)
                 {
@@ -180,6 +204,41 @@ public class DeviceRuntime : IAsyncDisposable
             LedRed = true;
             _pushState(this);
             _pushLog(string.Format(T("[{0}] 启动采集异常: {1}"), DeviceName, ex.Message));
+        }
+        finally
+        {
+            _collectGate.Release();
+        }
+    }
+
+    /// <summary>释放采集 handler 及相关资源（无锁版，须在 _collectGate 持有内调用）。
+    /// 插件实例缓存创建时的参数快照（IP/端口等），配置变更或采集失败后必须置空，下次采集用最新配置重建</summary>
+    private async Task ReleaseHandlerInternalAsync()
+    {
+        _cts?.Cancel();
+        _cts?.Dispose();
+        _cts = null;
+        if (_daqHandler is not null)
+        {
+            _daqHandler.OnDataEventAsync -= OnDataEvent;
+            try { await _daqHandler.DisposeAsync(); } catch { }
+            _daqHandler = null;
+        }
+        if (_dataChannel is not null)
+            _dataChannel.Writer.TryComplete();
+        _dataChannel = null;
+        foreach (var mq in _mqHandlers.Values)
+            await mq.DisposeAsync();
+        _mqHandlers.Clear();
+    }
+
+    /// <summary>带锁释放采集 handler（供配置变更时未运行设备清理旧实例，对齐 WPF 改配置后重新采集语义）</summary>
+    public async Task ResetHandlerAsync()
+    {
+        await _collectGate.WaitAsync();
+        try
+        {
+            await ReleaseHandlerInternalAsync();
         }
         finally
         {
@@ -274,12 +333,24 @@ public class DeviceRuntime : IAsyncDisposable
             return OperateResult.CreateFailureResult(string.Format(T("[{0}] 采集未启动，无法操作 WebApi"), DeviceName));
         if (_daqConfig.WebApi is null)
             return OperateResult.CreateFailureResult(string.Format(T("[{0}] 未设置 WebApi 参数"), DeviceName));
-        // 对齐 WPF WASatrtAsync：先查状态，失败（设备未连接等）则提示并停止
-        var status = await handler.WAStatusAsync(_daqConfig.Guid);
+        // 对齐 WPF WASatrtAsync：先查状态，失败（设备未连接等）则提示并停止。
+        // GetStatusAsync 在插件连接异常时可能直接抛异常，这里兜底转为失败消息（否则异常上抛到页面崩溃）
+        OperateResult? status;
+        try
+        {
+            status = await handler.WAStatusAsync(_daqConfig.Guid);
+        }
+        catch (Exception ex)
+        {
+            return OperateResult.CreateFailureResult(string.Format(T("[{0}] WebApi 状态查询异常: {1}"), DeviceName, ex.Message));
+        }
         if (!status.Status)
             return OperateResult.CreateFailureResult(string.Format(T("[{0}] {1}"), DeviceName, status.Message));
         var result = await handler.WAOnAsync(_daqConfig.Guid, _daqConfig.WebApi);
-        _pushLog(string.Format(T("[{0}] WebApi 启动{1}: {2}"), DeviceName, result.Status ? T("成功") : T("失败"), result.Message));
+        var tip = !result.Status && _daqConfig.WebApi.Port > 0 && _daqConfig.WebApi.Port < 1024
+            ? T("（端口小于 1024 需管理员权限运行或 netsh URLACL 授权）")
+            : "";
+        _pushLog(string.Format(T("[{0}] WebApi 启动{1}: {2}") + "{3}", DeviceName, result.Status ? T("成功") : T("失败"), result.Message, tip));
         return result;
     }
 

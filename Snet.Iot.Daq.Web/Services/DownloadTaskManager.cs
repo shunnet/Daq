@@ -10,6 +10,8 @@ namespace Snet.Iot.Daq.Web.Services;
 public class DownloadTaskManager
 {
     private readonly LoggerBuffer _logger;
+    private readonly DeviceRuntimeManager _runtimeManager;
+    private readonly AppStateService _appState;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly List<DownloadJob> _jobs = new();
     private CancellationTokenSource? _stopCts;
@@ -28,7 +30,12 @@ public class DownloadTaskManager
 
     public event Action<DownloadJob>? JobChanged;
 
-    public DownloadTaskManager(LoggerBuffer logger) => _logger = logger;
+    public DownloadTaskManager(LoggerBuffer logger, DeviceRuntimeManager runtimeManager, AppStateService appState)
+    {
+        _logger = logger;
+        _runtimeManager = runtimeManager;
+        _appState = appState;
+    }
 
     /// <summary>dotnet CLI 可用性探测（Core PluginDownloadHandler 依赖 dotnet publish）。异步版：不阻塞电路线程</summary>
     public static async Task<bool> IsSdkAvailableAsync()
@@ -135,7 +142,8 @@ public class DownloadTaskManager
             Update(job with { Status = "安装中", Progress = 60 });
             _logger.Push($"[Info] 插件下载完成，开始安装: {job.PackName}");
             // 下载即安装：探测类型 → 归位 lib/{type}/{name}/ → InitPlugin → 注册 PluginList.json
-            var installResults = TryAutoInstall(names);
+            // 同名插件走热更新（停设备 → 卸载 → 替换 → 恢复），对齐上传路径语义
+            var installResults = await TryAutoInstallAsync(names);
             Update(job with
             {
                 Status = installResults > 0 ? "完成" : "失败",
@@ -160,46 +168,87 @@ public class DownloadTaskManager
 
     /// <summary>
     /// 下载即安装：把 lib/{name}/ 探测类型后归位到 lib/{type}/{name}/ 并 InitPlugin 注册。
+    /// 同名插件执行热更新（对齐上传路径）：停使用该插件的设备 → 卸载旧程序集 → 替换目录 → 恢复设备采集。
     /// 返回成功安装的接口数。
     /// </summary>
-    private static int TryAutoInstall(List<string> names)
+    private async Task<int> TryAutoInstallAsync(List<string> names)
     {
         var installed = 0;
-        foreach (var name in names)
+        var stopped = new List<DeviceRuntime>();
+        try
         {
-            try
+            foreach (var name in names)
             {
-                var srcPath = Path.Combine(WebPaths.FilePath, name);
-                if (!Directory.Exists(srcPath)) continue;
-                // 探测 Daq / Mq 接口
-                foreach (var type in new[] { Snet.Model.@enum.PluginType.Daq, Snet.Model.@enum.PluginType.Mq })
+                try
                 {
-                    var iName = $"Snet.Model.interface.I{type}";
-                    var result = PluginHandlerCore.PluginOperate.InitPlugin(srcPath, iName);
-                    if (result.Count == 0) continue;
-                    // 归位到 lib/{type小写}/{name}/
-                    var typePath = Path.Combine(WebPaths.FilePath, type.ToString().ToLower());
-                    var targetPath = Path.Combine(typePath, name);
-                    Directory.CreateDirectory(typePath);
-                    if (Directory.Exists(targetPath)) Directory.Delete(targetPath, true);
-                    Directory.Move(srcPath, targetPath);
-                    foreach (var (model, _) in result)
+                    var srcPath = Path.Combine(WebPaths.FilePath, name);
+                    if (!Directory.Exists(srcPath)) continue;
+                    // 探测 Daq / Mq 接口
+                    foreach (var type in new[] { Snet.Model.@enum.PluginType.Daq, Snet.Model.@enum.PluginType.Mq })
                     {
-                        model.Path = targetPath;
-                        var plugin = new PluginListModel(model.Name, type, model.Version, DateTime.Now, model);
-                        var list = LoadPluginList();
-                        if (list.All(p => p.Name != plugin.Name))
-                            list.Add(plugin);
-                        PluginHandlerCore.SavePluginUIConfig(new System.Collections.ObjectModel.ObservableCollection<PluginListModel>(list), WebPaths.PluginListConfigPath);
+                        var iName = $"Snet.Model.interface.I{type}";
+                        var result = PluginHandlerCore.PluginOperate.InitPlugin(srcPath, iName);
+                        if (result.Count == 0) continue;
+                        // 归位到 lib/{type小写}/{name}/
+                        var typePath = Path.Combine(WebPaths.FilePath, type.ToString().ToLower());
+                        var targetPath = Path.Combine(typePath, name);
+                        Directory.CreateDirectory(typePath);
+                        var isHotUpdate = Directory.Exists(targetPath) || LoadPluginList().Any(p => p.Name == name);
+                        if (isHotUpdate)
+                        {
+                            _logger.Push($"[Info] 检测到同名插件 {name}，执行热更新");
+                            // 停使用该插件的 DAQ 设备：设备类型是插件类名（如 SiemensOperate），下载名是包名（如 Snet.Siemens），
+                            // 通过 PluginList 的 Name → 包目录名 映射关联（对齐 WPF libPath == DaqPluginPath 语义）
+                            var deviceToPack = LoadPluginList()
+                                .Where(p => !string.IsNullOrWhiteSpace(p.PluginDetails.Path))
+                                .ToDictionary(p => p.Name,
+                                    p => Path.GetFileName(Path.TrimEndingDirectorySeparator(p.PluginDetails.Path)),
+                                    StringComparer.OrdinalIgnoreCase);
+                            foreach (var rt in _runtimeManager.Runtimes.Where(rt => rt.IsRun && type == Snet.Model.@enum.PluginType.Daq
+                                && deviceToPack.TryGetValue(rt.DeviceType, out var pack)
+                                && pack.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                await rt.StopAsync();
+                                stopped.Add(rt);
+                            }
+                            // 卸载旧程序集并回收，避免文件锁/旧实例残留（对齐 WPF PrivateRemovalPlugin）
+                            foreach (var old in LoadPluginList().Where(p => p.Name == name))
+                            {
+                                try { PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
+                            }
+                            GC.Collect();
+                            GC.WaitForPendingFinalizers();
+                        }
+                        if (Directory.Exists(targetPath)) Directory.Delete(targetPath, true);
+                        Directory.Move(srcPath, targetPath);
+                        foreach (var (model, _) in result)
+                        {
+                            model.Path = targetPath;
+                            var plugin = new PluginListModel(model.Name, type, model.Version, DateTime.Now, model);
+                            var list = LoadPluginList();
+                            // 热更新：替换同名旧条目（刷新路径/版本/时间）；新插件：追加
+                            var index = list.FindIndex(p => p.Name == plugin.Name);
+                            if (index >= 0) list[index] = plugin;
+                            else list.Add(plugin);
+                            PluginHandlerCore.SavePluginUIConfig(new System.Collections.ObjectModel.ObservableCollection<PluginListModel>(list), WebPaths.PluginListConfigPath);
+                        }
+                        installed += result.Count;
+                        break;
                     }
-                    installed += result.Count;
-                    break;
+                }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"[DownloadTaskManager] 自动安装失败 {name}: {ex.Message}");
                 }
             }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"[DownloadTaskManager] 自动安装失败 {name}: {ex.Message}");
-            }
+        }
+        finally
+        {
+            // 恢复热更新前正在运行的设备（只恢复本次停掉的）
+            foreach (var rt in stopped)
+                await rt.CollectAsync();
+            // 感知更新：同步设备底层版本号（设备卡展示热更新后的新版本）
+            _appState.NotifyEntityChanged();
         }
         return installed;
     }

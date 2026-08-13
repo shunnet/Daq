@@ -824,6 +824,8 @@
             // 恢复热更新前正在运行的设备（只恢复本次停掉的，不复活用户手动停止的）
             foreach (var rt in stoppedDevices)
                 await rt.CollectAsync();
+            // 感知更新：同步设备底层版本号（设备卡展示热更新后的新版本）
+            AppState.NotifyEntityChanged();
         }
     }
 

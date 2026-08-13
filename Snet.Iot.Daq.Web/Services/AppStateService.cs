@@ -55,10 +55,35 @@ public class AppStateService
             var plugins = PluginHandlerCore.GetPluginUIConfig<ObservableCollection<PluginConfigModel>>(WebPaths.PluginConfigPath);
             if (plugins is not null)
             {
+                var pathRepaired = false;
                 foreach (var item in plugins)
                 {
+                    // 自愈：迁移/换机后 PluginConfig.json 可能残留旧环境绝对 ConfigPath（如 C:\Users\...\config\daq），
+                    // 后续 UpdateLocalConfig 会把 per-SN 文件写进旧目录（幽灵文件），当前环境的 per-SN 永远是陈旧副本。
+                    // 对齐 WPF：ConfigPath 一律是 config/{daq|mq} 相对路径（运行时再绝对化）
+                    if (!string.IsNullOrWhiteSpace(item.ConfigPath) && Path.IsPathRooted(item.ConfigPath)
+                        && !IsPathUnder(item.ConfigPath, WebPaths.DataDir))
+                    {
+                        item.ConfigPath = item.Type == Snet.Model.@enum.PluginType.Daq ? "config/daq" : "config/mq";
+                        pathRepaired = true;
+                    }
                     NormalizeConfigPath(item);
                     PluginDict[item.Guid] = item;
+                    // 修复过路径的配置：立即把 per-SN 参数文件重写到当前环境（刷新陈旧副本）
+                    if (pathRepaired) item.UpdateLocalConfig();
+                }
+                // 文件层统一落相对路径（对齐 WPF：ConfigPath = config/{daq|mq}），内存保持绝对化结果；
+                // 任何绝对路径（含当前环境绝对）都转相对，幂等，防再次迁移/换机残留
+                if (pathRepaired || PluginDict.Values.Any(p => !string.IsNullOrWhiteSpace(p.ConfigPath) && Path.IsPathRooted(p.ConfigPath)))
+                {
+                    foreach (var item in PluginDict.Values)
+                    {
+                        if (!string.IsNullOrWhiteSpace(item.ConfigPath) && Path.IsPathRooted(item.ConfigPath))
+                            item.ConfigPath = Path.GetRelativePath(WebPaths.DataDir, item.ConfigPath);
+                    }
+                    await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath,
+                        new ObservableCollection<PluginConfigModel>(PluginDict.Values.OrderBy(p => p.Index)).ToJson(true));
+                    _logger.Push("[Info] 已规范化插件配置路径（对齐 WPF 相对路径布局）");
                 }
             }
         }
@@ -190,6 +215,21 @@ public class AppStateService
     {
         if (!string.IsNullOrWhiteSpace(model.ConfigPath) && !Path.IsPathRooted(model.ConfigPath))
             model.ConfigPath = Path.GetFullPath(Path.Combine(WebPaths.DataDir, model.ConfigPath));
+    }
+
+    /// <summary>绝对路径是否位于某根目录之下（用于识别迁移残留的旧环境路径）</summary>
+    private static bool IsPathUnder(string path, string root)
+    {
+        try
+        {
+            var full = Path.GetFullPath(path).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            var baseDir = Path.GetFullPath(root).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+            return full.StartsWith(baseDir, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     /// <summary>导入项目树准备：初始化父子关系 + 全展开 + 回灌全局引用（对齐 LoadAllAsync 处理流程，供导入功能复用）。缺失地址同步落库</summary>

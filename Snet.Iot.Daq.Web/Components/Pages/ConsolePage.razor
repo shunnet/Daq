@@ -1,4 +1,4 @@
-@page "/console"
+﻿@page "/console"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -70,6 +70,7 @@
                     }
                     <div class="device-info">
                         <div class="row"><i class="bi bi-hdd"></i><span class="label">@T("设备类型")</span><span class="mono">@rt.DeviceType</span></div>
+                        <div class="row"><i class="bi bi-tag"></i><span class="label">@T("插件版本")</span><span class="mono">@rt.DeviceVersion</span></div>
                         <div class="row"><i class="bi bi-diagram-3"></i><span class="label">@T("设备层级")</span><span>@rt.DeviceHierarchy</span></div>
                         <div class="row"><i class="bi bi-hash"></i><span class="label">@T("地址数量")</span><span class="num">@rt.AddressCount</span></div>
                         <div class="row"><i class="bi bi-stopwatch"></i><span class="label">@T("采集时间")</span><span class="num">@rt.CollectTimeSeconds s</span></div>
@@ -307,8 +308,15 @@
     private async Task WebApiStartAsync(DeviceRuntime rt)
     {
         _moreOpen = null;
-        var r = await rt.WebApiStartAsync();
-        Toast.Show(r.Message, r.Status ? "success" : "error");
+        try
+        {
+            var r = await rt.WebApiStartAsync();
+            Toast.Show(r.Message, r.Status ? "success" : "error");
+        }
+        catch (Exception ex)
+        {
+            Toast.Error(rt.DeviceName + ": " + ex.Message);
+        }
     }
 
     private async Task WebApiStopAsync(DeviceRuntime rt)
@@ -323,9 +331,9 @@
         _moreOpen = null;
         var r = await rt.WebApiExampleAsync();
         if (r.Status)
-            Toast.Show(r.ResultData?.ToString() ?? T("无数据"), "info");
+            LogBuffer.Push($"[{rt.DeviceName}] WebApi 请求示例: {r.ResultData?.ToString() ?? T("无数据")}");
         else
-            Toast.Error(r.Message);
+            LogBuffer.Push($"[{rt.DeviceName}] WebApi 请求示例失败: {r.Message}");
     }
 
     private async Task SoftCollectAsync(DeviceRuntime rt, bool on)
