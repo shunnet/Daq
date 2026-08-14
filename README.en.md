@@ -26,24 +26,19 @@
 </p>
 
 <p align="center">
-  English | 📖 <a href="README.md"><b>简体中文</b></a>
+  English | 📖 <a href="README.md"><b>简体中�?/b></a>
 </p>
 
-## ✨ Introduction
+## �?Introduction
 
 **Snet.Iot.Daq** is a plugin-based data acquisition tool built on the **Snet.cn industrial communication library**, designed for industrial device data collection.
 
 ```
-┌────────────────────────────────────────┐
-│  Snet.Iot.Daq (WPF desktop / Windows)   │  ← UI: MVVM + modern interface
-├────────────────────────────────────────┤
-│  Snet.Iot.Daq.Web (Web app / Linux)     │  ← UI: Blazor Server, browser access
-├────────────────────────────────────────┤
-│  Snet.Iot.Daq.Core (library)            │  ← Core: business logic / models / services
-├────────────────────────────────────────┤
-│  Snet.cn industrial comm. lib.          │  ← Foundation: plugin framework / protocols / tools
-└────────────────────────────────────────┘
-```
+┌────────────────────────────────────────�?�? Snet.Iot.Daq (WPF desktop / Windows)   �? �?UI: MVVM + modern interface
+├────────────────────────────────────────�?�? Snet.Iot.Daq.Web (Web app / Linux)     �? �?UI: Blazor Server, browser access
+├────────────────────────────────────────�?�? Snet.Iot.Daq.Core (library)            �? �?Core: business logic / models / services
+├────────────────────────────────────────�?�? Snet.cn industrial comm. lib.          �? �?Foundation: plugin framework / protocols / tools
+└────────────────────────────────────────�?```
 
 > 💡 The Core layer has no WPF dependency; the desktop edition (Windows) and the cross-platform Web edition (Linux / ARM64) share the same core business logic.
 
@@ -56,11 +51,11 @@
 | 📨 **MQTT Broker** | Built-in MQTT broker with client management, auth, max-connection control |
 | 🌐 **WebAPI Service** | Built-in HTTP service (WAOn / WAOff), external system data ingestion |
 | 📊 **Real-time Charts** | ScottPlot multi-line charts with skin switching and history |
-| 🖥️ **System Monitoring** | CPU / GPU / RAM dashboards (LibreHardwareMonitor + WMI dual-channel) |
+| 🖥�?**System Monitoring** | CPU / GPU / RAM dashboards (LibreHardwareMonitor + WMI dual-channel) |
 | 🎯 **Byte-Level Parser** | Visual byte / bit / encoding / data-format configurator for custom protocol parsing |
 | 📦 **NuGet Plugin Market** | Browse, download and one-click install Snet ecosystem plugins |
 | 🔢 **Auto Batching** | Smart merge of scattered addresses into batched reads, lower communication overhead |
-| ⚡ **Soft Start** | Starts acquisition automatically on launch |
+| �?**Soft Start** | Starts acquisition automatically on launch |
 | 🔔 **System Tray** | Minimize to tray, start/stop devices from tray context menu, single-instance guard |
 | 🌐 **i18n / 🌓 Themes** | Chinese / English switching · dark / light themes, charts follow the skin |
 | 🌐 **Cross-platform Web** | Blazor Server browser access, shared Core with the desktop edition, runs on Linux x64 / ARM64 |
@@ -76,29 +71,29 @@ The plugin engine (collectible `AssemblyLoadContext` + stream loading) is provid
 ### 🔄 Load / Unload Flow
 
 ```
-Upload ZIP plugin → auto-extract to plugin dir → create collectible AssemblyLoadContext
-→ stream-load assemblies → scan & instantiate IDaq / IMq → register into IOC → start acquisition
+Upload ZIP plugin �?auto-extract to plugin dir �?create collectible AssemblyLoadContext
+�?stream-load assemblies �?scan & instantiate IDaq / IMq �?register into IOC �?start acquisition
 ```
 
 ```
-Stop acquisition → dispose plugin (IAsyncDisposable) → remove IOC registration
-→ unload AssemblyLoadContext → GC collect → delete plugin files
+Stop acquisition �?dispose plugin (IAsyncDisposable) �?remove IOC registration
+�?unload AssemblyLoadContext �?GC collect �?delete plugin files
 ```
 
-> 🔁 **Hot Update**: uploading a plugin package with the same name runs "stop device → update → restore running state" automatically, no restart needed.
+> 🔁 **Hot Update**: uploading a plugin package with the same name runs "stop device �?update �?restore running state" automatically, no restart needed.
 
-### 🛠️ Developing Plugins
+### 🛠�?Developing Plugins
 
 1. Create a .NET class library and add the NuGet package `Snet.Core` (provides the plugin engine and the `IDaq` / `IMq` interfaces, located in the `Snet.Model.@interface` namespace)
 2. Implement the interface methods (`OnAsync`, `OffAsync`, `ReadAsync`, `WriteAsync`, `GetStatusAsync`, etc.)
 3. Pack the output directory into a **ZIP** file
 4. Upload the ZIP on the app's "Plugin Settings" page
 
-> 🤖 **AI-assisted development**: try [Snet.SKILLS](https://github.com/shunnet/SKILLS) — an AI skills collection for the SNET architecture.
+> 🤖 **AI-assisted development**: try [Snet.SKILLS](https://github.com/shunnet/SKILLS) �?an AI skills collection for the SNET architecture.
 
 ## 🌐 Cross-platform Web Edition (Snet.Iot.Daq.Web)
 
-The **Blazor Server Web edition** of Snet.Iot.Daq, sharing all business capabilities of `Snet.Iot.Daq.Core` with the desktop app — just open it in a browser, no client installation required.
+The **Blazor Server Web edition** of Snet.Iot.Daq, sharing all business capabilities of `Snet.Iot.Daq.Core` with the desktop app �?just open it in a browser, no client installation required.
 
 - **Platforms**: Windows / Linux x64 / Linux ARM64 (Raspberry Pi, Phytium, Kunpeng, etc.)
 - **Deployment**: Docker multi-arch images / Ubuntu systemd / bare-metal
@@ -118,7 +113,7 @@ Multi-arch images (linux/amd64 + linux/arm64) are built automatically by GitHub 
 ### 🐧 Ubuntu bare-metal deployment
 
 ```bash
-sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh          # installs runtime → publish → systemd service
+sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh          # installs runtime �?publish �?systemd service
 sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh --port 8080 --data /srv/snet-daq
 ```
 
@@ -134,10 +129,10 @@ Pushing a `v*` tag automatically produces **linux-x64 / linux-arm64 / win-x64** 
 
 | Component | Requirement |
 |-----------|-------------|
-| 🖥️ **OS** | Windows 10 / 11 (x64) |
+| 🖥�?**OS** | Windows 10 / 11 (x64) |
 | 🔧 **.NET Runtime** | .NET 10.0 Desktop Runtime |
-| 🛠️ **Build Tools** | Visual Studio 2022+ (to compile) |
-| 💾 **Disk Space** | ≥ 200 MB |
+| 🛠�?**Build Tools** | Visual Studio 2022+ (to compile) |
+| 💾 **Disk Space** | �?200 MB |
 
 ### 📥 1️⃣ Clone
 
@@ -165,7 +160,7 @@ The system uses a two-tier permission model: Administrator / Regular User.
 | Role | Permissions |
 |------|-------------|
 | **Administrator** | Full access: plugin browsing & settings, address management, project configuration, start/stop collection, WebApi / auto-pack settings, server management, user management |
-| **Regular User** | **Read-only**: can only view the Console (device status, system monitoring, run logs) — no operation buttons at all |
+| **Regular User** | **Read-only**: can only view the Console (device status, system monitoring, run logs) �?no operation buttons at all |
 
 **Default administrator account**: `snet` / `123456`
 
@@ -177,9 +172,9 @@ The system uses a two-tier permission model: Administrator / Regular User.
 
 > ⚠️ Change the default password right after deployment; regular users are created by administrators on the "User Management" page.
 
-## 🖥️ Screenshots
+## 🖥�?Screenshots
 
-### 🖥️ Desktop edition (WPF / Windows)
+### 🖥�?Desktop edition (WPF / Windows)
 
 <p align="center">
   <img src="images/home.png" width="900"/>
@@ -201,6 +196,7 @@ The system uses a two-tier permission model: Administrator / Regular User.
   <img src="images/w5.png" width="900"/>
   <img src="images/w6.png" width="900"/>
   <img src="images/w7.png" width="900"/>
+  <img src="images/w8.png" width="900"/>
 </p>
 
 ## 📚 Resources & Community
@@ -210,23 +206,23 @@ The system uses a two-tier permission model: Administrator / Regular User.
 | 🎬 **Demo Video** | [Watch](https://Snet.cn/YJybu) |
 | 🌐 **Website** | [snet.cn](https://snet.cn) |
 | 📦 **NuGet Plugin Market** | Browse in-app on the "Plugin Settings" page |
-| 🐛 **Issues** | [GitHub Issues](https://github.com/shunnet/Daq/issues) — bug reports & feature requests |
-| 💬 **QQ Group** | [Join](https://qm.qq.com/q/gPjrD9wGty) — technical community |
-| ⭐ **Star** | If this project helps you, please give it a Star ❤️ |
+| 🐛 **Issues** | [GitHub Issues](https://github.com/shunnet/Daq/issues) �?bug reports & feature requests |
+| 💬 **QQ Group** | [Join](https://qm.qq.com/q/gPjrD9wGty) �?technical community |
+| �?**Star** | If this project helps you, please give it a Star ❤️ |
 
 ## 🙏 Acknowledgements
 
-- [Snet.cn](https://snet.cn) — Industrial communication library
-- [Snet.Windows.Controls](https://github.com/shunnet/WpfMUI) — WPF controls
-- [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) — Hardware monitoring
-- [ScottPlot](https://scottplot.net) — Scientific charting library
-- [sqlite-net](https://github.com/praeclarum/sqlite-net) — Lightweight database
+- [Snet.cn](https://snet.cn) �?Industrial communication library
+- [Snet.Windows.Controls](https://github.com/shunnet/WpfMUI) �?WPF controls
+- [LibreHardwareMonitor](https://github.com/LibreHardwareMonitor/LibreHardwareMonitor) �?Hardware monitoring
+- [ScottPlot](https://scottplot.net) �?Scientific charting library
+- [sqlite-net](https://github.com/praeclarum/sqlite-net) �?Lightweight database
 
 ## 📜 License
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 
-This project is licensed under the **MIT** License — free to use, modify and distribute.
+This project is licensed under the **MIT** License �?free to use, modify and distribute.
 
 📄 See the [LICENSE](LICENSE) file for the full terms.
 

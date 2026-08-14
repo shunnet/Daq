@@ -1,4 +1,4 @@
-<h1 align="center">🔌 Snet.Iot.Daq</h1>
+﻿<h1 align="center">🔌 Snet.Iot.Daq</h1>
 
 <p align="center">
   <img width="120" height="120" src="https://api.snet.cn/pic/nuget.png" alt="Snet Logo"/>
@@ -201,6 +201,7 @@ cd Daq
   <img src="images/w5.png" width="900"/>
   <img src="images/w6.png" width="900"/>
   <img src="images/w7.png" width="900"/>
+  <img src="images/w8.png" width="900"/>
 </p>
 
 ## 📚 资源与社区
