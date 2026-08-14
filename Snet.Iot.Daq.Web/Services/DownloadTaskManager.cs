@@ -13,6 +13,7 @@ public class DownloadTaskManager
     private readonly LoggerBuffer _logger;
     private readonly DeviceRuntimeManager _runtimeManager;
     private readonly AppStateService _appState;
+    private readonly DaqHostedService _hosted;
     private readonly SemaphoreSlim _gate = new(1, 1);
     private readonly List<DownloadJob> _jobs = new();
     private CancellationTokenSource? _stopCts;
@@ -34,11 +35,12 @@ public class DownloadTaskManager
 
     public event Action<DownloadJob>? JobChanged;
 
-    public DownloadTaskManager(LoggerBuffer logger, DeviceRuntimeManager runtimeManager, AppStateService appState)
+    public DownloadTaskManager(LoggerBuffer logger, DeviceRuntimeManager runtimeManager, AppStateService appState, DaqHostedService hosted)
     {
         _logger = logger;
         _runtimeManager = runtimeManager;
         _appState = appState;
+        _hosted = hosted;
     }
 
     /// <summary>dotnet CLI 可用性探测（Core PluginDownloadHandler 依赖 dotnet publish）。异步版：不阻塞电路线程</summary>
@@ -227,6 +229,9 @@ public class DownloadTaskManager
                                 await rt.StopAsync();
                                 stopped.Add(rt);
                             }
+                            // 卸载程序集前优雅停止 UA/MQTT 服务端：释放监听端口，防僵尸 socket 占用导致新服务端绑定失败
+                            try { await _hosted.StopServerServicesAsync(); }
+                            catch (Exception ex) { _logger.Push($"[Error] 服务端停止失败: {ex.Message}"); }
                             // 卸载旧程序集并回收，避免文件锁/旧实例残留（对齐 WPF PrivateRemovalPlugin）
                             foreach (var old in LoadPluginList().Where(p => p.Name == name))
                             {
@@ -247,6 +252,25 @@ public class DownloadTaskManager
                             if (index >= 0) list[index] = plugin;
                             else list.Add(plugin);
                             PluginHandlerCore.SavePluginUIConfig(new System.Collections.ObjectModel.ObservableCollection<PluginListModel>(list), WebPaths.PluginListConfigPath);
+                        }
+                        // 重新注册最终路径：探测注册的是下载临时目录（Move 后失效），
+                        // 不重注册则设备启动采集报"插件尚未加载"（对齐 WPF InitPlugin(libPath) 流程）
+                        foreach (var (model, _) in result)
+                        {
+                            try { PluginHandlerCore.PluginOperate.RemovePluginAsync(model.Name); } catch { /* 未注册忽略 */ }
+                        }
+                        try
+                        {
+                            PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                        }
+                        catch (Exception ex)
+                        {
+                            _logger.Push($"[Error] 插件运行时重新注册失败 {name}: {ex.Message}");
+                        }
+                        // 服务端重启（仅热更新：程序集卸载波及服务端，此时端口已释放可重新绑定）
+                        if (isHotUpdate)
+                        {
+                            await _hosted.InitServerServicesAsync();
                         }
                         installed += result.Count;
                         break;

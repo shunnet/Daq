@@ -18,6 +18,7 @@
 @inject AppStateService AppState
 @inject ToastService Toast
 @inject DeviceRuntimeManager RuntimeManager
+@inject DaqHostedService Hosted
 @inject IJSRuntime JS
 
 <div class="card">
@@ -691,7 +692,15 @@
         }
 
         _uploading = true;
-        var tempPath = Path.Combine(Path.GetTempPath(), "snet-upload-" + Guid.NewGuid().ToString("N"));
+        // 清理历史异常退出遗留的临时解压目录（同目录枚举，不误伤正式插件）
+        foreach (var leftover in Directory.GetDirectories(typePath, ".upload-tmp-*"))
+        {
+            try { Directory.Delete(leftover, true); } catch { /* 被占用/权限问题忽略，下次再清 */ }
+        }
+        // 临时解压目录必须与目标 lib 目录同卷：系统临时目录（C:\Temp 或 /tmp）与数据目录
+        // 分属不同卷/挂载点时 Directory.Move 抛 "Move will not work across volumes"。
+        // 放在 typePath 下（与最终 libPath 同目录）保证同卷且 rename 原子。
+        var tempPath = Path.Combine(typePath, ".upload-tmp-" + Guid.NewGuid().ToString("N"));
         try
         {
             // 1. 先解压到临时目录（ZipSlip 校验 + zip 炸弹防护）
@@ -771,6 +780,11 @@
             if (hotUpdate)
             {
                 stoppedDevices = await StopDevicesUsingPluginAsync(type, zipName);
+                // 卸载程序集前优雅停止 UA/MQTT 服务端：释放监听端口。
+                // 否则旧服务端 socket 僵尸占用端口（程序集卸载后无法优雅关闭），
+                // 新服务端绑定失败，客户端连上僵尸报 "Unexpected error while processing a Hello message" / BadDecodingError
+                try { await Hosted.StopServerServicesAsync(); }
+                catch (Exception ex) { Toast.Warning(T("服务端停止失败") + ": " + ex.Message); }
                 // 旧目录先原子让位（同盘 rename）：新包 Move 失败时立即恢复，旧插件不毁
                 backupPath = libPath + ".old-" + Guid.NewGuid().ToString("N")[..8];
                 Directory.Move(libPath, backupPath);
@@ -792,19 +806,18 @@
             }
 
             var names = new List<string>();
+            // 落盘用副本：界面列表保持旧引用——上传成功不自动刷新列表，由工具栏"刷新"按钮手动加载
+            var newList = _plugins.ToList();
             foreach (var (model, _) in result)
             {
                 model.Path = libPath;
-                // 热更新/重复上传时先移除同名旧列表项，避免重复显示
-                _plugins.RemoveAll(p => p.Name == model.Name);
-                _plugins.Add(new PluginListModel(model.Name, type, model.Version, DateTime.Now, model));
+                // 热更新/重复上传时先移除同名旧列表项，避免落盘出现重复
+                newList.RemoveAll(p => p.Name == model.Name);
+                newList.Add(new PluginListModel(model.Name, type, model.Version, DateTime.Now, model));
                 names.Add(model.Name);
             }
-            await SavePluginListAsync();
-            // 与文件强制同步（防内存/文件漂移），并确保列表区渲染
-            _plugins = LoadPluginList();
-            _tab = 0; // 强制切回"已装插件"Tab，让上传结果立即可见
-            _uploadStatus = new UploadStatus(string.Format(T("上传成功：{0}，已安装 {1}，见下方「已安装插件」列表"), zipName + ".zip", string.Join("、", names)), false);
+            await SavePluginListAsync(newList);
+            _uploadStatus = new UploadStatus(string.Format(T("上传成功：{0}，已安装 {1}，点击刷新按钮查看"), zipName + ".zip", string.Join("、", names)), false);
             Toast.Success(string.Format(T("插件上传成功：{0}"), zipName + ".zip"));
             StateHasChanged();
 
@@ -818,6 +831,30 @@
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
                 try { Directory.Delete(backupPath, true); } catch { /* 备份清理失败不影响主流程 */ }
+            }
+
+            // 在最终 libPath 重新注册运行时插件管理器（对齐 WPF：解压后直接 InitPlugin(libPath)）。
+            // 探测阶段注册的是临时目录（Move 后路径失效），热更新清理又移除了旧注册——
+            // 不重新注册会导致设备启动采集报"插件尚未加载"。
+            var iName = string.Format("Snet.Model.interface.I{0}", type);
+            foreach (var name in names)
+            {
+                try { PluginHandlerCore.PluginOperate.RemovePluginAsync(name); } catch { /* 未注册忽略 */ }
+            }
+            try
+            {
+                PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
+            }
+            catch (Exception ex)
+            {
+                // 上传本身已成功（文件/清单已落盘，重启后启动加载），仅本次运行内存注册失败
+                Toast.Warning(string.Format(T("插件已安装，但运行时加载失败：{0}"), ex.Message));
+            }
+
+            // 服务端重启（仅热更新：程序集卸载波及服务端，此时端口已释放可重新绑定）
+            if (hotUpdate)
+            {
+                await Hosted.InitServerServicesAsync();
             }
         }
         finally
@@ -886,14 +923,17 @@
     }
 
     /// <summary>保存插件清单（写门串行 + 重试写，对齐 ProjectConfig 落盘方式）。失败抛 IOException（调用方 catch 提示）</summary>
-    private async Task SavePluginListAsync()
+    private async Task SavePluginListAsync() => await SavePluginListAsync(_plugins);
+
+    /// <summary>按指定列表落盘（上传成功路径用副本落盘，界面列表不刷新）</summary>
+    private async Task SavePluginListAsync(List<PluginListModel> list)
     {
         Directory.CreateDirectory(WebPaths.UiConfigPath);
         await AppState.ConfigSaveGate.WaitAsync();
         try
         {
-            var list = new ObservableCollection<PluginListModel>(_plugins);
-            if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginListConfigPath, list.ToJson(true)))
+            var coll = new ObservableCollection<PluginListModel>(list);
+            if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginListConfigPath, coll.ToJson(true)))
                 throw new IOException($"写入失败: {WebPaths.PluginListConfigPath}");
         }
         finally
@@ -905,6 +945,7 @@
     private Task RefreshPluginList()
     {
         _plugins = LoadPluginList();
+        _uploadStatus = null; // 手动刷新视为已查看上传结果，清除成功/失败状态条
         StateHasChanged();
         return Task.CompletedTask;
     }

@@ -251,7 +251,8 @@ public class DaqHostedService : BackgroundService
     #endregion
 
     #region 停服与事件转发
-    private async Task StopServerServicesAsync()
+    /// <summary>停止全部服务端（热更新插件时需在卸载程序集前调用：优雅释放监听端口，防僵尸 socket 占用）</summary>
+    public async Task StopServerServicesAsync()
     {
         try
         {

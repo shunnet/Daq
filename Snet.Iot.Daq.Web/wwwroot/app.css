@@ -1840,7 +1840,7 @@ html[lang^="zh"] .device-info .row span.label::after { content: "\FF1A"; }
 
 /* 上传状态反馈条 */
 .upload-status {
-    margin-bottom: 10px;
+    margin-bottom: 0;
     padding: 8px 12px;
     border-radius: var(--radius-sm);
     font-size: 13px;
@@ -1856,6 +1856,8 @@ html[lang^="zh"] .device-info .row span.label::after { content: "\FF1A"; }
     border-color: var(--danger);
     background: var(--danger-soft);
 }
+/* 状态条紧随工具栏出现时与上方留出间距（toolbar 无下边距，直接粘连） */
+.toolbar + .upload-status { margin-top: 10px; }
 
 /* 插件配置卡片头部：SN 紧跟协议名称靠左，仅操作按钮在右侧；更新时间悬浮提示 */
 .item-card .item-name.cfg-item-name { flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
