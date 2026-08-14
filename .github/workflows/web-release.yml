@@ -119,6 +119,10 @@ jobs:
           file: Snet.Iot.Daq.Web/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
+          # 层缓存存 GitHub Actions cache（跨运行复用）：restore/publish 层命中后大幅缩短构建时间；
+          # arm64 在 QEMU 模拟下构建，restore+publish 是主要耗时，缓存命中后第二次起只需数分钟
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
           tags: |
             ghcr.io/${{ steps.repo.outputs.repo }}/snet-iot-daq-web:${{ steps.version.outputs.VERSION }}
             ghcr.io/${{ steps.repo.outputs.repo }}/snet-iot-daq-web:latest
