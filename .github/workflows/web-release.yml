@@ -21,8 +21,16 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     strategy:
+      # 单腿失败不取消其他腿（win 腿曾因上传路径不匹配失败，fail-fast 连带取消 linux 腿）
+      fail-fast: false
       matrix:
-        rid: [linux-x64, linux-arm64, win-x64]
+        include:
+          - rid: linux-x64
+            archive: tar.gz
+          - rid: linux-arm64
+            archive: tar.gz
+          - rid: win-x64
+            archive: zip
 
     steps:
       - name: Checkout
@@ -58,7 +66,7 @@ jobs:
       - name: Create archive (${{ matrix.rid }})
         run: |
           cd publish/${{ matrix.rid }}
-          if [[ "${{ matrix.rid }}" == win-* ]]; then
+          if [[ "${{ matrix.archive }}" == "zip" ]]; then
             zip -qr "../Snet.Iot.Daq.Web-v${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.zip" .
           else
             tar -czf "../Snet.Iot.Daq.Web-v${{ steps.version.outputs.VERSION }}-${{ matrix.rid }}.tar.gz" .
@@ -68,7 +76,8 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Snet.Iot.Daq.Web-${{ matrix.rid }}
-          path: publish/*.tar.gz
+          # 每腿只匹配自己的归档扩展名（win=.zip / linux=.tar.gz），避免 win 腿匹配不到 tar.gz 报错
+          path: publish/Snet.Iot.Daq.Web-v*.${{ matrix.archive }}
           if-no-files-found: error
 
   docker:
@@ -84,6 +93,11 @@ jobs:
           VER=$(grep -oP '<Version>\K[^<]+' Snet.Iot.Daq.Web/Snet.Iot.Daq.Web.csproj | head -1)
           [ -z "$VER" ] && VER="1.0.0"
           echo "VERSION=$VER" >> $GITHUB_OUTPUT
+
+      - name: Lowercase repository (ghcr 要求全小写)
+        id: repo
+        shell: bash
+        run: echo "repo=$(echo '${{ github.repository }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -106,8 +120,8 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/snet-iot-daq-web:${{ steps.version.outputs.VERSION }}
-            ghcr.io/${{ github.repository }}/snet-iot-daq-web:latest
+            ghcr.io/${{ steps.repo.outputs.repo }}/snet-iot-daq-web:${{ steps.version.outputs.VERSION }}
+            ghcr.io/${{ steps.repo.outputs.repo }}/snet-iot-daq-web:latest
 
   release:
     needs: publish
