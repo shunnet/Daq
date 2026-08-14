@@ -73,7 +73,7 @@
             <table class="snet-table">
                 <thead>
                     <tr>
-                        <th><input type="checkbox" value="@_allSelected" @onchange="OnAllSelectedChange" /></th>
+                        <th><input type="checkbox" checked="@_allSelected" @onchange="OnAllSelectedChange" /></th>
                         <th><i class="bi bi-list-ol"></i>@T("序号")</th>
                         <th><i class="bi bi-geo-alt"></i>@T("地址")</th>
                         <th><i class="bi bi-tag"></i>@T("别名")</th>
@@ -201,7 +201,8 @@
     private int _pageIndex = 1;
     private int _pageSize = 200;
     private bool _loading = true;
-    private bool _allSelected;
+    /// <summary>当前页全选状态（计算属性，对齐 PluginBrowsePage：行勾选变化驱动表头显示）</summary>
+    private bool _allSelected => _items.Count > 0 && _items.All(x => x.IsSelected);
     private bool _editing;
     private bool _confirmDelete;
     private string _deleteMessage = "";
@@ -294,7 +295,6 @@
     private void SelectAll()
     {
         foreach (var item in _items) item.IsSelected = true;
-        _allSelected = true;
     }
 
     private void InverseSelection()
@@ -302,7 +302,11 @@
         foreach (var item in _items) item.IsSelected = !item.IsSelected;
     }
 
-    private void OnAllSelectedChange() { foreach (var item in _items) item.IsSelected = _allSelected; }
+    private void OnAllSelectedChange(ChangeEventArgs e)
+    {
+        var all = e.Value is true;
+        foreach (var item in _items) item.IsSelected = all;
+    }
 
     private void OpenAdd()
     {
@@ -516,6 +520,11 @@
             Time = m.Time ?? DateTime.Now
         }).ToList();
 
+        // 导入前基线：过滤出真正新增的地址（InsertUnique 只返回计数，无法区分具体行）
+        var before = DbGate.QueryAddresses(null, 1, int.MaxValue, out _);
+        var beforeNames = new HashSet<string>(before.Select(x => x.AnotherName));
+        var beforeAddrs = new HashSet<string>(before.Select(x => x.Address));
+
         var result = DbGate.InsertUniqueAddresses(cores);
         if (result.Duplicate > 0)
             Toast.Warning(string.Format(T("导入完成：新增 {0} 个，重复跳过 {1} 个"), result.Success, result.Duplicate));
@@ -523,6 +532,13 @@
             Toast.Success(string.Format(T("导入成功：{0} 个地址"), result.Success));
         _pageIndex = 1;
         await LoadAsync();
+        // 回灌新增地址到内存字典（对齐 SaveAsync 单条添加）：导入只写库漏更新 AddressDict，
+        // 项目设置「选择采集地址」弹窗从 AddressDict 读取，会看不到导入的地址
+        foreach (var c in cores)
+        {
+            if (!beforeNames.Contains(c.AnotherName) && !beforeAddrs.Contains(c.Address))
+                AppState.AddressDict[c.Guid] = c;
+        }
         // 感知更新：导入的新地址同步回灌项目树引用
         AppState.NotifyEntityChanged();
     }

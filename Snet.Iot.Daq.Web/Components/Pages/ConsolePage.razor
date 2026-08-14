@@ -257,13 +257,25 @@
         return Task.CompletedTask;
     }
 
-    private Task CollectAsync(DeviceRuntime rt) => rt.CollectAsync();
-    private Task StopAsync(DeviceRuntime rt) => rt.StopAsync();
-    private Task RetryAsync(DeviceRuntime rt) => rt.RetryAsync();
-    private Task ClearLogAsync()
+    private async Task CollectAsync(DeviceRuntime rt)
     {
+        await OperateInfoAsync($"启动采集：{rt.DeviceName}");
+        await rt.CollectAsync();
+    }
+    private async Task StopAsync(DeviceRuntime rt)
+    {
+        await OperateInfoAsync($"停止采集：{rt.DeviceName}");
+        await rt.StopAsync();
+    }
+    private async Task RetryAsync(DeviceRuntime rt)
+    {
+        await OperateInfoAsync($"重试采集：{rt.DeviceName}");
+        await rt.RetryAsync();
+    }
+    private async Task ClearLogAsync()
+    {
+        await OperateInfoAsync("清空信息日志");
         LogBuffer.Clear();
-        return Task.CompletedTask;
     }
 
     // ================= 设备卡操作菜单（对齐 WPF ConsoleDevice.xaml Row2 的 ⋯ 菜单） =================
@@ -308,6 +320,7 @@
     private async Task WebApiStartAsync(DeviceRuntime rt)
     {
         _moreOpen = null;
+        await OperateInfoAsync($"WebApi 启动：{rt.DeviceName}");
         try
         {
             var r = await rt.WebApiStartAsync();
@@ -322,6 +335,7 @@
     private async Task WebApiStopAsync(DeviceRuntime rt)
     {
         _moreOpen = null;
+        await OperateInfoAsync($"WebApi 停止：{rt.DeviceName}");
         var r = await rt.WebApiStopAsync();
         Toast.Show(r.Message, r.Status ? "success" : "error");
     }
@@ -329,6 +343,7 @@
     private async Task WebApiExampleAsync(DeviceRuntime rt)
     {
         _moreOpen = null;
+        await OperateInfoAsync($"WebApi 请求示例：{rt.DeviceName}");
         var r = await rt.WebApiExampleAsync();
         if (r.Status)
             LogBuffer.Push($"[{rt.DeviceName}] WebApi 请求示例: {r.ResultData?.ToString() ?? T("无数据")}");
@@ -339,6 +354,7 @@
     private async Task SoftCollectAsync(DeviceRuntime rt, bool on)
     {
         _moreOpen = null;
+        await OperateInfoAsync($"{(on ? "添加软启采集" : "取消软启采集")}：{rt.DeviceName}");
         rt.SetSoftCollect(on);
         await AppState.SaveProjectsAsync();
         Toast.Success(on ? T("添加软启采集成功") : T("取消软启采集成功"));
@@ -348,6 +364,7 @@
     private async Task StartServerAsync(string kind)
     {
         if (_serverBusy) return;
+        await OperateInfoAsync($"启动服务端：{kind}");
         _serverBusy = true;
         try
         {
@@ -364,6 +381,7 @@
     private async Task StopServerAsync(string kind)
     {
         if (_serverBusy) return;
+        await OperateInfoAsync($"停止服务端：{kind}");
         _serverBusy = true;
         try
         {

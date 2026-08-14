@@ -141,28 +141,37 @@ app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService 
         if (!ok) return Results.Redirect($"/login?mode=change&error={err}");
         var changedUser = auth.FindUser(username);
         await SignInAsync(ctx, username, changedUser?.Role ?? AuthService.RoleUser);
+        await Snet.Log.LogHelper.InfoAsync($"{username} - {changedUser?.Role ?? AuthService.RoleUser} - 修改密码成功", foldername: Path.Combine("operate", username));
         return Results.Redirect("/console");
     }
 
     // 登录分支兜底：无用户名时按 admin 处理（登录表单始终带用户名，兜底仅防异常提交）
     if (string.IsNullOrEmpty(username)) username = "admin";
     var (valid, err2) = await auth.ValidateAsync(username, password);
-    if (!valid) return Results.Redirect($"/login?error={err2}");
+    if (!valid)
+    {
+        await Snet.Log.LogHelper.WarningAsync($"{username} - 登录失败：{err2}", foldername: Path.Combine("operate", username));
+        return Results.Redirect($"/login?error={err2}");
+    }
     var user = auth.FindUser(username);
     var role = user?.Role ?? AuthService.RoleUser;
     if (auth.MustChangePassword(username))
     {
         // 带"必须改密"声明的受限会话：只能访问登录/改密页（见下方强制改密中间件）
         await SignInAsync(ctx, username, role, mustChangePassword: true);
+        await Snet.Log.LogHelper.InfoAsync($"{username} - {role} - 登录成功（首次需修改密码）", foldername: Path.Combine("operate", username));
         return Results.Redirect("/login?mode=change");
     }
     await SignInAsync(ctx, username, role);
+    await Snet.Log.LogHelper.InfoAsync($"{username} - {role} - 登录成功", foldername: Path.Combine("operate", username));
     return Results.Redirect("/console");
 }).DisableAntiforgery().RequireRateLimiting("login");
 
 app.MapGet("/logout", async (HttpContext ctx) =>
 {
+    var name = ctx.User.Identity?.Name ?? "anonymous";
     await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+    await Snet.Log.LogHelper.InfoAsync($"{name} - 退出登录", foldername: Path.Combine("operate", name));
     return Results.Redirect("/login");
 }).DisableAntiforgery();
 

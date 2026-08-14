@@ -4,11 +4,11 @@
             <span class="modal-title-text">
                 @if (!string.IsNullOrEmpty(TitleIcon))
                 {
-                    <i class="bi @TitleIcon"></i>
+                    <span class="modal-title-icon"><i class="bi @TitleIcon"></i></span>
                 }
                 @Title
             </span>
-            <button class="btn btn-icon" @onclick="Close" aria-label="close">
+            <button class="btn btn-icon modal-close" @onclick="Close" aria-label="close">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
                     <path d="M18 6L6 18M6 6l12 12" />
                 </svg>

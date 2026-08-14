@@ -1,4 +1,4 @@
-@page "/plugins/settings"
+﻿@page "/plugins/settings"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -925,6 +925,7 @@
         var sharedCount = _removingSharedCount;
         _removingSharedCount = 0;
         if (selected is null) return;
+        await OperateInfoAsync($"移除插件：{selected.Name}");
         var path = selected.PluginDetails?.Path;
         // 同 dll 目录（Path 一致）的全部插件条目（对齐 WPF PrivateRemovalPlugin：删目录后一并清列表，不留幽灵条目）
         var sharedNames = _plugins
@@ -1715,6 +1716,7 @@
 
     private async Task SaveConfigAsync()
     {
+        await OperateInfoAsync($"保存插件配置：{(_editingConfig?.SN ?? "新建配置")}");
         // 表单视图保存前先合并进 JSON（与实时同步同一路径）
         if (_paramTab == "form") SyncFormToJson();
         var param = string.IsNullOrWhiteSpace(_configParam) ? "" : _configParam;
@@ -1871,6 +1873,7 @@
             Toast.Warning(T("该插件配置在项目设置中有使用"));
             return;
         }
+        await OperateInfoAsync($"移除插件配置：{item.SN}");
         await AppState.ConfigSaveGate.WaitAsync();
         try
         {

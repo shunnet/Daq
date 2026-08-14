@@ -33,12 +33,13 @@ public class AuthService
         bool MustChangePassword,
         int FailedAttempts,
         DateTime? LockoutUntil,
-        string Role = RoleAdmin);
+        string Role = RoleAdmin,
+        bool IsDisabled = false);
 
     private sealed record UsersFile(List<UserRecord> Users);
 
     /// <summary>用户概览（供用户管理界面展示，不含敏感字段）</summary>
-    public sealed record UserInfo(string Username, string Role, bool MustChangePassword);
+    public sealed record UserInfo(string Username, string Role, bool MustChangePassword, bool IsDisabled = false);
 
     private List<UserRecord>? _cache;
 
@@ -157,6 +158,10 @@ public class AuthService
                 RegisterFailure(user, users);
                 return (false, "InvalidUsernameOrPassword");
             }
+            // 密码正确但账号已停用：拒绝登录（不计失败次数）
+            if (user.IsDisabled)
+                return (false, "UserDisabled");
+            // 登录成功：清零失败计数
             users[index] = user with { FailedAttempts = 0, LockoutUntil = null };
             Save();
             return (true, null);
@@ -214,7 +219,7 @@ public class AuthService
     // ================= 用户管理（仅管理员） =================
 
     public List<UserInfo> ListUsers() =>
-        Load().Select(u => new UserInfo(u.Username, u.Role, u.MustChangePassword)).ToList();
+        Load().Select(u => new UserInfo(u.Username, u.Role, u.MustChangePassword, u.IsDisabled)).ToList();
 
     /// <summary>新增用户。返回 (成功, 错误消息)</summary>
     public async Task<(bool Ok, string? Error)> AddUserAsync(string username, string password, string role)
@@ -290,6 +295,30 @@ public class AuthService
                 FailedAttempts = 0,
                 LockoutUntil = null
             };
+            Save();
+            return (true, null);
+        }
+        finally
+        {
+            _fileLock.Release();
+        }
+    }
+
+    /// <summary>启用/停用用户。返回 (成功, 错误消息)。不允许停用最后一个管理员、不允许停用自己</summary>
+    public async Task<(bool Ok, string? Error)> SetDisabledAsync(string username, bool disabled, string currentUser)
+    {
+        await _fileLock.WaitAsync();
+        try
+        {
+            var users = Load();
+            var index = users.FindIndex(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
+            if (index < 0) return (false, "UserNotFound");
+            var target = users[index];
+            if (disabled && target.Role == RoleAdmin && users.Count(u => u.Role == RoleAdmin) <= 1)
+                return (false, "LastAdmin");
+            if (disabled && string.Equals(username, currentUser, StringComparison.OrdinalIgnoreCase))
+                return (false, "CannotDisableSelf");
+            users[index] = target with { IsDisabled = disabled };
             Save();
             return (true, null);
         }

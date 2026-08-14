@@ -653,6 +653,8 @@
             ToastSvc.Warning(T("没有可添加的地址（已全部绑定或重复）"));
             return;
         }
+        // 更新设备树节点 SpecialData（[ 插件 ] ( 地址数 )）：添加地址路径此前漏调用，左侧树数量不刷新
+        _selectedDevice.UpdateSpecialData();
         await AppState.SaveProjectsAsync();
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(string.Format(T("已添加 {0} 个采集地址"), added));
@@ -902,6 +904,10 @@
             : _selectedDevice.Details.Remove(target);
         if (removed && target.Parent is not null)
             target.Parent.UpdateSpecialData();
+        // 设备节点 SpecialData（[ 插件 ] ( 地址数 )）：删除顶层地址节点时 Parent 为 null，
+        // 只更新 Parent 会漏掉设备节点，必须显式刷新
+        if (removed)
+            _selectedDevice.UpdateSpecialData();
         await AppState.SaveProjectsAsync();
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("删除成功"));

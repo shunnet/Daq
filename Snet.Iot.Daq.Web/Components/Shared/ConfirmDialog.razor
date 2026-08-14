@@ -1,10 +1,18 @@
 <div class="modal-overlay">
     <div class="modal" role="alertdialog" aria-modal="true">
         <div class="modal-header">
-            <span class="modal-title-text"><i class="bi bi-question-circle"></i>@Title</span>
+            <span class="modal-title-text">
+                <span class="modal-title-icon modal-title-icon-warning"><i class="bi bi-question-circle"></i></span>
+                @Title
+            </span>
+            <button class="btn btn-icon modal-close" @onclick="Cancel" aria-label="close">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                    <path d="M18 6L6 18M6 6l12 12" />
+                </svg>
+            </button>
         </div>
         <div class="modal-body">
-            @Message
+            <p class="confirm-message">@Message</p>
         </div>
         <div class="modal-footer">
             <button class="btn" @onclick="Cancel"><i class="bi bi-x-lg"></i>@CancelText</button>

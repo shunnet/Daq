@@ -1045,10 +1045,6 @@ namespace Snet.Iot.Daq.viewModel
             }
         }
 
-        /// <summary>
-        /// 配置
-        /// </summary>
-        /// <param name="model">项目信息</param>
 
         /// <summary>
         /// 按插件类名查 PluginList.json 的包版本（与 Web 端 DeviceRuntime 同源逻辑）
@@ -1066,6 +1062,10 @@ namespace Snet.Iot.Daq.viewModel
             }
         }
 
+        /// <summary>
+        /// 配置
+        /// </summary>
+        /// <param name="model">项目信息</param>
         public async Task SettingsAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
             DaqPluginPath = PluginHandlerCore.PluginOperate.GetPluginPath(model.DaqDetails.Name);

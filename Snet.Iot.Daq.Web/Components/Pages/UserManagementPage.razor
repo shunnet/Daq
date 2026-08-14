@@ -1,12 +1,14 @@
-@page "/users"
+﻿@page "/users"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
+@implements IDisposable
 @using Microsoft.AspNetCore.Authorization
 @using Snet.Iot.Daq.Web.Components.Shared
 @using Snet.Iot.Daq.Web.Services
 @attribute [Authorize(Policy = AuthService.AdminPolicy)]
 @inject AuthService Auth
 @inject ToastService Toast
+@inject IJSRuntime JS
 
 <div class="card">
     <div class="card-header">
@@ -28,23 +30,49 @@
                 @foreach (var u in _users)
                 {
                     <tr>
-                        <td>@u.Username</td>
-                        <td><span class="tag @(u.Role == AuthService.RoleAdmin ? "tag-primary" : "")">@(u.Role == AuthService.RoleAdmin ? T("管理员") : T("普通用户"))</span></td>
-                        <td><span class="tag @(u.MustChangePassword ? "tag-warning" : "tag-success")">@(u.MustChangePassword ? T("需修改密码") : T("正常"))</span></td>
                         <td>
+                            @u.Username
                             @if (u.Username == _currentUser)
                             {
-                                <span class="tag tag-primary">@T("当前登录")</span>
+                                <span class="tag tag-primary ms-2">@T("当前登录")</span>
+                            }
+                        </td>
+                        <td><span class="tag @(u.Role == AuthService.RoleAdmin ? "tag-primary" : "")">@(u.Role == AuthService.RoleAdmin ? T("管理员") : T("普通用户"))</span></td>
+                        <td>
+                            @if (u.IsDisabled)
+                            {
+                                <span class="tag tag-danger">@T("已停用")</span>
                             }
                             else
                             {
-                                <button class="btn btn-sm" @onclick="() => ToggleRoleAsync(u)"><i class="bi @(u.Role == AuthService.RoleAdmin ? "bi-person-down" : "bi-person-check")"></i>@(u.Role == AuthService.RoleAdmin ? T("设为普通用户") : T("设为管理员"))</button>
+                                <span class="tag @(u.MustChangePassword ? "tag-warning" : "tag-success")">@(u.MustChangePassword ? T("需修改密码") : T("正常"))</span>
                             }
-                            <button class="btn btn-sm" @onclick="() => OpenReset(u)"><i class="bi bi-key"></i>@T("重置密码")</button>
-                            @if (u.Username != _currentUser)
-                            {
-                                <button class="btn btn-sm btn-danger" @onclick="() => RemoveUserAsync(u)"><i class="bi bi-trash"></i>@T("删除")</button>
-                            }
+                        </td>
+                        <td>
+                            <div class="device-more">
+                                <button class="btn btn-icon device-more-toggle" title="@T("操作")" @onclick:stopPropagation @onclick="() => ToggleUserMenuAsync(u)">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                        <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                                        <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                                    </svg>
+                                </button>
+                                @if (_menuUser == u.Username)
+                                {
+                                    <div class="device-more-menu menu-down">
+                                        @if (u.Username != _currentUser)
+                                        {
+                                            <button @onclick="() => ToggleRoleAsync(u)"><i class="bi @(u.Role == AuthService.RoleAdmin ? "bi-person-down" : "bi-person-check")"></i>@(u.Role == AuthService.RoleAdmin ? T("设为普通用户") : T("设为管理员"))</button>
+                                        }
+                                        <button @onclick="() => OpenReset(u)"><i class="bi bi-key"></i>@T("重置密码")</button>
+                                        @if (u.Username != _currentUser)
+                                        {
+                                            <button @onclick="() => ToggleDisabledAsync(u)"><i class="bi @(u.IsDisabled ? "bi-unlock" : "bi-lock")"></i>@(u.IsDisabled ? T("启用") : T("停用"))</button>
+                                            <button @onclick="() => RemoveUserAsync(u)"><i class="bi bi-trash"></i>@T("删除")</button>
+                                        }
+                                    </div>
+                                }
+                            </div>
                         </td>
                     </tr>
                 }
@@ -96,6 +124,62 @@
     </ModalDialog>
 }
 
+<div class="card operate-log-card">
+    <div class="card-header">
+        <div class="card-title"><i class="bi bi-clock-history me-2"></i>@T("操作日志")</div>
+        <div class="operate-log-filters">
+            <select @bind="_logDate" @bind:after="LoadLogUsers">
+                @foreach (var d in _logDates)
+                {
+                    <option value="@d">@d</option>
+                }
+            </select>
+            <select @bind="_logUser" @bind:after="LoadLogLines">
+                @if (_logUsers.Count == 0)
+                {
+                    <option value="">@T("无日志用户")</option>
+                }
+                @foreach (var u in _logUsers)
+                {
+                    <option value="@u">@u</option>
+                }
+            </select>
+            <button class="btn btn-icon device-more-toggle" @onclick="LoadLogLines" title="@T("刷新")"><i class="bi bi-arrow-clockwise"></i></button>
+            <div class="device-more">
+                <button class="btn btn-icon device-more-toggle" title="@T("操作")" @onclick="() => ToggleLogMenuAsync()">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                        <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                        <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                        <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                    </svg>
+                </button>
+                @if (_menuLog)
+                {
+                    <div class="device-more-menu">
+                        <button @onclick="ClearCurrentLog"><i class="bi bi-eraser"></i>@T("清空当前用户")</button>
+                        <button @onclick="ClearAllLog"><i class="bi bi-trash"></i>@T("清空所有用户")</button>
+                    </div>
+                }
+            </div>
+        </div>
+    </div>
+    <div class="operate-log-body">
+        @if (_logLines.Count == 0)
+        {
+            <div class="empty operate-log-empty"><span>@T("暂无操作日志")</span></div>
+        }
+        else
+        {
+            <div class="operate-log-lines">
+                @foreach (var line in _logLines)
+                {
+                    <div class="@LineClass(line)">@line</div>
+                }
+            </div>
+        }
+    </div>
+</div>
+
     <Toast />
 @code {
     private List<AuthService.UserInfo> _users = new();
@@ -106,17 +190,135 @@
     private string _newRole = AuthService.RoleUser;
     private string? _resetUser;
     private string _resetPassword = "";
+    // 行操作/日志操作弹出菜单（对齐 ConsolePage device-more 模式：互斥 + 区域外点击收起）
+    private string? _menuUser;
+    private bool _menuLog;
+    private DotNetObjectReference<UserManagementPage>? _jsRef;
+
+    // 操作日志查看区
+    private List<string> _logDates = new();
+    private List<string> _logUsers = new();
+    private List<string> _logLines = new();
+    private string _logDate = "";
+    private string _logUser = "";
+
+    private static string LineClass(string line)
+        => line.Contains("ERR") ? "log-err" : line.Contains("WRN") ? "log-warn" : "log-ok";
+
+    private void LoadLogDates()
+    {
+        _logDates = OperateLogReader.GetDates();
+        _logDate = _logDates.FirstOrDefault() ?? "";
+        LoadLogUsers();
+    }
+
+    private void LoadLogUsers()
+    {
+        _logUsers = OperateLogReader.GetUsers(_logDate);
+        _logUser = _logUsers.FirstOrDefault() ?? "";
+        LoadLogLines();
+    }
+
+    private void LoadLogLines()
+    {
+        _logLines = string.IsNullOrEmpty(_logDate) || string.IsNullOrEmpty(_logUser)
+            ? new List<string>()
+            : OperateLogReader.GetLines(_logDate, _logUser);
+    }
+
+    private async Task ClearCurrentLog()
+    {
+        _menuLog = false;
+        if (string.IsNullOrEmpty(_logDate) || string.IsNullOrEmpty(_logUser)) return;
+        await OperateLogReader.ClearUserAsync(_logDate, _logUser);
+        await OperateInfoAsync($"清空操作日志：{_logUser}（{_logDate}）");
+        LoadLogUsers();
+        Toast.Success(T("已清空"));
+    }
+
+    private async Task ClearAllLog()
+    {
+        _menuLog = false;
+        if (string.IsNullOrEmpty(_logDate)) return;
+        await OperateLogReader.ClearAllAsync(_logDate);
+        await OperateInfoAsync($"清空全部操作日志（{_logDate}）");
+        LoadLogUsers();
+        Toast.Success(T("已清空"));
+    }
 
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
 
     protected override async Task OnInitializedAsync()
     {
+        MenuCoordinator.Register(CloseMenu);
         if (AuthState is not null)
         {
             var state = await AuthState;
             _currentUser = state.User.Identity?.Name ?? "";
         }
         _users = Auth.ListUsers();
+        LoadLogDates();
+    }
+
+    /// <summary>全局互斥回调：其他菜单打开前先收起本页全部菜单</summary>
+    private void CloseMenu()
+    {
+        if (_menuUser is not null || _menuLog)
+        {
+            _menuUser = null;
+            _menuLog = false;
+            InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task ToggleUserMenuAsync(AuthService.UserInfo u)
+    {
+        // 全局互斥：先收起其他组件已打开的菜单
+        MenuCoordinator.CloseAllOthers();
+        _menuUser = _menuUser == u.Username ? null : u.Username;
+        // 展开后注册「区域外点击收起」；收起时注销
+        if (_menuUser is not null)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    private async Task ToggleLogMenuAsync()
+    {
+        // 全局互斥：先收起其他组件已打开的菜单
+        MenuCoordinator.CloseAllOthers();
+        _menuLog = !_menuLog;
+        // 展开后注册「区域外点击收起」；收起时注销
+        if (_menuLog)
+        {
+            _jsRef ??= DotNetObjectReference.Create(this);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+        }
+        else
+        {
+            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+        }
+    }
+
+    [JSInvokable]
+    public void CloseAllActions()
+    {
+        _menuUser = null;
+        _menuLog = false;
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        MenuCoordinator.Unregister(CloseMenu);
+        // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
+        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
+        _jsRef?.Dispose();
     }
 
     private void OpenAdd()
@@ -130,6 +332,7 @@
     private async Task AddUserAsync()
     {
         var (ok, err) = await Auth.AddUserAsync(_newUsername, _newPassword, _newRole);
+        await OperateInfoAsync($"添加用户：{_newUsername}（角色 {_newRole}）");
         if (!ok)
         {
             Toast.Error(T(ErrorKey(err)));
@@ -142,7 +345,9 @@
 
     private async Task RemoveUserAsync(AuthService.UserInfo u)
     {
+        _menuUser = null;
         var (ok, err) = await Auth.RemoveUserAsync(u.Username, _currentUser);
+        await OperateInfoAsync($"删除用户：{u.Username}");
         if (!ok)
         {
             Toast.Error(T(ErrorKey(err)));
@@ -154,8 +359,10 @@
 
     private async Task ToggleRoleAsync(AuthService.UserInfo u)
     {
+        _menuUser = null;
         var target = u.Role == AuthService.RoleAdmin ? AuthService.RoleUser : AuthService.RoleAdmin;
         var (ok, err) = await Auth.SetRoleAsync(u.Username, target);
+        await OperateInfoAsync($"修改用户角色：{u.Username} → {target}");
         if (!ok)
         {
             Toast.Error(T(ErrorKey(err)));
@@ -167,8 +374,23 @@
 
     private void OpenReset(AuthService.UserInfo u)
     {
+        _menuUser = null;
         _resetUser = u.Username;
         _resetPassword = "";
+    }
+
+    private async Task ToggleDisabledAsync(AuthService.UserInfo u)
+    {
+        _menuUser = null;
+        var (ok, err) = await Auth.SetDisabledAsync(u.Username, !u.IsDisabled, _currentUser);
+        await OperateInfoAsync($"{(u.IsDisabled ? "启用用户" : "停用用户")}：{u.Username}");
+        if (!ok)
+        {
+            Toast.Error(T(ErrorKey(err)));
+            return;
+        }
+        _users = Auth.ListUsers();
+        Toast.Success(u.IsDisabled ? T("用户已启用") : T("用户已停用"));
     }
 
     private async Task ResetPasswordAsync()
@@ -176,6 +398,7 @@
         var username = _resetUser;
         if (username is null) return;
         var (ok, err) = await Auth.ResetPasswordAsync(username, _resetPassword);
+        await OperateInfoAsync($"重置密码：{username}");
         if (!ok)
         {
             Toast.Error(T(ErrorKey(err)));
@@ -194,6 +417,7 @@
         "UserNotFound" => "用户不存在",
         "LastAdmin" => "至少保留一个管理员",
         "CannotRemoveSelf" => "不能删除当前登录用户",
+        "CannotDisableSelf" => "不能停用当前登录用户",
         _ => err ?? "操作失败"
     };
 }
