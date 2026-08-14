@@ -86,6 +86,7 @@ namespace Snet.Iot.Daq.Core.handler
             "Snet.RabbitMQ",
             "Snet.Netty",
             "Snet.NetMQ",
+            "Snet.RocketMQ",
 
             // 采集插件
             "Snet.AllenBradley",
