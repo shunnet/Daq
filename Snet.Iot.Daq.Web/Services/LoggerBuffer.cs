@@ -1,6 +1,4 @@
-using System.Threading.Channels;
-
-namespace Snet.Iot.Daq.Web.Services;
+﻿namespace Snet.Iot.Daq.Web.Services;
 
 /// <summary>
 /// 日志缓冲：环形缓冲（快照）+ 事件推送（供控制台实时显示）
@@ -13,6 +11,7 @@ public class LoggerBuffer
 
     public event Action? Changed;
 
+    #region 缓冲操作
     public void Push(string line)
     {
         lock (_lock)
@@ -36,4 +35,5 @@ public class LoggerBuffer
             _lines.Clear();
         Changed?.Invoke();
     }
+    #endregion
 }

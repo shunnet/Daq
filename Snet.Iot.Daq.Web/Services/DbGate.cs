@@ -1,7 +1,7 @@
-using SQLite;
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Web.Data;
+using SQLite;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -14,6 +14,7 @@ public class DbGate
     public SQLiteConnection Db { get; }
     public object DbLock { get; } = new();
 
+    #region 构造与迁移
     public DbGate()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(WebPaths.DbPath)!);
@@ -53,6 +54,9 @@ public class DbGate
     }
 
     /// <summary>分页查询地址（模糊匹配 别名/地址/描述），keyword 为空返回全部</summary>
+    #endregion
+
+    #region 查询
     public List<AddressModel> QueryAddresses(string? keyword, int pageIndex, int pageSize, out int total)
     {
         lock (DbLock)
@@ -72,4 +76,5 @@ public class DbGate
     /// <summary>批量插入（防重），返回统计</summary>
     public BatchInsertResult InsertUniqueAddresses(IEnumerable<AddressModel> items) =>
         ProjectHandlerCore.InsertUnique(Db, DbLock, items, null, x => x.AnotherName, x => x.Address);
+    #endregion
 }

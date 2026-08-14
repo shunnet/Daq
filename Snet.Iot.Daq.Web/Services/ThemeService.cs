@@ -1,10 +1,11 @@
-namespace Snet.Iot.Daq.Web.Services;
+﻿namespace Snet.Iot.Daq.Web.Services;
 
 /// <summary>
 /// 主题服务：服务端仅维护状态供组件/图表订阅，实际 CSS 应用由前端 JS（localStorage + data-theme）执行
 /// </summary>
 public class ThemeService
 {
+    #region 主题状态
     public bool IsDark { get; private set; } = true;
 
     public event Action? ThemeChanged;
@@ -17,4 +18,5 @@ public class ThemeService
         IsDark = dark;
         ThemeChanged?.Invoke();
     }
+    #endregion
 }

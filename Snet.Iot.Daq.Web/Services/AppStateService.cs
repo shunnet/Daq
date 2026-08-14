@@ -15,6 +15,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class AppStateService
 {
+    #region 全局字典与服务实例
     private readonly DbGate _dbGate;
     private readonly LoggerBuffer _logger;
 
@@ -46,6 +47,9 @@ public class AppStateService
     }
 
     /// <summary>从 JSON 配置 + SQLite 加载插件/地址/项目树并回灌全局引用（对齐 WPF App.xaml.cs Init）</summary>
+    #endregion
+
+    #region 加载
     public async Task LoadAllAsync()
     {
         PluginDict.Clear();
@@ -108,8 +112,6 @@ public class AppStateService
                 ProjectDict.Add(node);
             }
         }
-
-        await Task.CompletedTask;
     }
 
     /// <summary>
@@ -117,6 +119,9 @@ public class AppStateService
     /// 对齐原版 GlobalConfigModel.RefreshAsync + 节点 OnInfoEvent 后的 SetAsync：一处改变，所有用到的地方跟着变，且名称变更落盘。
     /// 落盘走 Task.Run + WaitAsync（调用方可能正持有 ConfigSaveGate，同线程再等待会死锁，后台线程安全等待即可）。
     /// </summary>
+    #endregion
+
+    #region 实体变更与持久化
     public void NotifyEntityChanged()
     {
         RefreshProjectBindings();
@@ -138,6 +143,9 @@ public class AppStateService
     }
 
     /// <summary>刷新项目树引用与名称：替换为全局字典最新对象 + 更新节点名（不塞回已删除实体）</summary>
+    #endregion
+
+    #region 项目树回灌
     private void RefreshProjectBindings()
     {
         foreach (var node in ProjectDict)
@@ -209,6 +217,9 @@ public class AppStateService
     /// 绝对化插件配置的 ConfigPath：WPF 存的是相对路径（config/daq），
     /// 统一解析到数据目录，保证 per-SN 参数文件在 WPF/Web 间读写同一位置。
     /// </summary>
+    #endregion
+
+    #region 路径工具
     public static void NormalizeConfigPath(PluginConfigModel model)
     {
         if (!string.IsNullOrWhiteSpace(model.ConfigPath) && !Path.IsPathRooted(model.ConfigPath))
@@ -325,4 +336,5 @@ public class AppStateService
         foreach (var child in node.Children)
             RebindDetailNode(child, persistMissingAddresses);
     }
+    #endregion
 }

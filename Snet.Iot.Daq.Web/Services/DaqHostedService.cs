@@ -1,10 +1,10 @@
-﻿using System.Collections.ObjectModel;
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
+using Snet.Model.data;
 using Snet.Mqtt.service;
 using Snet.Opc.ua.service;
-using Snet.Model.data;
 using Snet.Utility;
+using System.Collections.ObjectModel;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -21,13 +21,14 @@ public class DaqHostedService : BackgroundService
     private readonly LocalizationService _localization;
     private readonly ILogger<DaqHostedService> _logger;
 
+    #region 字段与构造
     public DaqHostedService(
-        AppStateService appState,
-        DeviceRuntimeManager runtimeManager,
-        MonitorSampler sampler,
-        LoggerBuffer loggerBuffer,
-        LocalizationService localization,
-        ILogger<DaqHostedService> logger)
+            AppStateService appState,
+            DeviceRuntimeManager runtimeManager,
+            MonitorSampler sampler,
+            LoggerBuffer loggerBuffer,
+            LocalizationService localization,
+            ILogger<DaqHostedService> logger)
     {
         _appState = appState;
         _runtimeManager = runtimeManager;
@@ -37,6 +38,9 @@ public class DaqHostedService : BackgroundService
         _logger = logger;
     }
 
+    #endregion
+
+    #region 生命周期
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("DaqHostedService 启动");
@@ -63,6 +67,9 @@ public class DaqHostedService : BackgroundService
     }
 
     /// <summary>按 PluginList.json 逐个 InitPlugin 加载插件程序集（对齐 WPF Init 流程）</summary>
+    #endregion
+
+    #region 插件加载
     private void InitPlugins()
     {
         if (!File.Exists(WebPaths.PluginListConfigPath)) return;
@@ -106,6 +113,9 @@ public class DaqHostedService : BackgroundService
     /// 启动服务端（对齐 WPF ConsoleModel.MqttServerInitAsync / OpcUaServerInitAsync）：
     /// 配置存在才实例化并 OnAsync，失败退订事件 + Dispose + 置空。
     /// </summary>
+    #endregion
+
+    #region 服务端启动
     public async Task InitServerServicesAsync()
     {
         await InitMqttServerAsync();
@@ -145,6 +155,9 @@ public class DaqHostedService : BackgroundService
     }
 
     /// <summary>停止单个服务端（对齐 WPF MqttServerStopAsync / OpcUaServerStopAsync）</summary>
+    #endregion
+
+    #region 服务端停止
     public async Task<(bool Ok, string Message)> StopServerAsync(string kind)
     {
         try
@@ -178,6 +191,9 @@ public class DaqHostedService : BackgroundService
         return (false, T("未知服务"));
     }
 
+    #endregion
+
+    #region 内嵌服务端初始化
     private async Task<bool> InitMqttServerAsync()
     {
         if (!File.Exists(WebPaths.MqttServerConfigPath)) return false;
@@ -232,6 +248,9 @@ public class DaqHostedService : BackgroundService
         }
     }
 
+    #endregion
+
+    #region 停服与事件转发
     private async Task StopServerServicesAsync()
     {
         try
@@ -271,5 +290,9 @@ public class DaqHostedService : BackgroundService
         return Task.CompletedTask;
     }
 
+    #endregion
+
+    #region 本地化
     private string T(string key) => _localization.T(key);
+    #endregion
 }

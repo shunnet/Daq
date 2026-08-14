@@ -1,10 +1,11 @@
-namespace Snet.Iot.Daq.Web.Services;
+﻿namespace Snet.Iot.Daq.Web.Services;
 
 /// <summary>
 /// 数据目录与路径（与 WPF 端 GlobalConfigModel 路径常量对齐，全部绝对化）
 /// </summary>
 public static class WebPaths
 {
+    #region 路径
     public static string DataDir { get; private set; } = ".";
 
     public static string FilePath => Path.Combine(DataDir, "lib");
@@ -28,6 +29,9 @@ public static class WebPaths
     /// <summary>
     /// 初始化数据目录：环境变量 SNET_IOT_DAQ_DATA > appsettings 配置 > 程序目录（与 WPF DAQ 一致，配置直接放程序根目录）
     /// </summary>
+    #endregion
+
+    #region 初始化与迁移
     public static void Init(IConfiguration config)
     {
         var dataDir = Environment.GetEnvironmentVariable("SNET_IOT_DAQ_DATA")
@@ -67,4 +71,5 @@ public static class WebPaths
         }
         catch { /* 清理失败不影响主流程 */ }
     }
+    #endregion
 }

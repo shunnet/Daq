@@ -16,6 +16,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class DeviceRuntime : IAsyncDisposable
 {
+    #region 常量与类型映射
     private const int ChannelCapacity = 1024;
     private static readonly TimeSpan FailLogThrottleWindow = TimeSpan.FromSeconds(5);
     /// <summary>状态推送节流窗口：数据事件高频时避免每条样本都触发整页重渲染（对齐 WPF 状态翻转才通知 + 1s 轮询运行时间）</summary>
@@ -45,6 +46,9 @@ public class DeviceRuntime : IAsyncDisposable
         { DataType.Char, BuiltInType.String },
     };
 
+    #endregion
+
+    #region 字段
     private readonly ConcurrentDictionary<string, DateTime> _lastFailLog = new();
     private DateTime _lastStatePush = DateTime.MinValue;
     private PluginConfigModel _daqConfig;
@@ -78,6 +82,9 @@ public class DeviceRuntime : IAsyncDisposable
     private readonly ConcurrentDictionary<string, int> _failedBytesModels = new();
     private BytesHandler? _bytesHandler;
 
+    #endregion
+
+    #region 属性
     public string Guid => _daqConfig.Guid;
     public bool IsRun { get; private set; }
     public string DeviceName { get; private set; }
@@ -94,6 +101,9 @@ public class DeviceRuntime : IAsyncDisposable
     public string UpdateTime { get; private set; } = "-";
     public int CollectTimeSeconds => (int)_runtime.TotalSeconds;
 
+    #endregion
+
+    #region 构造与配置快照
     public DeviceRuntime(IProjectTreeViewModel deviceNode, Func<OpcUaServiceOperate?> uaService, Action<string> pushLog, Action<DeviceRuntime> pushState, LocalizationService localization)
     {
         _daqConfig = deviceNode.DaqDetails!;
@@ -185,6 +195,9 @@ public class DeviceRuntime : IAsyncDisposable
 
     /// <summary>启动采集（对齐 WPF CollectAsync：订阅地址 → 起通道 → 计时）。
     /// 通道与事件订阅仅在首次启动时创建一次，避免重复订阅叠加；SemaphoreSlim 防双击并发重复订阅。</summary>
+    #endregion
+
+    #region 采集控制
     public async Task CollectAsync()
     {
         if (IsRun) return;
@@ -315,6 +328,9 @@ public class DeviceRuntime : IAsyncDisposable
 
     /// <summary>释放采集 handler 及相关资源（无锁版，须在 _collectGate 持有内调用）。
     /// 插件实例缓存创建时的参数快照（IP/端口等），配置变更或采集失败后必须置空，下次采集用最新配置重建</summary>
+    #endregion
+
+    #region 停止与资源释放
     private async Task ReleaseHandlerInternalAsync()
     {
         _cts?.Cancel();
@@ -442,6 +458,9 @@ public class DeviceRuntime : IAsyncDisposable
     }
 
     /// <summary>随软启状态（对齐 WPF ConsoleDeviceModel.IsSoftStart：持久化于项目树，宿主启动/配置同步时自动恢复采集）</summary>
+    #endregion
+
+    #region 软启采集
     public bool IsSoftStart => _deviceNode.IsSoftStart;
 
     /// <summary>添加/取消软启采集（对齐 WPF OnSoftCollectAsync/OffSoftCollectAsync：改项目节点标志 + 成功提示，落盘由页面调 SaveProjectsAsync 等价 Project.SetAsync）</summary>
@@ -452,6 +471,9 @@ public class DeviceRuntime : IAsyncDisposable
     }
 
     /// <summary>WebApi 启动（对齐 WPF WASatrtAsync：状态预检 → 未设置参数/未运行提示失败 → WAOnAsync）</summary>
+    #endregion
+
+    #region WebApi 操作
     public async Task<OperateResult> WebApiStartAsync()
     {
         var handler = _daqHandler;
@@ -523,13 +545,21 @@ public class DeviceRuntime : IAsyncDisposable
     }
 
     /// <summary>数据事件入队（一次订阅，避免重复叠加；带取消令牌防停止时挂起）</summary>
+    #endregion
+
+    #region 数据事件与消费
     private async Task OnDataEvent(object? sender, EventDataResult e)
     {
         var channel = _dataChannel;
         if (channel is null) return;
+        // BUG 修复：原用 _cts?.Token ?? default——StopAsync 先 Cancel/Dispose/_cts=null 再退订事件，
+        // 窗口期回调拿到 default(不可取消) 令牌，通道已满且消费循环已退出时会永久阻塞事件回调。
+        // 改为捕获本地令牌：已停止（null）直接丢弃事件，绝不阻塞。
+        var cts = _cts;
+        if (cts is null) return;
         try
         {
-            await channel.Writer.WriteAsync(e, _cts?.Token ?? default);
+            await channel.Writer.WriteAsync(e, cts.Token);
         }
         catch (OperationCanceledException)
         {
@@ -605,6 +635,9 @@ public class DeviceRuntime : IAsyncDisposable
 
     /// <summary>处理一组地址值（原样移植 WPF ConsoleDeviceModel.ProcessKeysAsync）：
     /// 质量校验 → 字节解包（GetBytesModels）→ UA 通道 + MQ 转发，单地址异常不影响整组消费。</summary>
+    #endregion
+
+    #region 数据处理与转发
     private async Task ProcessKeysAsync(ConcurrentDictionary<string, AddressValue> keys, CancellationToken token)
     {
         if (keys.Count == 0)
@@ -692,7 +725,9 @@ public class DeviceRuntime : IAsyncDisposable
             return null;
 
         // 缓存命中且参数来源未变，直接复用，避免每个采集周期重复反序列化与文件读取
-        if (_bytesModels.TryGetValue(addressValue.AddressName, out var cached) && cached.Source == param)
+        // BUG 修复：原用 cached.Source == param——Source 为 object 时装箱后是引用比较，
+        // 插件每周期给新 string 实例会导致缓存永远失效（每周期重复解析）。改为值比较。
+        if (_bytesModels.TryGetValue(addressValue.AddressName, out var cached) && Equals(cached.Source, param))
             return cached.Models;
 
         List<BytesModel>? models = ParseBytesModels(param);
@@ -764,6 +799,9 @@ public class DeviceRuntime : IAsyncDisposable
 
     /// <summary>UA 通道数据事件消费（原样移植 WPF ConsoleDeviceModel.UaSyncChannelDataEventAsync）：
     /// 质量校验 → 层级文件夹 → 首次地址创建 + NodeId 映射 → 写入 UA 地址空间。</summary>
+    #endregion
+
+    #region UA 转发
     private async Task UaSyncChannelDataEventAsync(CancellationToken token)
     {
         try
@@ -945,6 +983,9 @@ public class DeviceRuntime : IAsyncDisposable
     }
 
     /// <summary>失败日志节流：同一键 5 秒内只记一次，避免高频失败刷爆日志缓冲</summary>
+    #endregion
+
+    #region 日志节流
     private void ThrottledLog(string message, string key)
     {
         var now = DateTime.UtcNow;
@@ -958,4 +999,5 @@ public class DeviceRuntime : IAsyncDisposable
         await StopAsync();
         GC.SuppressFinalize(this);
     }
+    #endregion
 }

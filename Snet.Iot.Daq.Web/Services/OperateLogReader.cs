@@ -1,4 +1,4 @@
-namespace Snet.Iot.Daq.Web.Services;
+﻿namespace Snet.Iot.Daq.Web.Services;
 
 /// <summary>
 /// 操作日志读取：遍历 logs/{日期}/operate/{用户名}/ 目录，供用户管理页按日期/用户筛选查看。
@@ -8,6 +8,7 @@ public static class OperateLogReader
     private static string LogsRoot => Path.Combine(WebPaths.DataDir, "logs");
 
     /// <summary>所有日志日期目录（倒序，最新在前）</summary>
+    #region 日期与用户
     public static List<string> GetDates()
     {
         try
@@ -35,6 +36,9 @@ public static class OperateLogReader
     }
 
     /// <summary>指定日期+用户的操作日志行（合并当天全部 .log 文件，按时间序），行格式 "HH:mm:ss | 级别 | 内容"</summary>
+    #endregion
+
+    #region 日志行读取
     public static List<string> GetLines(string date, string user)
     {
         try
@@ -69,6 +73,9 @@ public static class OperateLogReader
     }
 
     /// <summary>清空指定用户的操作日志目录（先 Reset 释放 LogHelper 文件句柄，否则删除被锁文件失败）</summary>
+    #endregion
+
+    #region 清理
     public static async Task ClearUserAsync(string date, string user)
     {
         await Snet.Log.LogHelper.ResetAsync();
@@ -92,6 +99,9 @@ public static class OperateLogReader
         catch { /* 清理失败不阻断 */ }
     }
 
+    #endregion
+
+    #region 行格式化
     private static string? FormatLine(string raw)
     {
         // 把完整时间戳压缩为 HH:mm:ss，跳过毫秒，保留级别与内容（按第一个 | 定位）
@@ -104,4 +114,5 @@ public static class OperateLogReader
         }
         return raw;
     }
+    #endregion
 }

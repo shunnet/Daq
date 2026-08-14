@@ -1,4 +1,4 @@
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 
 namespace Snet.Iot.Daq.Web.Services;
@@ -9,6 +9,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class DownloadTaskManager
 {
+    #region 字段与作业模型
     private readonly LoggerBuffer _logger;
     private readonly DeviceRuntimeManager _runtimeManager;
     private readonly AppStateService _appState;
@@ -17,6 +18,9 @@ public class DownloadTaskManager
     private CancellationTokenSource? _stopCts;
 
     /// <summary>取消所有进行中的下载（「停止下载」按钮）</summary>
+    #endregion
+
+    #region 队列控制
     public void StopAll()
     {
         lock (_gate)
@@ -38,6 +42,9 @@ public class DownloadTaskManager
     }
 
     /// <summary>dotnet CLI 可用性探测（Core PluginDownloadHandler 依赖 dotnet publish）。异步版：不阻塞电路线程</summary>
+    #endregion
+
+    #region SDK 探测
     public static async Task<bool> IsSdkAvailableAsync()
     {
         try
@@ -107,6 +114,9 @@ public class DownloadTaskManager
         return id;
     }
 
+    #endregion
+
+    #region 下载作业执行
     private async Task RunAsync(DownloadJob job, List<string> names)
     {
         if (!await IsSdkAvailableAsync())
@@ -171,6 +181,9 @@ public class DownloadTaskManager
     /// 同名插件执行热更新（对齐上传路径）：停使用该插件的设备 → 卸载旧程序集 → 替换目录 → 恢复设备采集。
     /// 返回成功安装的接口数。
     /// </summary>
+    #endregion
+
+    #region 自动安装
     private async Task<int> TryAutoInstallAsync(List<string> names)
     {
         var installed = 0;
@@ -199,10 +212,13 @@ public class DownloadTaskManager
                             _logger.Push($"[Info] 检测到同名插件 {name}，执行热更新");
                             // 停使用该插件的 DAQ 设备：设备类型是插件类名（如 SiemensOperate），下载名是包名（如 Snet.Siemens），
                             // 通过 PluginList 的 Name → 包目录名 映射关联（对齐 WPF libPath == DaqPluginPath 语义）
+                            // BUG 修复：ToDictionary 在 PluginList 出现重复 Name（异常残留/手改）时会抛
+                            // "相同键已存在"，导致整个自动安装中断。改为 GroupBy 取首条，重复条目无害降级。
                             var deviceToPack = LoadPluginList()
                                 .Where(p => !string.IsNullOrWhiteSpace(p.PluginDetails.Path))
-                                .ToDictionary(p => p.Name,
-                                    p => Path.GetFileName(Path.TrimEndingDirectorySeparator(p.PluginDetails.Path)),
+                                .GroupBy(p => p.Name, StringComparer.OrdinalIgnoreCase)
+                                .ToDictionary(g => g.Key,
+                                    g => Path.GetFileName(Path.TrimEndingDirectorySeparator(g.First().PluginDetails.Path)),
                                     StringComparer.OrdinalIgnoreCase);
                             foreach (var rt in _runtimeManager.Runtimes.Where(rt => rt.IsRun && type == Snet.Model.@enum.PluginType.Daq
                                 && deviceToPack.TryGetValue(rt.DeviceType, out var pack)
@@ -245,14 +261,24 @@ public class DownloadTaskManager
         finally
         {
             // 恢复热更新前正在运行的设备（只恢复本次停掉的）
+            // 单个设备恢复失败不影响其他设备与安装结果（异常不外抛覆盖 installed 计数）
             foreach (var rt in stopped)
-                await rt.CollectAsync();
+            {
+                try { await rt.CollectAsync(); }
+                catch (Exception ex)
+                {
+                    _logger.Push($"[Error] 热更新后恢复设备采集失败 {rt.DeviceName}: {ex.Message}");
+                }
+            }
             // 感知更新：同步设备底层版本号（设备卡展示热更新后的新版本）
             _appState.NotifyEntityChanged();
         }
         return installed;
     }
 
+    #endregion
+
+    #region 列表读取与状态更新
     private static List<PluginListModel> LoadPluginList()
     {
         if (!File.Exists(WebPaths.PluginListConfigPath)) return new();
@@ -275,4 +301,5 @@ public class DownloadTaskManager
         }
         JobChanged?.Invoke(job);
     }
+    #endregion
 }

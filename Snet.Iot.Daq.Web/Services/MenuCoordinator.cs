@@ -1,4 +1,4 @@
-namespace Snet.Iot.Daq.Web.Services;
+﻿namespace Snet.Iot.Daq.Web.Services;
 
 /// <summary>
 /// 全局 ⋯ 菜单互斥协调器：所有操作菜单（项目树/详情树/工具栏/插件卡/设备卡）共用。
@@ -10,6 +10,7 @@ public static class MenuCoordinator
     private static readonly List<Action> _callbacks = new();
     private static readonly object _lock = new();
 
+    #region 注册与互斥
     public static void Register(Action close)
     {
         lock (_lock)
@@ -34,4 +35,5 @@ public static class MenuCoordinator
             catch { /* 单个组件异常不影响其余菜单关闭 */ }
         }
     }
+    #endregion
 }

@@ -1,4 +1,4 @@
-using System.Diagnostics;
+﻿using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 namespace Snet.Iot.Daq.Web.Services;
@@ -10,6 +10,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class MonitorSampler : IDisposable
 {
+    #region 字段与事件
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(1));
     private readonly CancellationTokenSource _cts = new();
     private PerformanceCounter? _cpuCounter;
@@ -21,7 +22,9 @@ public class MonitorSampler : IDisposable
     public event Action<MonitorSample>? Sample;
 
     public record MonitorSample(double Cpu, double RamPercent, double TotalRamMb);
+    #endregion
 
+    #region 互操作结构体与 P/Invoke
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Auto)]
     private struct MemoryStatusEx
     {
@@ -38,6 +41,9 @@ public class MonitorSampler : IDisposable
 
     [DllImport("kernel32.dll", SetLastError = true)]
     private static extern bool GlobalMemoryStatusEx(ref MemoryStatusEx lpBuffer);
+    #endregion
+
+    #region 启动
 
     public void Start()
     {
@@ -56,17 +62,31 @@ public class MonitorSampler : IDisposable
         _loop ??= LoopAsync();
     }
 
+    #endregion
+
+    #region 采样循环
     private async Task LoopAsync()
     {
         while (await _timer.WaitForNextTickAsync(_cts.Token))
         {
-            Sample?.Invoke(new MonitorSample(
-                Math.Clamp(ReadCpu(), 0, 100),
-                Math.Clamp(ReadRamPercent(), 0, 100),
-                ReadTotalRamMb()));
+            // 订阅者（页面电路）异常不能杀死采样循环，否则监控永久停摆
+            try
+            {
+                Sample?.Invoke(new MonitorSample(
+                    Math.Clamp(ReadCpu(), 0, 100),
+                    Math.Clamp(ReadRamPercent(), 0, 100),
+                    ReadTotalRamMb()));
+            }
+            catch (Exception ex)
+            {
+                Console.Error.WriteLine($"[MonitorSampler] 采样订阅者异常（循环继续）: {ex.Message}");
+            }
         }
     }
 
+    #endregion
+
+    #region 指标读取
     private double ReadCpu()
     {
         if (_cpuCounter is not null)
@@ -158,6 +178,9 @@ public class MonitorSampler : IDisposable
         return ulong.TryParse(value, out var kb) ? kb : 0;
     }
 
+    #endregion
+
+    #region 释放
     public void Dispose()
     {
         _cts.Cancel();
@@ -165,4 +188,5 @@ public class MonitorSampler : IDisposable
         _cpuCounter?.Dispose();
         GC.SuppressFinalize(this);
     }
+    #endregion
 }

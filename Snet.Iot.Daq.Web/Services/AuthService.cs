@@ -1,4 +1,4 @@
-using System.Security.Cryptography;
+﻿using System.Security.Cryptography;
 using System.Text.Json;
 
 namespace Snet.Iot.Daq.Web.Services;
@@ -8,6 +8,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class AuthService
 {
+    #region 常量与字段
     public const string RoleAdmin = "Admin";
     public const string RoleUser = "User";
     /// <summary>管理员授权策略名（[Authorize(Policy = ...)] 使用）</summary>
@@ -26,21 +27,27 @@ public class AuthService
         EnsureDefaultUser();
     }
 
+    #endregion
+
+    #region 数据模型
     internal sealed record UserRecord(
-        string Username,
-        string PasswordHash,
-        string Salt,
-        bool MustChangePassword,
-        int FailedAttempts,
-        DateTime? LockoutUntil,
-        string Role = RoleAdmin,
-        bool IsDisabled = false);
+            string Username,
+            string PasswordHash,
+            string Salt,
+            bool MustChangePassword,
+            int FailedAttempts,
+            DateTime? LockoutUntil,
+            string Role = RoleAdmin,
+            bool IsDisabled = false);
 
     private sealed record UsersFile(List<UserRecord> Users);
 
     /// <summary>用户概览（供用户管理界面展示，不含敏感字段）</summary>
     public sealed record UserInfo(string Username, string Role, bool MustChangePassword, bool IsDisabled = false);
 
+    #endregion
+
+    #region 加载与持久化
     private List<UserRecord>? _cache;
 
     private List<UserRecord> Load()
@@ -108,8 +115,11 @@ public class AuthService
         File.Move(tmp, _path, overwrite: true);
     }
 
+    #endregion
+
+    #region 密码学工具
     private static string HashPassword(string password, byte[] salt) =>
-        Convert.ToBase64String(Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, 32));
+            Convert.ToBase64String(Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, 32));
 
     private static bool TryParseSalt(string? salt, out byte[] bytes)
     {
@@ -127,8 +137,11 @@ public class AuthService
     }
 
     /// <summary>按用户名查用户（供登录后取角色用）</summary>
+    #endregion
+
+    #region 登录校验与失败锁定
     internal UserRecord? FindUser(string username) =>
-        Load().FirstOrDefault(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
+            Load().FirstOrDefault(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
 
     /// <summary>
     /// 校验登录。返回 (成功, 错误消息)
@@ -155,7 +168,7 @@ public class AuthService
                 return (false, "InvalidUsernameOrPassword");
             if (user.PasswordHash != HashPassword(password, salt))
             {
-                RegisterFailure(user, users);
+                RegisterFailure(user, users, index);
                 return (false, "InvalidUsernameOrPassword");
             }
             // 密码正确但账号已停用：拒绝登录（不计失败次数）
@@ -172,10 +185,12 @@ public class AuthService
         }
     }
 
-    private void RegisterFailure(UserRecord user, List<UserRecord> users)
+    private void RegisterFailure(UserRecord user, List<UserRecord> users, int index)
     {
         var failed = user.FailedAttempts + 1;
-        var index = users.FindIndex(u => u.Username == user.Username);
+        // BUG 修复：原实现用 u.Username == user.Username（区分大小写）重新查找，
+        // 登录时大小写不同（如输入 Snet、存储 snet）会 FindIndex 返回 -1 → users[-1] 越界 500。
+        // 改为直接使用调用方按 OrdinalIgnoreCase 定位好的 index。
         users[index] = failed >= MaxFailedAttempts
             ? user with { FailedAttempts = failed, LockoutUntil = DateTime.UtcNow + LockoutDuration }
             : user with { FailedAttempts = failed };
@@ -184,6 +199,9 @@ public class AuthService
 
     public bool MustChangePassword(string username) => FindUser(username)?.MustChangePassword ?? false;
 
+    #endregion
+
+    #region 修改密码
     public async Task<(bool Ok, string? Error)> ChangePasswordAsync(string username, string oldPassword, string newPassword)
     {
         await _fileLock.WaitAsync();
@@ -198,7 +216,9 @@ public class AuthService
                 return (false, "PasswordTooShort");
             var salt = RandomNumberGenerator.GetBytes(SaltSize);
             var users = Load();
-            var index = users.FindIndex(u => u.Username == user.Username);
+            // BUG 修复：原用 u.Username == user.Username（区分大小写），大小写混合登录改密时
+            // FindIndex 返回 -1 → users[-1] 越界。与 FindUser 一致改为 OrdinalIgnoreCase。
+            var index = users.FindIndex(u => string.Equals(u.Username, user.Username, StringComparison.OrdinalIgnoreCase));
             users[index] = user with
             {
                 PasswordHash = HashPassword(newPassword, salt),
@@ -218,8 +238,11 @@ public class AuthService
 
     // ================= 用户管理（仅管理员） =================
 
+    #endregion
+
+    #region 用户管理
     public List<UserInfo> ListUsers() =>
-        Load().Select(u => new UserInfo(u.Username, u.Role, u.MustChangePassword, u.IsDisabled)).ToList();
+            Load().Select(u => new UserInfo(u.Username, u.Role, u.MustChangePassword, u.IsDisabled)).ToList();
 
     /// <summary>新增用户。返回 (成功, 错误消息)</summary>
     public async Task<(bool Ok, string? Error)> AddUserAsync(string username, string password, string role)
@@ -228,6 +251,12 @@ public class AuthService
         try
         {
             if (string.IsNullOrWhiteSpace(username) || username.Length < 2)
+                return (false, "InvalidUsername");
+            // 安全校验：用户名会拼接进操作日志目录（Path.Combine("operate", username)），
+            // 禁止路径分隔符/相对路径/非法文件名字符，防目录穿越与日志目录混乱
+            if (username is "." or ".."
+                || username.Contains('/') || username.Contains('\\')
+                || username.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
                 return (false, "InvalidUsername");
             if (password.Length < 6)
                 return (false, "PasswordTooShort");
@@ -350,8 +379,12 @@ public class AuthService
         }
     }
 
+    #endregion
+
+    #region 默认账号初始化
     private void EnsureDefaultUser()
     {
         if (!File.Exists(_path)) Load();
     }
+    #endregion
 }

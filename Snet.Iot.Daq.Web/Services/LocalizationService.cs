@@ -15,6 +15,7 @@ public class LocalizationService
     private readonly CultureInfo _zhCulture = CultureInfo.GetCultureInfo("zh-Hans");
 
     /// <summary>Core 资源未覆盖的 Web 端补充词表（key 即中文字面量）</summary>
+    #region 词表
     private static readonly Dictionary<string, string> WebTranslations = new(StringComparer.Ordinal)
     {
         ["插件"] = "Plugins",
@@ -340,10 +341,16 @@ public class LocalizationService
         ["警告: {0} 个地址未配置传输设备，不参与采集: {1}"] = "Warning: {0} addresses have no transmission device configured and will not be collected: {1}",
     };
 
+    #endregion
+
+    #region 语言状态与查表
     public string CurrentLanguage { get; private set; } = "zh";
 
     public event Action? LanguageChanged;
 
+    #endregion
+
+    #region 初始化
     public LocalizationService()
     {
         var rm = new ResourceManager("Snet.Iot.Daq.Core.Language", typeof(Snet.Iot.Daq.Core.Core).Assembly);
@@ -365,6 +372,9 @@ public class LocalizationService
             : key;
     }
 
+    #endregion
+
+    #region 语言切换
     public async Task SetLanguageAsync(string lang)
     {
         if (lang == CurrentLanguage) return;
@@ -376,4 +386,5 @@ public class LocalizationService
         CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
         LanguageChanged?.Invoke();
     }
+    #endregion
 }

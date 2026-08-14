@@ -1,5 +1,4 @@
-using System.Collections.Concurrent;
-using Snet.Iot.Daq.Core.@interface;
+﻿using System.Collections.Concurrent;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -10,6 +9,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class DeviceRuntimeManager
 {
+    #region 字段与事件
     private readonly ConcurrentDictionary<string, DeviceRuntime> _runtimes = new();
     private readonly LoggerBuffer _logger;
     private readonly LocalizationService _localization;
@@ -30,6 +30,9 @@ public class DeviceRuntimeManager
     public int Count => _runtimes.Count;
 
     /// <summary>按项目树同步设备集合（新增/移除），不自动启停。加锁串行：多电路并发修改时快照一致</summary>
+    #endregion
+
+    #region 同步与生命周期
     public void SyncFromProjects(AppStateService appState)
     {
         lock (_syncLock)
@@ -81,4 +84,5 @@ public class DeviceRuntimeManager
             CollectDevices(node.Children, result);
         }
     }
+    #endregion
 }

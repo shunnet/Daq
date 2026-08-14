@@ -1,5 +1,4 @@
-using Microsoft.AspNetCore.Components.Authorization;
-using System.Security.Claims;
+﻿using Microsoft.AspNetCore.Components.Authorization;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -9,8 +8,9 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public static class OperateLog
 {
+    #region 日志写入
     public static Task Info(string username, string role, string action)
-        => Snet.Log.LogHelper.InfoAsync($"{username} - {role} - {action}", foldername: Path.Combine("operate", username));
+            => Snet.Log.LogHelper.InfoAsync($"{username} - {role} - {action}", foldername: Path.Combine("operate", username));
 
     public static Task Warning(string username, string role, string action)
         => Snet.Log.LogHelper.WarningAsync($"{username} - {role} - {action}", foldername: Path.Combine("operate", username));
@@ -19,9 +19,13 @@ public static class OperateLog
         => Snet.Log.LogHelper.ErrorAsync($"{username} - {role} - {action}", foldername: Path.Combine("operate", username), exception: exception);
 
     /// <summary>从认证状态提取 用户名/角色（Role claim 缺失时按空字符串处理）</summary>
+    #endregion
+
+    #region 认证状态提取
     public static (string User, string Role) From(AuthenticationState state)
     {
         var user = state.User;
         return (user.Identity?.Name ?? "", user.IsInRole(AuthService.RoleAdmin) ? "管理员" : "普通用户");
     }
+    #endregion
 }

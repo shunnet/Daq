@@ -1,8 +1,8 @@
-using System.Security.Claims;
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server;
+using System.Security.Claims;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -17,8 +17,9 @@ public class ServerAuthStateProvider : RevalidatingServerAuthenticationStateProv
 
     private readonly Task<AuthenticationState> _authStateTask;
 
+    #region 字段与构造
     public ServerAuthStateProvider(ILoggerFactory loggerFactory, PersistentComponentState persistentState, IHttpContextAccessor httpContextAccessor)
-        : base(loggerFactory)
+            : base(loggerFactory)
     {
         // 1) SSR 首渲染：从 HttpContext 读取登录用户（AuthorizeRouteView 依赖它判定授权，否则重定向登录页）
         if (httpContextAccessor.HttpContext?.User is { Identity.IsAuthenticated: true } httpUser)
@@ -41,6 +42,9 @@ public class ServerAuthStateProvider : RevalidatingServerAuthenticationStateProv
         _authStateTask = DefaultUnauthenticated;
     }
 
+    #endregion
+
+    #region 认证状态
     protected override TimeSpan RevalidationInterval => TimeSpan.FromMinutes(30);
 
     protected override Task<bool> ValidateAuthenticationStateAsync(AuthenticationState authenticationState, CancellationToken cancellationToken) =>
@@ -56,6 +60,9 @@ public class ServerAuthStateProvider : RevalidatingServerAuthenticationStateProv
     }
 
     /// <summary>SSR 首渲染时由 App 根组件调用：把 HttpContext 用户持久化给交互电路（PersistAsJson 只能在 OnPersisting 回调中执行）</summary>
+    #endregion
+
+    #region 持久化
     public static void PersistFromHttpContext(PersistentComponentState state, ClaimsPrincipal? user)
     {
         if (user?.Identity?.IsAuthenticated == true)
@@ -71,4 +78,5 @@ public class ServerAuthStateProvider : RevalidatingServerAuthenticationStateProv
             });
         }
     }
+    #endregion
 }
