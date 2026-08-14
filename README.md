@@ -98,14 +98,15 @@
 
 ## 🌐 WEB 跨平台版本（Snet.Iot.Daq.Web）
 
-Snet.Iot.Daq 的 **Blazor Server Web 版**，与桌面版共用 `Snet.Iot.Daq.Core` 全部业务能力，浏览器访问即可使用，无需安装客户端。
+**Blazor Server Web 版**，与桌面版共用 `Snet.Iot.Daq.Core` 全部业务能力，浏览器访问即可使用，无需安装客户端。
 
 - **平台支持**：Windows / Linux x64 / Linux ARM64（树莓派、飞腾、鲲鹏等）
-- **部署方式**：Docker 多架构镜像 / Ubuntu systemd / 裸机运行
-- **功能对齐**：插件热插拔、OPC UA 服务端、MQTT Broker、WebAPI、自动组包、设备软启动、多用户与权限管理
+- **界面**：青蓝玻璃拟态 UI，暗 / 亮双主题，中英文切换，手机 / 平板自适应布局
+- **功能对齐**：插件热插拔与热更新、OPC UA 服务端、MQTT Broker、WebAPI、自动组包、设备软启动
+- **多用户与安全**：管理员 / 普通用户两级权限（普通用户只读），登录失败锁定，操作日志审计
 - **差异项**：无桌面版专属的 ScottPlot 图表、系统托盘与 GPU 监控
 
-### 🐳 Docker 部署（推荐，支持多架构）
+### 🐳 Docker 部署（推荐）
 
 ```bash
 git clone https://github.com/shunnet/Daq.git && cd Daq
@@ -128,7 +129,7 @@ sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh --port 8080 --data /srv/snet-
 
 📄 完整部署细节（数据持久化 / 端口 / 安全加固）见 [Snet.Iot.Daq.Web/README.DEPLOY.md](Snet.Iot.Daq.Web/README.DEPLOY.md)。
 
-## 📦 安装与使用
+## 📦 安装与使用（桌面版）
 
 ### 📋 环境要求
 
