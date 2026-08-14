@@ -1,4 +1,4 @@
-﻿@page "/plugins/settings"
+@page "/plugins/settings"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -22,7 +22,7 @@
 
 <div class="card">
     <div class="card-header">
-        <div class="card-title"><i class="bi bi-sliders me-2"></i>@T("插件设置")</div>
+        <h1 class="card-title"><i class="bi bi-sliders me-2"></i>@T("插件设置")</h1>
         <div class="segmented plugin-tabs">
             <button class="@(_tab == 0 ? "active" : "")" @onclick="() => { _tab = 0; StateHasChanged(); }"><i class="bi bi-box-seam"></i>@T("已装插件")</button>
             <button class="@(_tab == 1 ? "active" : "")" @onclick="() => { _tab = 1; StateHasChanged(); }"><i class="bi bi-gear"></i>@T("插件配置")</button>
@@ -31,7 +31,7 @@
 
     @if (_tab == 0)
     {
-        <div class="toolbar" style="margin-bottom:10px">
+        <div class="toolbar">
             <select class="form-select" style="width:120px" @bind="_uploadType">
                 <option value="Daq">Daq</option>
                 <option value="Mq">Mq</option>
@@ -88,7 +88,7 @@
     }
     else
     {
-        <div class="toolbar" style="margin-bottom:10px">
+        <div class="toolbar">
             <span class="spacer"></span>
             <button class="btn btn-primary" @onclick="VerifyStatusAsync" disabled="@_verifying">
                 <i class="bi bi-check2-circle"></i>@(_verifying ? T("验证中...") : T("状态验证"))
@@ -109,7 +109,7 @@
                             <span class="tag @(item.Status ? "tag-success" : "tag-danger")">@(item.Status ? T("正常") : T("异常"))</span>
                             <span class="tag @(item.Type == PluginType.Daq ? "tag-primary" : "tag-success")">@item.Type</span>
                             <span class="item-name cfg-item-name">@item.Name</span>
-                            <span class="tag mono">@item.SN</span>
+                            <span class="tag mono" title="@item.SN">@item.GetObjSn()</span>
                             <span class="item-time-tip">
                                 <span class="tip-text">@T("更新时间")：@item.Time.ToString("yyyy-MM-dd HH:mm:ss")</span>
                             </span>
@@ -249,10 +249,6 @@
 {
     <ModalDialog Title="@T("生产测试")" TitleIcon="bi-send" OnClose="CloseMqTest">
         <div class="form-field">
-            <label>@T("插件")</label>
-            <input value="@_mqTestConfig.Name" disabled />
-        </div>
-        <div class="form-field">
             <label>@T("Topic")</label>
             <input @bind="_mqTestTopic" placeholder="topic/test" />
         </div>
@@ -272,10 +268,13 @@
 @if (_daqTestConfig is not null)
 {
     <ModalDialog Title="@(_daqTestMode == "read" ? T("读取测试") : T("写入测试"))" TitleIcon="bi-arrow-down-up" OnClose="CloseDaqTest">
-        <div class="form-field">
-            <label>@T("插件")</label>
-            <input value="@_daqTestConfig.Name" disabled />
-        </div>
+        @if (!string.IsNullOrEmpty(_daqTestProtocol))
+        {
+            <div class="form-field">
+                <label>@T("插件")</label>
+                <input value="@_daqTestProtocol" disabled />
+            </div>
+        }
         <div class="form-field">
             <label>@T("地址")</label>
             <input @bind="_daqTestAddress" placeholder="3!40001 / DB5.DBW0" />
@@ -455,6 +454,8 @@
     private bool _mqTestRunning;
     private PluginConfigModel? _daqTestConfig;
     private string _daqTestMode = "read";
+    /// <summary>读取/写入测试弹窗显示的协议类型（插件无协议字段时为空，隐藏"插件"行）</summary>
+    private string _daqTestProtocol = "";
     private string _daqTestAddress = "";
     private DataType _daqTestType = DataType.Int16;
     private ushort _daqTestLength = 1;
@@ -1902,13 +1903,30 @@
         }
     }
 
-    private void OpenDaqTest(PluginConfigModel item, string mode)
+    private async Task OpenDaqTest(PluginConfigModel item, string mode)
     {
         _daqTestConfig = item;
         _daqTestMode = mode;
         _daqTestAddress = "";
         _daqTestValue = "";
         _daqTestRunning = false;
+        // 协议类型：从插件参数的自动分配属性读取当前协议值；插件无协议字段时留空（弹窗不显示该行）
+        _daqTestProtocol = "";
+        try
+        {
+            var (propName, _) = await GetAutoSubsetAsync(item.Name, item.Type, item.Param);
+            if (!string.IsNullOrEmpty(propName) && !string.IsNullOrWhiteSpace(item.Param))
+            {
+                using var doc = System.Text.Json.JsonDocument.Parse(item.Param);
+                if (doc.RootElement.TryGetProperty(propName, out var p)
+                    && p.ValueKind == System.Text.Json.JsonValueKind.String)
+                    _daqTestProtocol = p.GetString() ?? "";
+            }
+        }
+        catch
+        {
+            _daqTestProtocol = "";
+        }
     }
 
     private void CloseDaqTest() => _daqTestConfig = null;

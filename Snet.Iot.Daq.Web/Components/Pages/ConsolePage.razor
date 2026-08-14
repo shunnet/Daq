@@ -30,7 +30,7 @@
 <div class="console-page">
 <div class="card console-devices">
     <div class="card-header">
-        <div class="card-title"><i class="bi bi-activity me-2"></i>@T("控制台")</div>
+        <h1 class="card-title"><i class="bi bi-activity me-2"></i>@T("控制台")</h1>
         @if (_isAdmin)
         {
             <button class="btn btn-sm" @onclick="RefreshAsync"><i class="bi bi-arrow-clockwise"></i>@T("刷新")</button>
@@ -117,12 +117,12 @@
             <div class="monitor-item">
                 <span class="monitor-label">CPU</span>
                 <span class="monitor-value num">@_cpu.ToString("F1")%</span>
-                <div class="monitor-bar"><div class="monitor-bar-fill" style="width: @Math.Min(100, _cpu)%; background: #4caf50"></div></div>
+                <div class="monitor-bar"><div class="monitor-bar-fill monitor-bar-cpu" style="width: @Math.Min(100, _cpu)%"></div></div>
             </div>
             <div class="monitor-item" title="@(_totalRamMb.ToString("F0")) MB">
                 <span class="monitor-label">RAM</span>
                 <span class="monitor-value num">@_ramMb.ToString("F0")%</span>
-                <div class="monitor-bar"><div class="monitor-bar-fill" style="width: @Math.Min(100, _ramMb)%; background: #2196f3"></div></div>
+                <div class="monitor-bar"><div class="monitor-bar-fill monitor-bar-ram" style="width: @Math.Min(100, _ramMb)%"></div></div>
             </div>
         </div>
         <!-- 服务端管理（对齐 WPF 控制台 MqttServer/OpcUaServer 按钮）：卡片式布局，操作按钮仅管理员可见，卡片+状态所有人可见 -->

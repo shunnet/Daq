@@ -17,7 +17,7 @@
 
 <div class="card project-card">
     <div class="card-header">
-        <div class="card-title"><i class="bi bi-diagram-3 me-2"></i>@T("项目设置")</div>
+        <h1 class="card-title"><i class="bi bi-diagram-3 me-2"></i>@T("项目设置")</h1>
         <div style="display:flex;gap:8px">
             <InputFile OnChange="@OnImportProjectAsync" accept=".json" multiple="false" class="upload-input-hidden" />
             <button class="btn btn-sm" @onclick="TriggerProjectImport"><i class="bi bi-file-earmark-arrow-down"></i>@T("导入")</button>
@@ -183,7 +183,7 @@
             @if (_bulkMq)
             {
                 <div class="form-field form-field-block">
-                    <label>@T("将应用到该设备下的全部采集地址（已有相同 SN 的跳过）")</label>
+                    <div class="form-hint-text">@T("将应用到该设备下的全部采集地址（已有相同 SN 的跳过）")</div>
                 </div>
             }
             <div class="form-field">

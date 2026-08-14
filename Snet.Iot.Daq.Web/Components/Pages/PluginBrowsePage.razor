@@ -13,7 +13,7 @@
 
 <div class="card">
     <div class="card-header">
-        <div class="card-title"><i class="bi bi-box-seam me-2"></i>@T("插件浏览")</div>
+        <h1 class="card-title"><i class="bi bi-box-seam me-2"></i>@T("插件浏览")</h1>
         <span class="plugin-path-hint" title="@WebPaths.FilePath">@T("插件下载位置")：@WebPaths.FilePath</span>
     </div>
 
@@ -228,9 +228,12 @@
     {
         _loading = true;
         _pageIndex = 1;
+        // 不用 using：CoreUnify.Dispose 对无 SN 实例（无参构造）会从静态容器
+        // Remove(null) 抛 ArgumentNullException("key")（外部库缺陷），
+        // 在 finally 中安全释放（HttpClient 仍会被 Dispose）
+        var handler = new PluginBrowseHandler();
         try
         {
-            using var handler = new PluginBrowseHandler();
             // 与 WPF 一致：按更新时间倒序（最新在前）
             _all = (await handler.GetPluginBrowseDataGridModelsAsync(false))
                 .OrderByDescending(x => x.UpdateTime)
@@ -255,6 +258,7 @@
         finally
         {
             _loading = false;
+            try { handler.Dispose(); } catch { /* CoreUnify 无 SN Dispose 缺陷，忽略 */ }
         }
     }
 

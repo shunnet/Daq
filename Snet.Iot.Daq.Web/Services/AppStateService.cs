@@ -1,12 +1,11 @@
-using System.Collections.Concurrent;
-using System.Collections.ObjectModel;
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
-using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Web.Data;
 using Snet.Mqtt.service;
 using Snet.Opc.ua.service;
 using Snet.Utility;
+using System.Collections.Concurrent;
+using System.Collections.ObjectModel;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -83,7 +82,6 @@ public class AppStateService
                     }
                     await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath,
                         new ObservableCollection<PluginConfigModel>(PluginDict.Values.OrderBy(p => p.Index)).ToJson(true));
-                    _logger.Push("[Info] 已规范化插件配置路径（对齐 WPF 相对路径布局）");
                 }
             }
         }

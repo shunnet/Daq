@@ -12,7 +12,7 @@
 
 <div class="card">
     <div class="card-header">
-        <div class="card-title"><i class="bi bi-people me-2"></i>@T("用户管理")</div>
+        <h1 class="card-title"><i class="bi bi-people me-2"></i>@T("用户管理")</h1>
         <button class="btn btn-primary btn-sm" @onclick="OpenAdd"><i class="bi bi-person-plus"></i>@T("添加用户")</button>
     </div>
 
@@ -78,6 +78,56 @@
                 }
             </tbody>
         </table>
+    </div>
+
+    <!-- 移动端卡片列表（桌面被 .card:has(table.snet-table) .item-cards 规则隐藏） -->
+    <div class="item-cards">
+        @foreach (var u in _users)
+        {
+            <div class="item-card">
+                <div class="item-head">
+                    <span class="item-name">@u.Username</span>
+                    @if (u.Username == _currentUser)
+                    {
+                        <span class="tag tag-primary">@T("当前登录")</span>
+                    }
+                    <span class="tag @(u.Role == AuthService.RoleAdmin ? "tag-primary" : "")">@(u.Role == AuthService.RoleAdmin ? T("管理员") : T("普通用户"))</span>
+                    @if (u.IsDisabled)
+                    {
+                        <span class="tag tag-danger">@T("已停用")</span>
+                    }
+                    else
+                    {
+                        <span class="tag @(u.MustChangePassword ? "tag-warning" : "tag-success")">@(u.MustChangePassword ? T("需修改密码") : T("正常"))</span>
+                    }
+                    <span class="spacer"></span>
+                    <div class="device-more">
+                        <button class="btn btn-icon device-more-toggle" title="@T("操作")" @onclick:stopPropagation @onclick="() => ToggleUserMenuAsync(u)">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16">
+                                <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+                                <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+                                <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+                            </svg>
+                        </button>
+                        @if (_menuUser == u.Username)
+                        {
+                            <div class="device-more-menu menu-down">
+                                @if (u.Username != _currentUser)
+                                {
+                                    <button @onclick="() => ToggleRoleAsync(u)"><i class="bi @(u.Role == AuthService.RoleAdmin ? "bi-person-down" : "bi-person-check")"></i>@(u.Role == AuthService.RoleAdmin ? T("设为普通用户") : T("设为管理员"))</button>
+                                }
+                                <button @onclick="() => OpenReset(u)"><i class="bi bi-key"></i>@T("重置密码")</button>
+                                @if (u.Username != _currentUser)
+                                {
+                                    <button @onclick="() => ToggleDisabledAsync(u)"><i class="bi @(u.IsDisabled ? "bi-unlock" : "bi-lock")"></i>@(u.IsDisabled ? T("启用") : T("停用"))</button>
+                                    <button @onclick="() => RemoveUserAsync(u)"><i class="bi bi-trash"></i>@T("删除")</button>
+                                }
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
     </div>
 </div>
 
