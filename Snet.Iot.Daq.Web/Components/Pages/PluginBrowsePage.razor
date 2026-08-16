@@ -1,4 +1,4 @@
-@page "/plugins/browse"
+﻿@page "/plugins/browse"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -78,6 +78,7 @@
                     <tr>
                         <th><input type="checkbox" checked="@_allSelected" @onchange="OnAllSelectedChange" /></th>
                         <th><i class="bi bi-list-ol"></i>@T("序号")</th>
+                        <th><i class="bi bi-card-image"></i>@T("图标")</th>
                         <th><i class="bi bi-box-seam"></i>@T("包名")</th>
                         <th><i class="bi bi-hash"></i>@T("版本")</th>
                         <th><i class="bi bi-card-text"></i>@T("描述")</th>
@@ -90,10 +91,11 @@
                         <tr>
                             <td><input type="checkbox" @bind="item.IsSelected" /></td>
                             <td class="num">@item.Index</td>
+                            <td class="num"><img src="/images/nuget.png" width="30" height="30" alt="图标" /></td>
                             <td>@item.PackName</td>
                             <td>@item.Version</td>
                             <td>@item.Describe</td>
-                            <td class="num">@item.UpdateTime.ToString("yyyy-MM-dd")</td>
+                            <td class="num">@item.UpdateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
                         </tr>
                     }
                 </tbody>

@@ -3,7 +3,7 @@ using System.IO;
 using System.IO.Pipes;
 using System.Windows;
 
-namespace Snet.Iot.Daq.Handler
+namespace Snet.Iot.Daq.handler
 {
     /// <summary>
     /// 单实例管理器

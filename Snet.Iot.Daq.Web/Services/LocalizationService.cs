@@ -38,6 +38,7 @@ public class LocalizationService
         ["InvalidOldPassword"] = "Invalid old password",
         ["PasswordMismatch"] = "Passwords do not match",
         // ---- 以下为页面/组件中使用的补充词表（按首字拼音排序）----
+        ["图标"] = "Icon",
         ["保存"] = "Save",
         ["折叠导航"] = "Toggle Navigation",
         ["必填"] = "Required",

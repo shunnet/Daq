@@ -3,7 +3,7 @@ using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.data;
-using Snet.Iot.Daq.Handler;
+using Snet.Iot.Daq.handler;
 using Snet.Iot.Daq.view;
 using Snet.Log;
 using Snet.Model.data;
