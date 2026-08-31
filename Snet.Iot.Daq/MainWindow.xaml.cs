@@ -8,6 +8,7 @@ using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Data;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -197,6 +198,12 @@ namespace Snet.Iot.Daq
                 // 修正 Header ContentPresenter 垂直居中
                 if (ctrl.Template?.FindName("Header", ctrl) is ContentPresenter headerPresenter)
                     headerPresenter.VerticalAlignment = VerticalAlignment.Center;
+
+                // 子菜单右移，避免与托盘菜单可见边框重叠（模板 PlacementTarget 是菜单项内容区，
+                // 加上其内侧边距后子菜单边框会嵌进父菜单的 30px 阴影区，两者看起来"粘住"了；
+                // 偏移 +10 后两个菜单的可见边框之间留出约 8px 间隙）
+                if (ctrl.Template?.FindName("Popup", ctrl) is Popup subPopup)
+                    subPopup.HorizontalOffset = 5;
             };
 
             // 添加子菜单：采集、停止、重试

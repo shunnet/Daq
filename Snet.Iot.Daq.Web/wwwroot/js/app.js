@@ -9,7 +9,11 @@ window.snet = {
             var fn = function (e) {
                 if (!e.target.closest('.tree-actions, .device-more')) {
                     snet.outsideClick.unregisterAll();
-                    dotnetRef.invokeMethodAsync('CloseAllActions');
+                    // 组件可能已随切页释放：吞掉回调失败，避免 Unhandled Promise Rejection 刷屏
+                    try {
+                        var invoke = dotnetRef.invokeMethodAsync('CloseAllActions');
+                        if (invoke && invoke.catch) invoke.catch(function () { });
+                    } catch (err) { }
                 }
             };
             document.addEventListener('click', fn);

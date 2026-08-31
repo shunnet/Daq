@@ -1,4 +1,4 @@
-﻿@page "/plugins/browse"
+@page "/plugins/browse"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -24,7 +24,7 @@
             <span class="tree-actions-expand @(IsBrowseActionsOpen ? "open" : "")">
                 <button class="btn btn-sm" @onclick="SelectAll"><i class="bi bi-check2-square"></i>@T("全选")</button>
                 <button class="btn btn-sm" @onclick="InverseSelection"><i class="bi bi-square-half"></i>@T("反选")</button>
-                <button class="btn btn-sm btn-primary" disabled="@(_selected.Count == 0)" @onclick="DownloadSelectedAsync"><i class="bi bi-download"></i>@T("下载选中")</button>
+                <button class="btn btn-sm" disabled="@(_selected.Count == 0)" @onclick="DownloadSelectedAsync"><i class="bi bi-download"></i>@T("下载选中")</button>
                 <button class="btn btn-sm btn-danger" disabled="@(!_downloading)" @onclick="StopDownloadAsync"><i class="bi bi-stop"></i>@T("停止下载")</button>
             </span>
             <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="ToggleBrowseActions" title="@T("操作")">
@@ -72,34 +72,58 @@
             }
         </div>
 
-        <div class="snet-table-wrap">
-            <table class="snet-table">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" checked="@_allSelected" @onchange="OnAllSelectedChange" /></th>
-                        <th><i class="bi bi-list-ol"></i>@T("序号")</th>
-                        <th><i class="bi bi-card-image"></i>@T("图标")</th>
-                        <th><i class="bi bi-box-seam"></i>@T("包名")</th>
-                        <th><i class="bi bi-hash"></i>@T("版本")</th>
-                        <th><i class="bi bi-card-text"></i>@T("描述")</th>
-                        <th><i class="bi bi-arrow-repeat"></i>@T("更新时间")</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in paged)
-                    {
+        <div class="snet-table-panel">
+            <div class="snet-table-head">
+                <table class="snet-table">
+                    <colgroup>
+                        <col style="width:40px" />
+                        <col style="width:70px" />
+                        <col style="width:54px" />
+                        <col style="width:240px" />
+                        <col style="width:90px" />
+                        <col style="width:230px" />
+                        <col style="width:180px" />
+                    </colgroup>
+                    <thead>
                         <tr>
-                            <td><input type="checkbox" @bind="item.IsSelected" /></td>
-                            <td class="num">@item.Index</td>
-                            <td class="num"><img src="/images/nuget.png" width="30" height="30" alt="图标" /></td>
-                            <td>@item.PackName</td>
-                            <td>@item.Version</td>
-                            <td>@item.Describe</td>
-                            <td class="num">@item.UpdateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            <th><input type="checkbox" checked="@_allSelected" @onchange="OnAllSelectedChange" /></th>
+                            <th><i class="bi bi-list-ol"></i>@T("序号")</th>
+                            <th><i class="bi bi-card-image"></i>@T("图标")</th>
+                            <th><i class="bi bi-box-seam"></i>@T("包名")</th>
+                            <th><i class="bi bi-hash"></i>@T("版本")</th>
+                            <th><i class="bi bi-card-text"></i>@T("描述")</th>
+                            <th><i class="bi bi-arrow-repeat"></i>@T("更新时间")</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                </table>
+            </div>
+            <div class="snet-table-wrap">
+                <table class="snet-table">
+                    <colgroup>
+                        <col style="width:40px" />
+                        <col style="width:70px" />
+                        <col style="width:54px" />
+                        <col style="width:240px" />
+                        <col style="width:90px" />
+                        <col style="width:230px" />
+                        <col style="width:180px" />
+                    </colgroup>
+                    <tbody>
+                        @foreach (var item in paged)
+                        {
+                            <tr>
+                                <td><input type="checkbox" @bind="item.IsSelected" /></td>
+                                <td class="num">@item.Index</td>
+                                <td class="num"><img src="/images/nuget.png" width="30" height="30" alt="图标" /></td>
+                                <td>@item.PackName</td>
+                                <td>@item.Version</td>
+                                <td>@item.Describe</td>
+                                <td class="num">@item.UpdateTime.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <PageBar Total="@total" PageIndex="@_pageIndex" PageSize="@_pageSize"
@@ -146,12 +170,8 @@
         base.Dispose();
         DownloadManager.JobChanged -= OnJobChanged;
         // 注销 document 上的外部点击监听：否则切页后旧 handler 残留会清掉新页面的监听（菜单失去失焦关闭能力）
-        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
-        if (_jsRef is not null)
-        {
-            _jsRef.Dispose();
-            _jsRef = null;
-        }
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        _jsRef = null;
     }
 
     /// <summary>工具栏操作按钮：⋯ 点击展开，区域外点击收起（刷新按钮常显）</summary>

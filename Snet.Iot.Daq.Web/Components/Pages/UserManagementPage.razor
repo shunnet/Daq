@@ -1,4 +1,4 @@
-﻿@page "/users"
+@page "/users"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @implements IDisposable
@@ -16,17 +16,34 @@
         <button class="btn btn-primary btn-sm" @onclick="OpenAdd"><i class="bi bi-person-plus"></i>@T("添加用户")</button>
     </div>
 
-    <div class="snet-table-wrap">
-        <table class="snet-table">
-            <thead>
-                <tr>
-                    <th><i class="bi bi-person"></i>@T("用户名")</th>
-                    <th><i class="bi bi-shield-check"></i>@T("角色")</th>
-                    <th><i class="bi bi-key"></i>@T("状态")</th>
-                    <th><i class="bi bi-tools"></i>@T("操作")</th>
-                </tr>
-            </thead>
-            <tbody>
+    <div class="snet-table-panel">
+        <div class="snet-table-head">
+            <table class="snet-table">
+                <colgroup>
+                    <col style="width:260px" />
+                    <col style="width:120px" />
+                    <col style="width:140px" />
+                    <col style="width:130px" />
+                </colgroup>
+                <thead>
+                    <tr>
+                        <th><i class="bi bi-person"></i>@T("用户名")</th>
+                        <th><i class="bi bi-shield-check"></i>@T("角色")</th>
+                        <th><i class="bi bi-key"></i>@T("状态")</th>
+                        <th><i class="bi bi-tools"></i>@T("操作")</th>
+                    </tr>
+                </thead>
+            </table>
+        </div>
+        <div class="snet-table-wrap">
+            <table class="snet-table">
+                <colgroup>
+                    <col style="width:260px" />
+                    <col style="width:120px" />
+                    <col style="width:140px" />
+                    <col style="width:130px" />
+                </colgroup>
+                <tbody>
                 @foreach (var u in _users)
                 {
                     <tr>
@@ -76,8 +93,9 @@
                         </td>
                     </tr>
                 }
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
 
     <!-- 移动端卡片列表（桌面被 .card:has(table.snet-table) .item-cards 规则隐藏） -->
@@ -363,12 +381,13 @@
         InvokeAsync(StateHasChanged);
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
+        base.Dispose();
         MenuCoordinator.Unregister(CloseMenu);
-        // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
-        _jsRef?.Dispose();
+        // 注销 document 上的外部点击监听：先让 JS 移除监听，再释放引用（避免残留回调打到已释放对象 → EndInvokeDotNet NRE）
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        _jsRef = null;
     }
 
     private void OpenAdd()

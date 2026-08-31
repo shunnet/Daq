@@ -420,11 +420,8 @@
     {
         AppState.EntityChanged -= OnEntityChanged;
         MenuCoordinator.Unregister(CloseMenu);
-        if (_jsRef is not null)
-        {
-            _jsRef.Dispose();
-            _jsRef = null;
-        }
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        _jsRef = null;
         base.Dispose();
     }
 

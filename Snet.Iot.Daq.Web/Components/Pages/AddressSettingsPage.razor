@@ -23,7 +23,7 @@
         <span class="tree-actions">
             <span class="tree-actions-expand @(IsAddressActionsOpen ? "open" : "")">
                 <InputFile OnChange="@OnImportAsync" accept=".json" multiple="false" class="upload-input-hidden" />
-                <button class="btn btn-sm btn-primary" @onclick="OpenAdd"><i class="bi bi-plus-lg"></i>@T("添加")</button>
+                <button class="btn btn-sm" @onclick="OpenAdd"><i class="bi bi-plus-lg"></i>@T("添加")</button>
                 <button class="btn btn-sm" @onclick="TriggerImport"><i class="bi bi-file-earmark-arrow-down"></i>@T("导入")</button>
                 <button class="btn btn-sm" @onclick="ExportAsync"><i class="bi bi-file-earmark-arrow-up"></i>@T("导出")</button>
                 <button class="btn btn-sm" @onclick="InverseSelection"><i class="bi bi-square-half"></i>@T("反选")</button>
@@ -69,36 +69,62 @@
             }
         </div>
 
-        <div class="snet-table-wrap">
-            <table class="snet-table">
-                <thead>
-                    <tr>
-                        <th><input type="checkbox" checked="@_allSelected" @onchange="OnAllSelectedChange" /></th>
-                        <th><i class="bi bi-list-ol"></i>@T("序号")</th>
-                        <th><i class="bi bi-geo-alt"></i>@T("地址")</th>
-                        <th><i class="bi bi-tag"></i>@T("别名")</th>
-                        <th><i class="bi bi-grid-1x2"></i>@T("类型")</th>
-                        <th><i class="bi bi-card-text"></i>@T("描述")</th>
-                        <th><i class="bi bi-clock-history"></i>@T("时间")</th>
-                        <th><i class="bi bi-sliders"></i>@T("操作")</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    @foreach (var item in _items)
-                    {
+        <div class="snet-table-panel">
+            <div class="snet-table-head">
+                <table class="snet-table">
+                    <colgroup>
+                        <col style="width:40px" />
+                        <col style="width:70px" />
+                        <col style="width:200px" />
+                        <col style="width:160px" />
+                        <col style="width:84px" />
+                        <col style="width:230px" />
+                        <col style="width:180px" />
+                        <col style="width:120px" />
+                    </colgroup>
+                    <thead>
                         <tr>
-                            <td><input type="checkbox" @bind="item.IsSelected" /></td>
-                            <td class="num">@item.Index</td>
-                            <td class="mono">@item.Address</td>
-                            <td>@item.AnotherName</td>
-                            <td>@item.Type</td>
-                            <td>@item.Describe</td>
-                            <td class="num">@item.Time.ToString("yyyy-MM-dd HH:mm:ss")</td>
-                            <td><button class="btn btn-sm" @onclick="() => OpenEdit(item)"><i class="bi bi-pencil"></i>@T("修改")</button></td>
+                            <th><input type="checkbox" checked="@_allSelected" @onchange="OnAllSelectedChange" /></th>
+                            <th><i class="bi bi-list-ol"></i>@T("序号")</th>
+                            <th><i class="bi bi-geo-alt"></i>@T("地址")</th>
+                            <th><i class="bi bi-tag"></i>@T("别名")</th>
+                            <th><i class="bi bi-grid-1x2"></i>@T("类型")</th>
+                            <th><i class="bi bi-card-text"></i>@T("描述")</th>
+                            <th><i class="bi bi-clock-history"></i>@T("时间")</th>
+                            <th><i class="bi bi-sliders"></i>@T("操作")</th>
                         </tr>
-                    }
-                </tbody>
-            </table>
+                    </thead>
+                </table>
+            </div>
+            <div class="snet-table-wrap">
+                <table class="snet-table">
+                    <colgroup>
+                        <col style="width:40px" />
+                        <col style="width:70px" />
+                        <col style="width:200px" />
+                        <col style="width:160px" />
+                        <col style="width:84px" />
+                        <col style="width:230px" />
+                        <col style="width:180px" />
+                        <col style="width:120px" />
+                    </colgroup>
+                    <tbody>
+                        @foreach (var item in _items)
+                        {
+                            <tr>
+                                <td><input type="checkbox" @bind="item.IsSelected" /></td>
+                                <td class="num">@item.Index</td>
+                                <td class="mono">@item.Address</td>
+                                <td>@item.AnotherName</td>
+                                <td>@item.Type</td>
+                                <td>@item.Describe</td>
+                                <td class="num">@item.Time.ToString("yyyy-MM-dd HH:mm:ss")</td>
+                                <td><button class="btn btn-sm" @onclick="() => OpenEdit(item)"><i class="bi bi-pencil"></i>@T("修改")</button></td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
         </div>
 
         <PageBar Total="@_total" PageIndex="@_pageIndex" PageSize="@_pageSize"
@@ -263,12 +289,8 @@
         base.Dispose();
         MenuCoordinator.Unregister(CloseMenu);
         // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
-        if (_jsRef is not null)
-        {
-            _jsRef.Dispose();
-            _jsRef = null;
-        }
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        _jsRef = null;
     }
 
     private async Task LoadAsync()

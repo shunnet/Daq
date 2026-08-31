@@ -430,8 +430,8 @@ a:hover { color: var(--primary-hover); }
 /* 手机端（<768px）：边距 10 */
 @media (max-width: 767px) {
     .app-main { padding: 10px; padding-bottom: 66px; }
-    /* 移动端表格隐藏（卡片视图），wrap 不撑满高度 */
-    .card .snet-table-wrap { flex: none; }
+    /* 移动端表格隐藏（卡片视图），表格面板不撑满高度 */
+    .card .snet-table-panel { flex: none; }
     /* 搜索框放开最小宽度（flex:1 自适应收缩）：工具栏一行放得下查询按钮与 ⋯ 操作，不再换行 */
     .toolbar .search-box { min-width: 0; }
     /* 搜索框加宽到操作按钮旁：有 ⋯ 操作的工具栏用 auto margin 右对齐（spacer 与 flex:1 平分空间才是搜索框偏窄的原因） */
@@ -833,64 +833,57 @@ html[lang^="zh"] .modal .form-field > label::after { content: "\FF1A"; }
 }
 
 /* 桌面表格（≥768px） */
-.snet-table-wrap {
+/* ---- 表格面板：表头固定满宽 + 数据区滚动（滚动条长在表格内部） ---- */
+.snet-table-panel {
+    display: none;              /* 移动端默认隐藏（卡片视图） */
     flex: 1;
     min-height: 0;
     margin-top: 10px; /* 与 card-header / 工具栏保持留白 */
-    /* 撑满卡片剩余高度（含分页隐藏时）：表格数据多时纵向滚动条只属于表格，页面不滚动 */
-    overflow: auto;
-    width: 100%;
-    max-width: 100%;
-    box-sizing: border-box;
-    -webkit-overflow-scrolling: touch;
-    /* 圆角裁剪交给滚动容器：table 自身的 border-radius 不裁剪内部内容，
-       数据翻到顶部/左侧时行内容会在圆角处露出直角，容器 overflow 按圆角裁剪可根治 */
+    flex-direction: column;
+    border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    /* 遮罩定位基准 */
-    position: relative;
+    background: var(--surface);
+    overflow: hidden;           /* 整体裁住上下两段的圆角 */
 }
-/* 右上角补圆：纵向滚动条占据容器右缘内侧，内容在滚动条左缘被直角截断
-   （左侧无滚动条，内容被容器圆角平滑裁剪 → 左右不对称）。
-   用表头底色遮罩补出右上圆角，与左侧视觉对称 */
-.snet-table-wrap::after {
-    content: "";
-    position: absolute;
-    top: 0;
-    right: 0;
-    width: calc(var(--radius-md) + 2px);
-    height: calc(var(--radius-md) + 2px);
-    border-radius: 0 var(--radius-md) 0 0;
+/* 表头区：固定满宽，不被竖向滚动条压住 */
+.snet-table-head {
+    flex: none;
     background: var(--surface-2);
-    pointer-events: none;
-    z-index: 3; /* 高于粘性表头 z-index:2 */
+    overflow: hidden;
+    /* 预留与数据区滚动条等宽的右内边距，保证表头/正文各列纵向对齐（webkit 细滚动条 8px） */
+    padding-right: 8px;
+}
+/* 数据区：内部滚动，竖向滚动条落在该区域右侧 */
+.snet-table-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto;
+    overflow-x: hidden;
+    /* 始终预留滚动条空间（即使内容没溢出），使列宽稳定、与表头对齐 */
+    scrollbar-gutter: stable;
+    -webkit-overflow-scrolling: touch;
 }
 table.snet-table {
-    display: none;
     width: 100%;
-    /* separate 模式保证 sticky 表头在滚动容器内固定（collapse 在 Chrome 下背景会透出） */
+    /* 固定布局 + colgroup 列宽一致，保证表头与正文各列纵向对齐 */
+    table-layout: fixed;
     border-collapse: separate;
     border-spacing: 0;
     font-size: 13px;
     background: var(--surface);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-md);
 }
 table.snet-table th, table.snet-table td {
     padding: 10px 12px;
     text-align: left;
     border-bottom: 1px solid var(--border);
     white-space: nowrap;
-}
-table.snet-table thead {
-    /* 表头固定：表格滚动时标题永远在顶部 */
-    position: sticky;
-    top: 0;
-    z-index: 2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    vertical-align: middle;
 }
 table.snet-table th {
     color: var(--text-secondary);
     font-weight: 600;
-    /* 不透明表面色：粘性表头滚动时行内容不会透出叠字（tint 半透明洗色不可用于 sticky 表头） */
     background: var(--surface-2);
 }
 table.snet-table th i {
@@ -906,17 +899,13 @@ table.snet-table th i {
 .snet-table td .tag + .btn { margin-left: 8px; }
 table.snet-table tr:last-child td { border-bottom: none; }
 table.snet-table tr:hover td { background: var(--tint); }
-/* 单元格背景随表格圆角收角：thead 背景/hover 高亮不超出表格 12px 圆角 */
-table.snet-table thead th:first-child { border-top-left-radius: calc(var(--radius-md) - 1px); }
-table.snet-table thead th:last-child { border-top-right-radius: calc(var(--radius-md) - 1px); }
-table.snet-table tr:last-child td:first-child { border-bottom-left-radius: calc(var(--radius-md) - 1px); }
-table.snet-table tr:last-child td:last-child { border-bottom-right-radius: calc(var(--radius-md) - 1px); }
+/* 圆角由 .snet-table-panel 的 overflow:hidden 统一裁剪 */
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .num { font-variant-numeric: tabular-nums; }
 @media (min-width: 768px) {
+    .snet-table-panel { display: flex; }
     /* 仅当卡片旁边存在桌面表格兜底时才隐藏卡片（浏览/地址页）；纯卡片页（插件设置）保持显示 */
     .card:has(table.snet-table) .item-cards { display: none; }
-    table.snet-table { display: table; }
 }
 
 /* 日志框 */
@@ -1941,9 +1930,11 @@ html[lang^="zh"] .device-info .row span.label::after { content: "\FF1A"; }
 }
 .param-card-body { padding: 12px 14px; }
 .param-form {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    display: grid;
+    grid-template-columns: max-content minmax(0, 1fr);
+    column-gap: 10px;
+    row-gap: 10px;
+    align-items: center;
     max-height: 46vh;
     overflow-y: auto;
     padding-right: 4px;
@@ -1956,28 +1947,38 @@ html[lang^="zh"] .device-info .row span.label::after { content: "\FF1A"; }
     margin-bottom: 2px;
     border-bottom: 1px solid var(--border);
 }
-/* 字段行：描述在左（自动带冒号），控件在右，同一行不换行 */
-.param-row { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; }
+/* 字段行：作为 param-form 网格的内容参与布局，使所有行共享同一列宽
+   左列 = 最长标签（自适应宽度、文本右对齐并自动带冒号），
+   右列 = 剩余空间（输入框等宽、随容器自适应） */
+.param-row { display: contents; }
 .param-label {
-    flex: none;
-    width: 108px;
+    grid-column: 1;
+    justify-self: end;
     text-align: right;
     font-size: 13px;
     color: var(--text-secondary);
     white-space: nowrap;
+    max-width: 200px;
     overflow: hidden;
     text-overflow: ellipsis;
 }
 .param-label::after { content: ":"; }
 html[lang^="zh"] .param-label::after { content: "\FF1A"; }
-.param-input { flex: 1; width: auto; min-width: 0; }
+.param-input { grid-column: 2; width: 100%; min-width: 0; }
 .param-error-inline {
+    grid-column: 1 / -1;
     width: 100%;
-    margin-left: 118px;
     font-size: 12px;
     color: var(--danger);
 }
-.param-empty { padding: 12px; font-size: 13px; color: var(--text-secondary); border: 1px dashed var(--border); border-radius: var(--radius-sm); }
+.param-empty {
+    grid-column: 1 / -1;
+    padding: 12px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    border: 1px dashed var(--border);
+    border-radius: var(--radius-sm);
+}
 .param-json { width: 100%; }
 .param-error {
     margin-top: 8px;
@@ -2515,14 +2516,8 @@ table.snet-table td { transition: background-color var(--dur-fast); }
     word-break: break-all;
     line-height: 1.45;
 }
-.param-label {
-    width: auto;
-    min-width: 108px;
-    max-width: 40%;
-    white-space: normal;
-    word-break: break-all;
-    line-height: 1.45;
-}
+/* .param-label（插件配置参数表单标签）已在上方“参数表单”区块用网格自适应列宽定义：
+   左列随最长标签自适应、文本右对齐并自动带冒号，此处不再重复覆盖 */
 
 /* 2. 弹窗控件：圆角与全局统一，高度 38px 更舒展 */
 .modal .form-field > input:not([type="checkbox"]),

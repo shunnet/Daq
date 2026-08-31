@@ -129,12 +129,8 @@
         MenuCoordinator.Unregister(CloseMenu);
         GC.SuppressFinalize(this);
         // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
-        if (_jsRef is not null)
-        {
-            _jsRef.Dispose();
-            _jsRef = null;
-        }
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        _jsRef = null;
     }
 
     private static string KeyOf(IProjectTreeViewModel node) => node.DaqDetails?.Guid ?? node.Name + "|" + node.NodeType;

@@ -449,9 +449,8 @@
         AppState.EntityChanged -= OnEntityChanged;
         Sampler.Sample -= OnSample;
         LogBuffer.Changed -= OnLogChanged;
-        // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
-        _jsRef?.Dispose();
+        // 注销 document 上的外部点击监听：先让 JS 移除监听，再释放引用（避免残留回调打到已释放对象 → EndInvokeDotNet NRE）
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
         _jsRef = null;
     }
 }

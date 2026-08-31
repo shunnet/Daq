@@ -2,7 +2,7 @@
 
 	<PropertyGroup>
 		<OutputType>WinExe</OutputType>
-		<TargetFramework>net10.0-windows</TargetFramework>
+		<TargetFramework>net10.0-windows10.0.19041</TargetFramework>
 		<Nullable>enable</Nullable>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UseWPF>true</UseWPF>
@@ -22,8 +22,9 @@
 	
 	<ItemGroup>
 		<PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
-		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4129.50" />
+		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
 		<PackageReference Include="ScottPlot.WPF" Version="5.1.59" />
+		<PackageReference Include="SkiaSharp.Views.WPF" Version="4.151.1" />
 		<PackageReference Include="Snet.Windows.Controls" Version="26.236.1" />
 	</ItemGroup>
 

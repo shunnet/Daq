@@ -547,12 +547,8 @@
         base.Dispose();
         MenuCoordinator.Unregister(CloseMenu);
         // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        try { JS.InvokeVoidAsync("snet.outsideClick.unregisterAll"); } catch { }
-        if (_jsRef is not null)
-        {
-            _jsRef.Dispose();
-            _jsRef = null;
-        }
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        _jsRef = null;
         // 页面销毁时清理热更新挂起的临时目录（切页放弃上传）
         var pending = _pendingHotUpdate;
         _pendingHotUpdate = null;
