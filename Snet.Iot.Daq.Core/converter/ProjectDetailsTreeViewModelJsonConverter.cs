@@ -1,4 +1,4 @@
-﻿using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.@interface;
 using System.Text.Json;
@@ -11,7 +11,7 @@ namespace Snet.Iot.Daq.Core.converter
     /// </summary>
     /// <remarks>
     /// 设计目标：
-    /// 1. 优先绑定到应用层详情节点模型（WPF / Avalonia），确保业务重写方法可用；
+    /// 1. 优先绑定到应用层详情节点模型（WPF），确保业务重写方法可用；
     /// 2. 不可用时安全回退到 Core 模型；
     /// 3. 在频繁读配置场景中减少分配与反射重复开销。
     /// </remarks>
@@ -21,8 +21,7 @@ namespace Snet.Iot.Daq.Core.converter
         /// 缓存优先目标类型，降低每次反序列化的类型解析成本。
         /// </summary>
         private static readonly Type? PreferredType = GlobalHandler.ResolvePreferredType(
-            "Snet.Iot.Daq.data.ProjectDetailsTreeViewModel, Snet.Iot.Daq",
-            "Snet.Iot.Daq.Avalonia.data.ProjectDetailsTreeViewModel, Snet.Iot.Daq.Avalonia");
+            "Snet.Iot.Daq.data.ProjectDetailsTreeViewModel, Snet.Iot.Daq");
 
         /// <summary>
         /// 从 JSON 读取并反序列化为 <see cref="IProjectDetailsTreeViewModel"/>。

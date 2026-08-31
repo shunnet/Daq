@@ -41,7 +41,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
     {
         private static readonly JsonSerializerSettings s_settings = new()
         {
-            TypeNameHandling = TypeNameHandling.All
+            TypeNameHandling = TypeNameHandling.All,
+            SerializationBinder = new SafeSerializationBinder()
         };
 
         private static readonly string s_storage_path = Path.Combine(

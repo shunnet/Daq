@@ -41,7 +41,7 @@ namespace Snet.Iot.Daq.Core.opc.core
         /// <summary>
         /// 应用名称（用于日志、追踪、指标命名）
         /// </summary>
-        private const string AppName = "Snet.Opc";
+        private const string AppName = "Snet.Iot.Daq.Opc";
 
         /// <summary>
         /// 当前程序集版本号（优先取 InformationalVersion）

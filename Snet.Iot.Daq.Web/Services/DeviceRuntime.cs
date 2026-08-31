@@ -1,4 +1,4 @@
-using Opc.Ua;
+﻿using Opc.Ua;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
@@ -277,10 +277,8 @@ public class DeviceRuntime : IAsyncDisposable
                 if (srv is not null)
                 {
                     try { srv.RemoveFolder([_uaFolderStates[0].NodeId]); } catch { }
-                    try { _uaFolderStates[0].Dispose(); } catch { }
                 }
                 _uaFolderStates.Clear();
-                _uaFolder?.Dispose();
                 _uaFolder = null;
             }
             _uaAddressMap.Clear();

@@ -53,6 +53,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         private ServerConfiguration m_configuration;
         private List<BaseDataVariableState> m_staticNodes = [];
         /// <summary>
+        /// 静态/动态节点索引（NodeId 文本 → 节点），避免大地址空间下 GetNodeId 线性扫描
+        /// </summary>
+        private readonly ConcurrentDictionary<string, BaseDataVariableState> m_staticIndex = new();
+        private readonly ConcurrentDictionary<string, BaseDataVariableState> m_dynamicIndex = new();
+        /// <summary>
         /// 第一次的地址空间
         /// </summary>
         private FolderState folderState;
@@ -105,9 +110,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 }
 
                 folderState = CreateFolder(null, AddressSpaceName, AddressSpaceName);
-                folderState.Description = "公共地址空间";
-                folderState.AddReference(ReferenceTypes.Organizes, true, ObjectIds.ObjectsFolder);
-                references.Add(new NodeStateReference(ReferenceTypes.Organizes, false, folderState.NodeId));
+                folderState.Description = new LocalizedText("公共地址空间");
+                folderState.AddReference((NodeId)ReferenceTypes.Organizes, true, ObjectIds.ObjectsFolder);
+                references.Add(new NodeStateReference((NodeId)ReferenceTypes.Organizes, false, new ExpandedNodeId(folderState.NodeId)));
                 folderState.EventNotifier = EventNotifiers.SubscribeToEvents;
 
                 base.AddRootNotifier(this.folderState);
@@ -123,7 +128,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         if (!File.Exists(m_configuration.NodeManagerSaveFile))   //如果不存在 则生成固定
                         {
                             //创建默认的配置
-                            string[] datatype = { "Boolean", "Byte", "ByteString", "DateTime", "Double", "Float", "Guid", "Int16", "Int32", "Int64", "Integer", "LocaleId", "LocalizedText", "NodeId", "Number", "QualifiedName", "SByte", "String", "UInt16", "UInt32", "UInt64", "UInteger", "UtcTime", "XmlElement" };
+                            string[] datatype = { "Boolean", "Byte", "DateTime", "Double", "Float", "Guid", "Int16", "Int32", "Int64", "SByte", "String", "UInt16", "UInt32", "UInt64", "UtcTime", "XmlElement" };
                             //静态
                             NodeBody Devices_Static = new NodeBody() { Name = "静态常量", Description = "测试节点", CreateTime = DateTime.Now.ToString() };
                             //节点
@@ -179,8 +184,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         NodeBody body = Json.ToJsonEntity<NodeBody>() ?? new NodeBody();  //JSON反序列化
                         FolderState folder = CreateFolder(body, null);
                         AddPredefinedNode(SystemContext, folder);
-                        m_simulationTimer = new Timer(DoSimulation, null, 1000, 1000);
-                        references.Add(new NodeStateReference(ReferenceTypes.Organizes, false, folderState.NodeId));
+                        // 模拟 Timer 统一在方法末尾创建一次，避免重复创建导致双定时器泄漏
+                        references.Add(new NodeStateReference((NodeId)ReferenceTypes.Organizes, false, new ExpandedNodeId(folderState.NodeId)));
                     }
                 }
                 catch (Exception e)
@@ -219,15 +224,32 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// </summary>
         public void CreateNode(NodeBody node, FolderState folder)
         {
+            if (string.IsNullOrWhiteSpace(node.DataType))
+            {
+                throw new ArgumentException($"节点 {node.Name} 未配置数据类型（DataType）");
+            }
+            // 通过 DataTypeIds 反射解析数据类型；
+            // 2.0 preview.3 中 DataTypeIds 为静态属性（NodeId 类型），旧版为静态字段（NodeId/uint），两者兼容
+            object? value = typeof(DataTypeIds).GetProperty(node.DataType)?.GetValue(null)
+                ?? typeof(DataTypeIds).GetField(node.DataType)?.GetValue(null);
+            if (value == null)
+            {
+                throw new ArgumentException($"不支持的数据类型：{node.DataType}");
+            }
+            NodeId dataType = value switch
+            {
+                NodeId nodeId => nodeId,
+                uint id => (NodeId)id,
+                _ => throw new NotSupportedException($"DataTypeIds.{node.DataType} 成员类型不受支持：{value.GetType().Name}")
+            };
+
             if (node.Dynamic)  //创建动态
             {
-                //通过反射找到对应的属性并获取它的值
-                CreateDynamicVariable(folder, node.Name, node.Description, (NodeId)typeof(DataTypeIds).GetField(node.DataType).GetValue(new object()), ValueRanks.Scalar, node.AccessLevel);
+                CreateDynamicVariable(folder, node.Name, node.Description, dataType, ValueRanks.Scalar, node.AccessLevel);
             }
             else  //创建静态
             {
-                //通过反射找到对应的属性并获取它的值
-                CreateVariable(folder, node.Name, node.Description, (NodeId)typeof(DataTypeIds).GetField(node.DataType).GetValue(new object()), ValueRanks.Scalar, accessLevel: node.AccessLevel);
+                CreateVariable(folder, node.Name, node.Description, dataType, ValueRanks.Scalar, accessLevel: node.AccessLevel);
             }
         }
 
@@ -236,7 +258,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// </summary>
         public BaseDataVariableState CreateDynamicVariable(NodeState parent, string name, string des, BuiltInType dataType, int valueRank, byte accessLevel = 3)
         {
-            return CreateDynamicVariable(parent, name, des, (uint)dataType, valueRank, accessLevel);
+            return CreateDynamicVariable(parent, name, des, (NodeId)(uint)dataType, valueRank, accessLevel);
         }
 
         /// <summary>
@@ -245,7 +267,10 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         public BaseDataVariableState CreateDynamicVariable(NodeState parent, string name, string des, NodeId dataType, int valueRank, byte accessLevel = 3)
         {
             BaseDataVariableState variable = CreateVariable(parent, name, des, dataType, valueRank, accessLevel: accessLevel);
+            // CreateVariable 会写入静态索引，动态变量需移入动态索引
+            m_staticIndex.TryRemove(variable.NodeId.ToString(), out _);
             m_dynamicNodes.Add(variable);
+            m_dynamicIndex[variable.NodeId.ToString()] = variable;
             return variable;
         }
 
@@ -254,7 +279,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// </summary>
         public BaseDataVariableState CreateVariable(NodeState parent, string name, string des, BuiltInType dataType, int valueRank, bool ini = true, object? value = null, byte accessLevel = 3)
         {
-            return CreateVariable(parent, name, des, (uint)dataType, valueRank, ini, value, accessLevel);
+            return CreateVariable(parent, name, des, (NodeId)(uint)dataType, valueRank, ini, value, accessLevel);
         }
 
         /// <summary>
@@ -264,11 +289,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         {
             BaseDataVariableState variable = new BaseDataVariableState(parent);
 
-            string newName = $"{parent.NodeId.Identifier}.{name}";
+            string newName = $"{parent.NodeId.IdentifierAsString}.{name}";
 
             variable.SymbolicName = name;
-            variable.ReferenceTypeId = ReferenceTypes.Organizes;
-            variable.TypeDefinitionId = VariableTypeIds.BaseDataVariableType;
+            variable.ReferenceTypeId = (NodeId)ReferenceTypes.Organizes;
+            variable.TypeDefinitionId = (NodeId)VariableTypeIds.BaseDataVariableType;
             variable.NodeId = new NodeId(newName, NamespaceIndex);
             variable.BrowseName = new QualifiedName(name, NamespaceIndex);
             variable.DisplayName = new LocalizedText("en", name);
@@ -279,23 +304,24 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             variable.AccessLevel = accessLevel;
             variable.UserAccessLevel = accessLevel;
             variable.Historizing = false;
-            variable.Value = ini ? GetNewValue(variable) : null;
+            variable.Value = ini ? GetNewValue(variable) : Variant.Null;
             variable.StatusCode = ini ? StatusCodes.Good : StatusCodes.Bad;
-            variable.Description = des;
+            variable.Description = new LocalizedText(des);
             if (value != null)
             {
-                variable.Value = value;
+                VariantHelper.TryCastFromWithReflectionFallback(value, out Variant variant);
+                variable.Value = variant;
                 variable.StatusCode = StatusCodes.Good;
             }
             variable.Timestamp = DateTime.UtcNow;
 
             if (valueRank == ValueRanks.OneDimension)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>(new List<uint> { 0 });
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0 });
             }
             else if (valueRank == ValueRanks.TwoDimensions)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>(new List<uint> { 0, 0 });
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0, 0 });
             }
 
             if (parent != null)
@@ -304,6 +330,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             }
 
             m_staticNodes.Add(variable);
+            m_staticIndex[variable.NodeId.ToString()] = variable;
 
             return variable;
         }
@@ -316,13 +343,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             FolderState folder = new FolderState(parent);
 
             folder.SymbolicName = name;
-            folder.ReferenceTypeId = ReferenceTypes.Organizes;
-            folder.TypeDefinitionId = ObjectTypeIds.FolderType;
+            folder.ReferenceTypeId = (NodeId)ReferenceTypes.Organizes;
+            folder.TypeDefinitionId = (NodeId)ObjectTypeIds.FolderType;
 
 
             if (parent != null)
             {
-                string newName = $"{parent.NodeId.Identifier}.{name}";
+                string newName = $"{parent.NodeId.IdentifierAsString}.{name}";
                 folder.NodeId = new NodeId(newName, NamespaceIndex);
             }
             else
@@ -334,7 +361,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             folder.WriteMask = AttributeWriteMask.None;
             folder.UserWriteMask = AttributeWriteMask.None;
             folder.EventNotifier = EventNotifiers.None;
-            folder.Description = des;
+            folder.Description = new LocalizedText(des);
 
             if (parent != null)
             {
@@ -512,7 +539,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     NodeId? nodeId = GetNodeId(item.AddressName, null);
                     if (nodeId != null)
                     {
-                        readValueIds.Add(new ReadValueId() { NodeId = nodeId, AttributeId = Attributes.Value });
+                        readValueIds.Add(new ReadValueId() { NodeId = nodeId.Value, AttributeId = Attributes.Value });
                         dataValues.Add(new DataValue());
                         serviceResults.Add(new ServiceResult(new StatusCode()));
                     }
@@ -535,7 +562,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     else
                     {
                         //数据处理
-                        AddressValue? addressValue = AddressHandler.ExecuteDispose(address.AddressArray[i], dataValues[i].Value, string.IsNullOrEmpty(dataValues[i].Value?.ToString()) ? "失败:" + dataValues[i].StatusCode.ToString() : "成功");
+                        object? value = dataValues[i].WrappedValue.AsBoxedObject();
+                        AddressValue? addressValue = AddressHandler.ExecuteDispose(address.AddressArray[i], value, string.IsNullOrEmpty(value?.ToString()) ? "失败:" + dataValues[i].StatusCode.ToString() : "成功");
 
                         //数据添加
                         param.AddOrUpdate(address.AddressArray[i].AddressName, addressValue, (k, v) => addressValue);
@@ -588,14 +616,12 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         continue;
                     }
 
+                    VariantHelper.TryCastFromWithReflectionFallback(item.Value, out Variant variant);
                     writeValues.Add(new WriteValue
                     {
-                        NodeId = nodeId,
+                        NodeId = nodeId.Value,
                         AttributeId = Attributes.Value,
-                        Value = new DataValue
-                        {
-                            WrappedValue = new Variant(item.Value)
-                        }
+                        Value = new DataValue(variant)
                     });
 
                     // 直接使用默认构造，不创建 StatusCode 对象
@@ -657,14 +683,14 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     NodeId? nodeId = GetNodeId(addressArray[i].AddressName, addressArray[i].Dynamic);
                     if (nodeId != null)
                     {
-                        bool state = DeleteNode(SystemContext, nodeId);
+                        bool state = DeleteNode(SystemContext, nodeId.Value);
                         if (!state)
                         {
                             FailMessage.Add($"{addressArray[i].AddressName} 移除失败");
                         }
                         else
                         {
-                            state = RemoveNodeId(nodeId);
+                            state = RemoveNodeId(nodeId.Value);
                             if (!state)
                             {
                                 FailMessage.Add($"{addressArray[i].AddressName} 移除失败");
@@ -696,31 +722,48 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns></returns>
         public NodeId? GetNodeId(string addressName, bool? dynamic = false)
         {
+            // 优先查索引（O(1)），未命中回退线性扫描（防止索引与列表不同步）
             if (dynamic == true)
             {
                 //是动态的
+                if (m_dynamicIndex.TryGetValue(addressName, out BaseDataVariableState? node))
+                {
+                    return node.NodeId;
+                }
                 if (m_dynamicNodes.Count > 0)
                 {
-                    return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId ?? null;
+                    return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
                 }
             }
             else if (dynamic == false)
             {
                 //不是动态的
+                if (m_staticIndex.TryGetValue(addressName, out BaseDataVariableState? node))
+                {
+                    return node.NodeId;
+                }
                 if (m_staticNodes.Count > 0)
                 {
-                    return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId ?? null;
+                    return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
                 }
             }
             else
             {
+                if (m_staticIndex.TryGetValue(addressName, out BaseDataVariableState? node))
+                {
+                    return node.NodeId;
+                }
+                if (m_dynamicIndex.TryGetValue(addressName, out node))
+                {
+                    return node.NodeId;
+                }
                 if (m_staticNodes.Count > 0)
                 {
-                    return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId ?? null;
+                    return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
                 }
                 if (m_dynamicNodes.Count > 0)
                 {
-                    return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId ?? null;
+                    return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
                 }
             }
             return null;
@@ -733,6 +776,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns></returns>
         public bool RemoveNodeId(NodeId nodeId, bool? dynamic = false)
         {
+            string key = nodeId.ToString();
+            bool removed = false;
             if (dynamic == true)
             {
                 lock (m_dynamicNodes)
@@ -743,9 +788,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         BaseDataVariableState? baseData = m_dynamicNodes.FirstOrDefault(c => c.NodeId == nodeId);
                         if (baseData != null)
                         {
-                            return m_dynamicNodes.Remove(baseData);
+                            removed = m_dynamicNodes.Remove(baseData);
                         }
                     }
+                }
+                if (removed)
+                {
+                    m_dynamicIndex.TryRemove(key, out _);
                 }
             }
             else if (dynamic == false)
@@ -758,9 +807,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         BaseDataVariableState? baseData = m_staticNodes.FirstOrDefault(c => c.NodeId == nodeId);
                         if (baseData != null)
                         {
-                            return m_staticNodes.Remove(baseData);
+                            removed = m_staticNodes.Remove(baseData);
                         }
                     }
+                }
+                if (removed)
+                {
+                    m_staticIndex.TryRemove(key, out _);
                 }
             }
             else
@@ -772,9 +825,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         BaseDataVariableState? baseData = m_staticNodes.FirstOrDefault(c => c.NodeId == nodeId);
                         if (baseData != null)
                         {
-                            return m_staticNodes.Remove(baseData);
+                            removed = m_staticNodes.Remove(baseData);
                         }
                     }
+                }
+                if (removed)
+                {
+                    m_staticIndex.TryRemove(key, out _);
                 }
                 lock (m_dynamicNodes)
                 {
@@ -783,12 +840,16 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         BaseDataVariableState? baseData = m_dynamicNodes.FirstOrDefault(c => c.NodeId == nodeId);
                         if (baseData != null)
                         {
-                            return m_dynamicNodes.Remove(baseData);
+                            removed = m_dynamicNodes.Remove(baseData);
                         }
                     }
                 }
+                if (removed)
+                {
+                    m_dynamicIndex.TryRemove(key, out _);
+                }
             }
-            return false;
+            return removed;
         }
 
         /// <summary>
@@ -868,7 +929,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             {
                 // TBD
 
-                Utils.SilentDispose(m_simulationTimer);
+                m_simulationTimer?.Dispose();
                 m_simulationTimer = null;
             }
             base.Dispose(disposing);
@@ -881,7 +942,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         {
             if (node is BaseInstanceState instance &&
                 instance.Parent != null &&
-                instance.Parent.NodeId.Identifier is string id)
+                instance.Parent.NodeId.TryGetValue(out string id))
             {
                 return new NodeId(
                     id + "_" + instance.SymbolicName,
@@ -1015,10 +1076,10 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             {
                 foreach (NodeState peer in peers)
                 {
-                    peer.AddReference(ReferenceTypes.HasCause, false, variable.NodeId);
-                    variable.AddReference(ReferenceTypes.HasCause, true, peer.NodeId);
-                    peer.AddReference(ReferenceTypes.HasEffect, true, variable.NodeId);
-                    variable.AddReference(ReferenceTypes.HasEffect, false, peer.NodeId);
+                    peer.AddReference((NodeId)ReferenceTypes.HasCause, false, new ExpandedNodeId(variable.NodeId));
+                    variable.AddReference((NodeId)ReferenceTypes.HasCause, true, new ExpandedNodeId(peer.NodeId));
+                    peer.AddReference((NodeId)ReferenceTypes.HasEffect, true, new ExpandedNodeId(variable.NodeId));
+                    variable.AddReference((NodeId)ReferenceTypes.HasEffect, false, new ExpandedNodeId(peer.NodeId));
                 }
             }
 
@@ -1036,34 +1097,34 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             int valueRank)
         {
             var variable = new DataItemState(parent);
-            variable.ValuePrecision = new PropertyState<double>(variable);
-            variable.Definition = new PropertyState<string>(variable);
+            variable.ValuePrecision = PropertyState<double>.With<VariantBuilder>(variable);
+            variable.Definition = PropertyState<string>.With<VariantBuilder>(variable);
 
-            variable.Create(SystemContext, null, variable.BrowseName, null, true);
+            variable.Create(SystemContext, NodeId.Null, variable.BrowseName, LocalizedText.Null, true);
 
             variable.SymbolicName = name;
-            variable.ReferenceTypeId = ReferenceTypes.Organizes;
+            variable.ReferenceTypeId = (NodeId)ReferenceTypes.Organizes;
             variable.NodeId = new NodeId(path, NamespaceIndex);
             variable.BrowseName = new QualifiedName(path, NamespaceIndex);
             variable.DisplayName = new LocalizedText("en", name);
             variable.WriteMask = AttributeWriteMask.None;
             variable.UserWriteMask = AttributeWriteMask.None;
-            variable.DataType = (uint)dataType;
+            variable.DataType = (NodeId)(uint)dataType;
             variable.ValueRank = valueRank;
             variable.AccessLevel = AccessLevels.CurrentReadOrWrite;
             variable.UserAccessLevel = AccessLevels.CurrentReadOrWrite;
             variable.Historizing = false;
-            variable.Value = TypeInfo.GetDefaultValue((uint)dataType, valueRank, Server.TypeTree);
+            variable.Value = TypeInfo.GetDefaultVariantValue((NodeId)(uint)dataType, valueRank, Server.TypeTree);
             variable.StatusCode = StatusCodes.Good;
             variable.Timestamp = DateTime.UtcNow;
 
             if (valueRank == ValueRanks.OneDimension)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>([0]);
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0 });
             }
             else if (valueRank == ValueRanks.TwoDimensions)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>([0, 0]);
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0, 0 });
             }
 
             variable.ValuePrecision.Value = 2;
@@ -1122,7 +1183,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 parent,
                 path,
                 name,
-                (uint)dataType,
+                (NodeId)(uint)dataType,
                 valueRank,
                 initialValues,
                 customRange);
@@ -1141,14 +1202,14 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             {
                 BrowseName = new QualifiedName(path, NamespaceIndex)
             };
-            variable.EngineeringUnits = new PropertyState<EUInformation>(variable);
-            variable.InstrumentRange = new PropertyState<Range>(variable);
+            variable.EngineeringUnits = PropertyState<EUInformation>.With<StructureBuilder<EUInformation>>(variable);
+            variable.InstrumentRange = PropertyState<Range>.With<StructureBuilder<Range>>(variable);
 
             variable.Create(
                 SystemContext,
                 new NodeId(path, NamespaceIndex),
                 variable.BrowseName,
-                null,
+                LocalizedText.Null,
                 true);
 
             variable.NodeId = new NodeId(path, NamespaceIndex);
@@ -1156,7 +1217,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             variable.DisplayName = new LocalizedText("en", name);
             variable.WriteMask = AttributeWriteMask.None;
             variable.UserWriteMask = AttributeWriteMask.None;
-            variable.ReferenceTypeId = ReferenceTypes.Organizes;
+            variable.ReferenceTypeId = (NodeId)ReferenceTypes.Organizes;
             variable.DataType = dataType;
             variable.ValueRank = valueRank;
             variable.AccessLevel = AccessLevels.CurrentReadOrWrite;
@@ -1165,11 +1226,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 
             if (valueRank == ValueRanks.OneDimension)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>([0]);
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0 });
             }
             else if (valueRank == ValueRanks.TwoDimensions)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>([0, 0]);
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0, 0 });
             }
 
             BuiltInType builtInType = TypeInfo.GetBuiltInType(dataType, Server.TypeTree);
@@ -1183,8 +1244,10 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 
             variable.EURange.Value = customRange ?? new Range(100, 0);
 
-            variable.Value = initialValues ??
-                TypeInfo.GetDefaultValue(dataType, valueRank, Server.TypeTree);
+            VariantHelper.TryCastFromWithReflectionFallback(initialValues, out Variant initialVariant);
+            variable.Value = initialValues != null
+                ? initialVariant
+                : TypeInfo.GetDefaultVariantValue(dataType, valueRank, Server.TypeTree);
 
             variable.StatusCode = StatusCodes.Good;
             variable.Timestamp = DateTime.UtcNow;
@@ -1233,11 +1296,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 UserWriteMask = AttributeWriteMask.None
             };
 
-            variable.Create(SystemContext, null, variable.BrowseName, null, true);
+            variable.Create(SystemContext, NodeId.Null, variable.BrowseName, LocalizedText.Null, true);
 
             variable.SymbolicName = name;
-            variable.ReferenceTypeId = ReferenceTypes.Organizes;
-            variable.DataType = DataTypeIds.Boolean;
+            variable.ReferenceTypeId = (NodeId)ReferenceTypes.Organizes;
+            variable.DataType = (NodeId)DataTypeIds.Boolean;
             variable.ValueRank = ValueRanks.Scalar;
             variable.AccessLevel = AccessLevels.CurrentReadOrWrite;
             variable.UserAccessLevel = AccessLevels.CurrentReadOrWrite;
@@ -1246,11 +1309,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             variable.StatusCode = StatusCodes.Good;
             variable.Timestamp = DateTime.UtcNow;
 
-            variable.TrueState.Value = trueState;
+            variable.TrueState.Value = new LocalizedText(trueState);
             variable.TrueState.AccessLevel = AccessLevels.CurrentReadOrWrite;
             variable.TrueState.UserAccessLevel = AccessLevels.CurrentReadOrWrite;
 
-            variable.FalseState.Value = falseState;
+            variable.FalseState.Value = new LocalizedText(falseState);
             variable.FalseState.AccessLevel = AccessLevels.CurrentReadOrWrite;
             variable.FalseState.UserAccessLevel = AccessLevels.CurrentReadOrWrite;
 
@@ -1277,11 +1340,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 UserWriteMask = AttributeWriteMask.None
             };
 
-            variable.Create(SystemContext, null, variable.BrowseName, null, true);
+            variable.Create(SystemContext, NodeId.Null, variable.BrowseName, LocalizedText.Null, true);
 
             variable.SymbolicName = name;
-            variable.ReferenceTypeId = ReferenceTypes.Organizes;
-            variable.DataType = DataTypeIds.UInt32;
+            variable.ReferenceTypeId = (NodeId)ReferenceTypes.Organizes;
+            variable.DataType = (NodeId)DataTypeIds.UInt32;
             variable.ValueRank = ValueRanks.Scalar;
             variable.AccessLevel = AccessLevels.CurrentReadOrWrite;
             variable.UserAccessLevel = AccessLevels.CurrentReadOrWrite;
@@ -1295,7 +1358,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 
             for (int ii = 0; ii < strings.Length; ii++)
             {
-                strings[ii] = values[ii];
+                strings[ii] = new LocalizedText(values[ii]);
             }
 
             variable.EnumStrings.Value = strings;
@@ -1316,7 +1379,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             string name,
             params string[] enumNames)
         {
-            return CreateMultiStateValueDiscreteItemVariable(parent, path, name, null, enumNames);
+            return CreateMultiStateValueDiscreteItemVariable(parent, path, name, NodeId.Null, enumNames);
         }
 
         /// <summary>
@@ -1338,11 +1401,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 UserWriteMask = AttributeWriteMask.None
             };
 
-            variable.Create(SystemContext, null, variable.BrowseName, null, true);
+            variable.Create(SystemContext, NodeId.Null, variable.BrowseName, LocalizedText.Null, true);
 
             variable.SymbolicName = name;
-            variable.ReferenceTypeId = ReferenceTypes.Organizes;
-            variable.DataType = nodeId ?? DataTypeIds.UInt32;
+            variable.ReferenceTypeId = (NodeId)ReferenceTypes.Organizes;
+            variable.DataType = nodeId.IsNull ? (NodeId)DataTypeIds.UInt32 : nodeId;
             variable.ValueRank = ValueRanks.Scalar;
             variable.AccessLevel = AccessLevels.CurrentReadOrWrite;
             variable.UserAccessLevel = AccessLevels.CurrentReadOrWrite;
@@ -1360,7 +1423,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             var strings = new LocalizedText[enumNames.Length];
             for (int ii = 0; ii < strings.Length; ii++)
             {
-                strings[ii] = enumNames[ii];
+                strings[ii] = new LocalizedText(enumNames[ii]);
             }
 
             // set the enumerated values
@@ -1389,9 +1452,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             NodeState node,
             NumericRange indexRange,
             QualifiedName dataEncoding,
-            ref object value,
+            ref Variant value,
             ref StatusCode statusCode,
-            ref DateTime timestamp)
+            ref DateTimeUtc timestamp)
         {
             var variable = node as MultiStateDiscreteState;
 
@@ -1403,19 +1466,19 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 context.NamespaceUris,
                 context.TypeTable);
 
-            if (typeInfo == null || typeInfo == TypeInfo.Unknown)
+            if (typeInfo == TypeInfo.Unknown)
             {
                 return StatusCodes.BadTypeMismatch;
             }
 
-            if (indexRange != NumericRange.Empty)
+            if (!indexRange.IsNull)
             {
                 return StatusCodes.BadIndexRangeInvalid;
             }
 
             double number = Convert.ToDouble(value, CultureInfo.InvariantCulture);
 
-            if (number >= variable.EnumStrings.Value.Length || number < 0)
+            if (number >= variable.EnumStrings.Value.Count || number < 0)
             {
                 return StatusCodes.BadOutOfRange;
             }
@@ -1428,27 +1491,26 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             NodeState node,
             NumericRange indexRange,
             QualifiedName dataEncoding,
-            ref object value,
+            ref Variant value,
             ref StatusCode statusCode,
-            ref DateTime timestamp)
+            ref DateTimeUtc timestamp)
         {
-            var typeInfo = TypeInfo.Construct(value);
+            var typeInfo = value.TypeInfo;
 
             if (node is not MultiStateValueDiscreteState variable ||
-                typeInfo == null ||
                 typeInfo == TypeInfo.Unknown ||
                 !TypeInfo.IsNumericType(typeInfo.BuiltInType))
             {
                 return StatusCodes.BadTypeMismatch;
             }
 
-            if (indexRange != NumericRange.Empty)
+            if (!indexRange.IsNull)
             {
                 return StatusCodes.BadIndexRangeInvalid;
             }
 
             int number = Convert.ToInt32(value, CultureInfo.InvariantCulture);
-            if (number >= variable.EnumValues.Value.Length || number < 0)
+            if (number >= variable.EnumValues.Value.Count || number < 0)
             {
                 return StatusCodes.BadOutOfRange;
             }
@@ -1473,9 +1535,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             NodeState node,
             NumericRange indexRange,
             QualifiedName dataEncoding,
-            ref object value,
+            ref Variant value,
             ref StatusCode statusCode,
-            ref DateTime timestamp)
+            ref DateTimeUtc timestamp)
         {
             var variable = node as AnalogItemState;
 
@@ -1487,7 +1549,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 context.NamespaceUris,
                 context.TypeTable);
 
-            if (typeInfo == null || typeInfo == TypeInfo.Unknown)
+            if (typeInfo == TypeInfo.Unknown)
             {
                 return StatusCodes.BadTypeMismatch;
             }
@@ -1495,9 +1557,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             // check index range.
             if (variable.ValueRank >= 0)
             {
-                if (indexRange != NumericRange.Empty)
+                if (!indexRange.IsNull)
                 {
-                    object target = variable.Value;
+                    Variant target = variable.Value;
                     ServiceResult result = indexRange.UpdateRange(ref target, value);
 
                     if (ServiceResult.IsBad(result))
@@ -1511,7 +1573,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             // check instrument range.
             else
             {
-                if (indexRange != NumericRange.Empty)
+                if (!indexRange.IsNull)
                 {
                     return StatusCodes.BadIndexRangeInvalid;
                 }
@@ -1534,38 +1596,39 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             NodeState node,
             NumericRange indexRange,
             QualifiedName dataEncoding,
-            ref object value,
+            ref Variant value,
             ref StatusCode statusCode,
-            ref DateTime timestamp)
+            ref DateTimeUtc timestamp)
         {
-            var typeInfo = TypeInfo.Construct(value);
+            var typeInfo = value.TypeInfo;
 
             if (node is not PropertyState<Range> variable ||
-                value is not ExtensionObject extensionObject ||
-                typeInfo == null ||
+                !value.TryGetValue(out ExtensionObject extensionObject) ||
                 typeInfo == TypeInfo.Unknown)
             {
                 return StatusCodes.BadTypeMismatch;
             }
-            if (extensionObject.Body is not Range newRange ||
+            if (!extensionObject.TryGetValue(out IEncodeable body, Server.MessageContext) ||
+                body is not Range newRange ||
                 variable.Parent is not AnalogItemState parent)
             {
                 return StatusCodes.BadTypeMismatch;
             }
 
-            if (indexRange != NumericRange.Empty)
+            if (!indexRange.IsNull)
             {
                 return StatusCodes.BadIndexRangeInvalid;
             }
 
-            var parentTypeInfo = TypeInfo.Construct(parent.Value);
+            var parentTypeInfo = parent.Value.TypeInfo;
             Range parentRange = GetAnalogRange(parentTypeInfo.BuiltInType);
             if (parentRange.High < newRange.High || parentRange.Low > newRange.Low)
             {
                 return StatusCodes.BadOutOfRange;
             }
 
-            value = newRange;
+            VariantHelper.TryCastFromWithReflectionFallback(newRange, out Variant rangeVariant);
+            value = rangeVariant;
 
             return ServiceResult.Good;
         }
@@ -1580,7 +1643,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             BuiltInType dataType,
             int valueRank)
         {
-            return CreateVariable(parent, path, name, (uint)dataType, valueRank);
+            return CreateVariable(parent, path, name, (NodeId)(uint)dataType, valueRank);
         }
 
         /// <summary>
@@ -1596,8 +1659,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             var variable = new BaseDataVariableState(parent)
             {
                 SymbolicName = name,
-                ReferenceTypeId = ReferenceTypes.Organizes,
-                TypeDefinitionId = VariableTypeIds.BaseDataVariableType,
+                ReferenceTypeId = (NodeId)ReferenceTypes.Organizes,
+                TypeDefinitionId = (NodeId)VariableTypeIds.BaseDataVariableType,
                 NodeId = new NodeId(path, NamespaceIndex),
                 BrowseName = new QualifiedName(path, NamespaceIndex),
                 DisplayName = new LocalizedText("en", name),
@@ -1615,11 +1678,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 
             if (valueRank == ValueRanks.OneDimension)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>([0]);
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0 });
             }
             else if (valueRank == ValueRanks.TwoDimensions)
             {
-                variable.ArrayDimensions = new ReadOnlyList<uint>([0, 0]);
+                variable.ArrayDimensions = new ArrayOf<uint>(new uint[] { 0, 0 });
             }
 
             parent?.AddChild(variable);
@@ -1635,7 +1698,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             int valueRank,
             ushort numVariables)
         {
-            return CreateVariables(parent, path, name, (uint)dataType, valueRank, numVariables);
+            return CreateVariables(parent, path, name, (NodeId)(uint)dataType, valueRank, numVariables);
         }
 
         private BaseDataVariableState[] CreateVariables(
@@ -1679,7 +1742,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             BuiltInType dataType,
             int valueRank)
         {
-            return CreateDynamicVariable(parent, path, name, (uint)dataType, valueRank);
+            return CreateDynamicVariable(parent, path, name, (NodeId)(uint)dataType, valueRank);
         }
 
         /// <summary>
@@ -1699,6 +1762,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 dataType,
                 valueRank);
             m_dynamicNodes.Add(variable);
+            m_dynamicIndex[variable.NodeId.ToString()] = variable;
             return variable;
         }
 
@@ -1714,7 +1778,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 parent,
                 path,
                 name,
-                (uint)dataType,
+                (NodeId)(uint)dataType,
                 valueRank,
                 numVariables);
         }
@@ -1765,7 +1829,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 NodeId = new NodeId(path, NamespaceIndex),
                 BrowseName = new QualifiedName(name, NamespaceIndex)
             };
-            type.DisplayName = type.BrowseName.Name;
+            type.DisplayName = new LocalizedText(type.BrowseName.Name);
             type.WriteMask = AttributeWriteMask.None;
             type.UserWriteMask = AttributeWriteMask.None;
             type.ContainsNoLoops = true;
@@ -1777,13 +1841,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 externalReferences[ObjectIds.ViewsFolder] = references = [];
             }
 
-            type.AddReference(ReferenceTypeIds.Organizes, true, ObjectIds.ViewsFolder);
-            references.Add(new NodeStateReference(ReferenceTypeIds.Organizes, false, type.NodeId));
+            type.AddReference((NodeId)ReferenceTypeIds.Organizes, true, ObjectIds.ViewsFolder);
+            references.Add(new NodeStateReference((NodeId)ReferenceTypeIds.Organizes, false, new ExpandedNodeId(type.NodeId)));
 
             if (parent != null)
             {
-                parent.AddReference(ReferenceTypes.Organizes, false, type.NodeId);
-                type.AddReference(ReferenceTypes.Organizes, true, parent.NodeId);
+                parent.AddReference((NodeId)ReferenceTypes.Organizes, false, new ExpandedNodeId(type.NodeId));
+                type.AddReference((NodeId)ReferenceTypes.Organizes, true, new ExpandedNodeId(parent.NodeId));
             }
 
             AddPredefinedNode(SystemContext, type);
@@ -1999,21 +2063,16 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             };
         }
 
-        private object GetNewValue(BaseVariableState variable)
+        private Variant GetNewValue(BaseVariableState variable)
         {
-            object value = null;
-            for (int retryCount = 0; value == null && retryCount < 10; retryCount++)
+            Variant value = Variant.Null;
+            for (int retryCount = 0; value.IsNull && retryCount < 10; retryCount++)
             {
                 value = m_generator.GetRandom(
                     variable.DataType,
                     variable.ValueRank,
                     [10],
                     Server.TypeTree);
-                // skip Variant Null
-                if (value is Variant variant && variant.Value == null)
-                {
-                    value = null;
-                }
             }
 
             return value;

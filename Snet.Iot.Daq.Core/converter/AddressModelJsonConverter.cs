@@ -1,4 +1,4 @@
-﻿using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.@interface;
 using System.Text.Json;
@@ -11,7 +11,7 @@ namespace Snet.Iot.Daq.Core.converter
     /// </summary>
     /// <remarks>
     /// 设计目标：
-    /// 1. 运行时优先绑定到上层应用模型（WPF / Avalonia），确保重写逻辑生效；
+    /// 1. 运行时优先绑定到上层应用模型（WPF / Web），确保重写逻辑生效；
     /// 2. 若上层模型不可用，则回退到 Core 模型，保证兼容性；
     /// 3. 通过缓存类型与减少中间字符串分配，降低高频反序列化开销。
     /// </remarks>
@@ -22,7 +22,7 @@ namespace Snet.Iot.Daq.Core.converter
         /// </summary>
         private static readonly Type? PreferredType = GlobalHandler.ResolvePreferredType(
             "Snet.Iot.Daq.data.AddressModel, Snet.Iot.Daq",
-            "Snet.Iot.Daq.Avalonia.data.AddressModel, Snet.Iot.Daq.Avalonia");
+            "Snet.Iot.Daq.Web.Data.AddressModel, Snet.Iot.Daq.Web");
 
         /// <summary>
         /// 从 JSON 读取并反序列化为 <see cref="IAddressModel"/>。

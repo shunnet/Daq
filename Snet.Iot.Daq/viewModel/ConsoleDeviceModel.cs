@@ -461,9 +461,7 @@ namespace Snet.Iot.Daq.viewModel
                     if (folderStates.Count > 0)
                     {
                         GlobalConfigModel.uaService.RemoveFolder([folderStates[0].NodeId]);
-                        folderStates[0].Dispose();
                         folderStates.Clear();
-                        folderState.Dispose();
                         folderState = null;
                     }
 

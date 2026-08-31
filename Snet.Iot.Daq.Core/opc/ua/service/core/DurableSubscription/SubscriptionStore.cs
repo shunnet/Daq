@@ -40,6 +40,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
         private static readonly JsonSerializerSettings s_settings = new()
         {
             TypeNameHandling = TypeNameHandling.All,
+            SerializationBinder = new SafeSerializationBinder(),
             Converters = { new ExtensionObjectConverter(), new NumericRangeConverter() }
         };
 
@@ -60,7 +61,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
                 .MonitoredItemQueueFactory as DurableMonitoredItemQueueFactory;
         }
 
-        public bool StoreSubscriptions(IEnumerable<IStoredSubscription> subscriptions)
+        public ValueTask<bool> StoreSubscriptionsAsync(
+            IEnumerable<IStoredSubscription> subscriptions,
+            CancellationToken cancellationToken = default)
         {
             try
             {
@@ -79,16 +82,17 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
                         s => s.MonitoredItems.Select(m => m.Id));
                     m_durableMonitoredItemQueueFactory.PersistQueues(ids, s_storage_path);
                 }
-                return true;
+                return new ValueTask<bool>(true);
             }
             catch (Exception ex)
             {
                 m_logger.LogWarning(ex, "Failed to store subscriptions");
             }
-            return false;
+            return new ValueTask<bool>(false);
         }
 
-        public RestoreSubscriptionResult RestoreSubscriptions()
+        public ValueTask<RestoreSubscriptionResult> RestoreSubscriptionsAsync(
+            CancellationToken cancellationToken = default)
         {
             string filePath = Path.Combine(s_storage_path, kFilename);
             try
@@ -101,7 +105,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 
                     File.Delete(filePath);
 
-                    return new RestoreSubscriptionResult(true, result);
+                    return new ValueTask<RestoreSubscriptionResult>(
+                        new RestoreSubscriptionResult(true, result));
                 }
             }
             catch (Exception ex)
@@ -109,7 +114,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
                 m_logger.LogWarning(ex, "Failed to restore subscriptions");
             }
 
-            return new RestoreSubscriptionResult(false, null);
+            return new ValueTask<RestoreSubscriptionResult>(
+                new RestoreSubscriptionResult(false, null));
         }
 
         public class ExtensionObjectConverter : JsonConverter
@@ -122,24 +128,55 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
             public override object ReadJson(
                 JsonReader reader,
                 Type objectType,
-                object existingValue,
+                object? existingValue,
                 JsonSerializer serializer)
             {
                 var jo = JObject.Load(reader);
-                object body = jo["Body"].ToObject<object>(serializer);
+                object? body = jo["Body"].ToObject<object>(serializer);
                 ExpandedNodeId typeId = jo["TypeId"].ToObject<ExpandedNodeId>(serializer);
-                return new ExtensionObject { Body = body, TypeId = typeId };
+                return body switch
+                {
+                    IEncodeable encodeable => new ExtensionObject(typeId, encodeable, false),
+                    ByteString binary => new ExtensionObject(typeId, binary),
+                    string json => new ExtensionObject(typeId, json),
+                    XmlElement xml => new ExtensionObject(typeId, xml),
+                    _ => throw new JsonSerializationException(
+                        $"不支持持久化的 ExtensionObject body 类型：{body?.GetType().FullName ?? "null"}")
+                };
             }
 
             public override void WriteJson(
                 JsonWriter writer,
-                object value,
+                object? value,
                 JsonSerializer serializer)
             {
                 var extensionObject = (ExtensionObject)value;
+                // 用 TryGetAsXXX 类型安全读取 body，替代已过时的 Body 属性
+                object? body = null;
+                if (extensionObject.TryGetValue(out IEncodeable? encodeable))
+                {
+                    body = encodeable;
+                }
+                else if (extensionObject.TryGetAsJson(out string? json))
+                {
+                    body = json;
+                }
+                else if (extensionObject.TryGetAsXml(out XmlElement xml))
+                {
+                    body = xml;
+                }
+                else if (extensionObject.TryGetAsBinary(out ByteString binary))
+                {
+                    body = binary;
+                }
+                else
+                {
+                    throw new JsonSerializationException(
+                        "无法读取 ExtensionObject 的 body（非 IEncodeable/Json/Xml/Binary 类型）");
+                }
                 var jo = new JObject
                 {
-                    ["Body"] = JToken.FromObject(extensionObject.Body, serializer),
+                    ["Body"] = JToken.FromObject(body, serializer),
                     ["TypeId"] = JToken.FromObject(extensionObject.TypeId, serializer)
                 };
                 jo.WriteTo(writer);
@@ -156,7 +193,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
             public override object ReadJson(
                 JsonReader reader,
                 Type objectType,
-                object existingValue,
+                object? existingValue,
                 JsonSerializer serializer)
             {
                 var jo = JObject.Load(reader);
@@ -167,7 +204,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 
             public override void WriteJson(
                 JsonWriter writer,
-                object value,
+                object? value,
                 JsonSerializer serializer)
             {
                 var extensionObject = (NumericRange)value;
@@ -195,7 +232,25 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
                 s_storage_path);
         }
 
-        public void OnSubscriptionRestoreComplete(Dictionary<uint, uint[]> createdSubscriptions)
+        public ValueTask<IDataChangeMonitoredItemQueue?> RestoreDataChangeMonitoredItemQueueAsync(
+            uint monitoredItemId,
+            CancellationToken cancellationToken = default)
+        {
+            return new ValueTask<IDataChangeMonitoredItemQueue?>(
+                RestoreDataChangeMonitoredItemQueue(monitoredItemId));
+        }
+
+        public ValueTask<IEventMonitoredItemQueue?> RestoreEventMonitoredItemQueueAsync(
+            uint monitoredItemId,
+            CancellationToken cancellationToken = default)
+        {
+            return new ValueTask<IEventMonitoredItemQueue?>(
+                RestoreEventMonitoredItemQueue(monitoredItemId));
+        }
+
+        public ValueTask OnSubscriptionRestoreCompleteAsync(
+            Dictionary<uint, ArrayOf<uint>> createdSubscriptions,
+            CancellationToken cancellationToken = default)
         {
             string filePath = Path.Combine(s_storage_path, kFilename);
 
@@ -214,9 +269,28 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
             //remove old batches & queues
             if (m_durableMonitoredItemQueueFactory != null)
             {
-                IEnumerable<uint> ids = createdSubscriptions.SelectMany(s => s.Value);
+                IEnumerable<uint> ids = createdSubscriptions.SelectMany(s => s.Value.Memory.ToArray());
                 m_durableMonitoredItemQueueFactory.CleanStoredQueues(s_storage_path, ids);
             }
+            return ValueTask.CompletedTask;
+        }
+    }
+
+    /// <summary>
+    /// 持久化 JSON 反序列化白名单：TypeNameHandling.All 会写入并信任类型名，
+    /// 不加限制会允许任意类型实例化（反序列化漏洞）。仅放行本方案与 OPC UA 框架类型。
+    /// </summary>
+    internal sealed class SafeSerializationBinder : Newtonsoft.Json.Serialization.DefaultSerializationBinder
+    {
+        public override Type BindToType(string assemblyName, string typeName)
+        {
+            if (!typeName.StartsWith("Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription.", StringComparison.Ordinal) &&
+                !typeName.StartsWith("Opc.Ua.", StringComparison.Ordinal) &&
+                !typeName.StartsWith("System.", StringComparison.Ordinal))
+            {
+                throw new JsonSerializationException($"禁止反序列化类型：{typeName}");
+            }
+            return base.BindToType(assemblyName, typeName);
         }
     }
 }

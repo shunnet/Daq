@@ -9,6 +9,7 @@ using Snet.Model.@interface;
 using Snet.Utility;
 using System.Collections.Concurrent;
 using System.Security.Cryptography.X509Certificates;
+using Certificate = Opc.Ua.Security.Certificates.Certificate;
 
 namespace Snet.Iot.Daq.Core.opc.ua.service
 {
@@ -73,7 +74,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         /// <param name="config">应用配置</param>
         /// <param name="cerRoot">证书根目录</param>
         /// <returns>仅包含指定证书的应用证书集合</returns>
-        private CertificateIdentifierCollection LoadApplicationCertificate(ApplicationConfiguration config, string cerRoot)
+        private ArrayOf<CertificateIdentifier> LoadApplicationCertificate(ApplicationConfiguration config, string cerRoot)
         {
             if (string.IsNullOrWhiteSpace(basics.SecreKey))
             {
@@ -97,18 +98,18 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
             {
                 throw new ArgumentException($"服务端应用证书已过期（有效期至 {certificate.NotAfter:yyyy-MM-dd}）");
             }
-            if (X509Utils.GetPublicKeySize(certificate) < config.SecurityConfiguration.MinimumCertificateKeySize)
+            using var uaCertificate = Certificate.FromRawData(certificate.RawData);
+            if (X509Utils.GetPublicKeySize(uaCertificate) < config.SecurityConfiguration.MinimumCertificateKeySize)
             {
                 throw new ArgumentException("服务端应用证书密钥长度不足");
             }
 
             //OPC UA 服务端证书必须包含监听地址的 SAN 域名，否则严格客户端会拒绝连接
-            IList<string> domains = X509Utils.GetDomainsFromCertificate(certificate);
+            ArrayOf<string> domains = X509Utils.GetDomainsFromCertificate(uaCertificate);
             string listenHost = basics.IpAddress == "0.0.0.0" ? Utils.GetHostName() : basics.IpAddress;
-            bool hasDomain = domains.Any(d =>
-                string.Equals(d, basics.IpAddress, StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(d, "localhost", StringComparison.OrdinalIgnoreCase) ||
-                string.Equals(d, listenHost, StringComparison.OrdinalIgnoreCase));
+            bool hasDomain = domains.Contains(basics.IpAddress) ||
+                domains.Contains("localhost") ||
+                domains.Contains(listenHost);
             if (!hasDomain)
             {
                 throw new ArgumentException(
@@ -117,7 +118,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
 
             //OPC UA 服务端证书必须包含配置的 ApplicationUri（SAN 的 uri:... 扩展），否则客户端验证会拒绝
             if (!X509Utils.CompareApplicationUriWithCertificate(
-                certificate,
+                uaCertificate,
                 config.ApplicationUri,
                 out IReadOnlyList<string> certificateUris))
             {
@@ -138,7 +139,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
             config.SecurityConfiguration.CertificatePasswordProvider =
                 new CertificatePasswordProvider(basics.SecreKey.ToCharArray());
 
-            return new CertificateIdentifierCollection
+            return new CertificateIdentifier[]
             {
                 new CertificateIdentifier
                 {
@@ -232,10 +233,10 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         {
             if (session == null) return;
             string ClientID = session.Id.ToString();
-            string item = String.Format("[ {0} ] ( {1} ) {2}", session.SessionDiagnostics.SessionName, ClientID, reason.Equals("Created") ? "创建" : reason.Equals("Activated") ? "激活" : reason.Equals("Closing") ? "结束" : reason.Equals("Impersonating") ? "新身份激活" : reason);
+            string item = String.Format("[ {0} ] ( {1} ) {2}", session.SessionName, ClientID, reason.Equals("Created") ? "创建" : reason.Equals("Activated") ? "激活" : reason.Equals("Closing") ? "结束" : reason.Equals("Impersonating") ? "新身份激活" : reason);
             if (IsHeartbeatPacket)
             {
-                item += String.Format(":{0:HH:mm:ss}", session.SessionDiagnostics.ClientLastContactTime.ToLocalTime());
+                item += String.Format(":{0:HH:mm:ss}", session.ClientLastContactTime.ToLocalTime());
             }
 
             if (reason.Equals("Closing"))
@@ -273,7 +274,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 string key = folderName;
                 if (fs != null)
                 {
-                    key = $"{fs.NodeId.Identifier}.{folderName}";
+                    key = $"{fs.NodeId.IdentifierAsString}.{folderName}";
                 }
                 else
                 {
@@ -287,7 +288,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     {
                         return EndOperate(false, $"{folderName} 文件夹创建失败，原因未知");
                     }
-                    FolderInfo.AddOrUpdate(folder.NodeId.Identifier.ToString(), folder, (k, v) => folder);
+                    FolderInfo.AddOrUpdate(folder.NodeId.IdentifierAsString, folder, (k, v) => folder);
                     return EndOperate(true, resultData: folder);
                 }
                 else
@@ -329,7 +330,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                         {
                             if (!FolderInfo.TryRemove(index))
                             {
-                                failMessages.Add($"{index.Value.NodeId.Identifier} 删除失败");
+                                failMessages.Add($"{index.Value.NodeId.IdentifierAsString} 删除失败");
                             }
                         }
                     }
@@ -410,7 +411,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 {
                     return EndOperate(false, $"导入地址失败，原因未知");
                 }
-                FolderInfo.AddOrUpdate(folderState.NodeId.Identifier.ToString(), folderState, (k, v) => folderState);
+                FolderInfo.AddOrUpdate(folderState.NodeId.IdentifierAsString, folderState, (k, v) => folderState);
                 return EndOperate(true, resultData: folderState);
             }
             catch (Exception ex)
@@ -596,13 +597,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     MaxNodesPerRegisterNodes = 2500,
                     MaxNodesPerTranslateBrowsePathsToNodeIds = 2500,
                 });
-                serverConfig.SetAvailableSamplingRates(new SamplingRateGroupCollection(new List<SamplingRateGroup>
+                serverConfig.SetAvailableSamplingRates(new SamplingRateGroup[]
                 {
                     new SamplingRateGroup(5, 5, 20),
                     new SamplingRateGroup(100, 100, 4),
                     new SamplingRateGroup(500, 250, 2),
                     new SamplingRateGroup(1000, 500, 20),
-                }));
+                });
 
                 //设置其他参数
                 serverConfig.SetMaxChannelCount(1000);
@@ -623,7 +624,6 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 serverConfig.SetMaxMessageQueueSize(100);
                 serverConfig.SetMaxNotificationQueueSize(100);
                 serverConfig.SetMaxNotificationsPerPublish(1000);
-                serverConfig.SetMinMetadataSamplingInterval(1000);
                 serverConfig.SetMaxRegistrationInterval(0);
                 serverConfig.SetNodeManagerSaveFile($"{tag}.Nodes.Json");
                 serverConfig.SetMinSubscriptionLifetime(10000);
@@ -636,21 +636,20 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 serverConfig.SetMaxDurableSubscriptionLifetime(10);
 
                 var cerRoot = Data.AppCerPath;
-                ApplicationConfiguration config = await serverConfig.AddSecurityConfiguration(new CertificateIdentifierCollection(new List<CertificateIdentifier>
+                ApplicationConfiguration config = await serverConfig.AddSecurityConfiguration(new CertificateIdentifier[]
                 {
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="RsaSha256"},
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="NistP256"},
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="NistP384"},
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="BrainpoolP256r1"},
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="BrainpoolP384r1"},
-                })).SetAutoAcceptUntrustedCertificates(true)
+                }).SetAutoAcceptUntrustedCertificates(true)
                     .SetRejectSHA1SignedCertificates(true)
                     .SetRejectUnknownRevocationStatus(true)
                     .SetMinimumCertificateKeySize(2048)
                     .SetMaxRejectedCertificates(5)
                     .SetAddAppCertToTrustedStore(false)
                     .SetSendCertificateChain(true)
-                    .SetOutputFilePath(Path.Combine("logs", $"{tag}.log"))
                    .CreateAsync(ct: token);
                 //设置 Nonce 长度
                 config.SecurityConfiguration.NonceLength = 32;
@@ -694,28 +693,17 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
 
                 //检查是否有有效的应用实例证书。
                 //用户指定了服务端应用证书时，先复制到 SDK 证书存储并加载私钥，
-                //跳过 SDK 的自动生成与 ApplicationUri 校验（通用证书不含 UA ApplicationUri 扩展）
+                //跳过 SDK 的自动生成与 ApplicationUri 校验（通用证书不含 UA ApplicationUri 扩展）。
+                //2.0 中 CertificateIdentifier 仅保存元数据，私钥证书由
+                //CheckApplicationInstanceCertificatesAsync 内部的 CertificateManager 统一加载。
                 bool haveAppCertificate;
                 if (!string.IsNullOrWhiteSpace(basics.Cer))
                 {
                     config.SecurityConfiguration.ApplicationCertificates = LoadApplicationCertificate(config, cerRoot);
-                    foreach (CertificateIdentifier id in config.SecurityConfiguration.ApplicationCertificates)
-                    {
-                        id.Certificate = await id.LoadPrivateKeyExAsync(
-                            config.SecurityConfiguration.CertificatePasswordProvider,
-                            config.ApplicationUri,
-                            Telemetry,
-                            token);
-                    }
-                    haveAppCertificate = config.SecurityConfiguration.ApplicationCertificates.All(
-                        id => id.Certificate?.HasPrivateKey == true);
                     await OnInfoEventHandlerAsync(this, new EventInfoResult(true,
                         $"服务端应用证书使用指定证书：{basics.Cer}"));
                 }
-                else
-                {
-                    haveAppCertificate = await AI.CheckApplicationInstanceCertificatesAsync(true, ct: token);
-                }
+                haveAppCertificate = await AI.CheckApplicationInstanceCertificatesAsync(true, ct: token);
                 if (!haveAppCertificate)
                 {
                     await OffAsync(true, token);
@@ -723,13 +711,13 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 }
 
                 //实例化
-                service = new ReferenceServer(basics.UserName, basics.Password, basics.AType, basics.AutoCreateAddress, basics.AddressSpaceName, OnDataEventHandler);
+                service = new ReferenceServer(Telemetry, basics.UserName, basics.Password, basics.AType, basics.AutoCreateAddress, basics.AddressSpaceName, OnDataEventHandler);
 
                 //启动服务
                 await AI.StartAsync(service);
 
                 //打印信息
-                var endpoints = AI.Server.GetEndpoints().Select(e => e.EndpointUrl).Distinct();
+                var endpoints = AI.Server.GetEndpoints().Memory.ToArray().Select(e => e.EndpointUrl).Distinct();
                 foreach (var endpoint in endpoints)
                 {
                     //事件抛出
@@ -782,7 +770,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
             }
         }
         /// <inheritdoc/>
-        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, (object value, Model.@enum.EncodingType? encodingType)> values, CancellationToken token = default)
+        public async Task<OperateResult> WriteAsync(ConcurrentDictionary<string, (object value, Snet.Model.@enum.EncodingType? encodingType)> values, CancellationToken token = default)
         {
             //开始记录运行时间
             await BegOperateAsync(token);

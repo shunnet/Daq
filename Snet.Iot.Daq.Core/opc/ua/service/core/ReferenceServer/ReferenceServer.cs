@@ -29,12 +29,14 @@
 
 using Microsoft.Extensions.Logging;
 using Opc.Ua;
+using Opc.Ua.Identity;
 using Opc.Ua.Server;
 using Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription;
 using Snet.Model.data;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 using static Snet.Iot.Daq.Core.opc.core.Data;
+using Certificate = Opc.Ua.Security.Certificates.Certificate;
+using TrustListIdentifier = Opc.Ua.Security.Certificates.TrustListIdentifier;
 
 namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
 {
@@ -54,12 +56,14 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <summary>
         /// 构造函数
         /// </summary>
+        /// <param name="telemetry">遥测上下文</param>
         /// <param name="User">用户名</param>
         /// <param name="Password">密码</param>
         /// <param name="AType">验证类型</param>
         /// <param name="AutoCreateAddress">自动创建地址</param>
         /// <param name="AddressSpaceName">地址空间名称</param>
-        public ReferenceServer(string User, string Password, AuType AType, bool AutoCreateAddress, string AddressSpaceName, Action<object?, EventDataResult> actionEvent)
+        public ReferenceServer(ITelemetryContext telemetry, string User, string Password, AuType AType, bool AutoCreateAddress, string AddressSpaceName, Action<object?, EventDataResult> actionEvent)
+            : base(telemetry)
         {
 
             this.ActionEvent = actionEvent;
@@ -70,10 +74,14 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             this.AddressSpaceName = AddressSpaceName;
         }
 
-        public override Task<WriteResponse> WriteAsync(SecureChannelContext secureChannelContext, RequestHeader requestHeader, WriteValueCollection nodesToWrite, CancellationToken ct)
+        public override ValueTask<WriteResponse> WriteAsync(
+            SecureChannelContext secureChannelContext,
+            RequestHeader? requestHeader,
+            ArrayOf<WriteValue> nodesToWrite,
+            RequestLifetime requestLifetime)
         {
             ActionEvent?.Invoke(this, new EventDataResult(true, "客户端写入操作", nodesToWrite));
-            return base.WriteAsync(secureChannelContext, requestHeader, nodesToWrite, ct);
+            return base.WriteAsync(secureChannelContext, requestHeader, nodesToWrite, requestLifetime);
         }
 
 
@@ -232,9 +240,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         {
             base.OnServerStarted(server);
 
-            // request notifications when the user identity is changed. all valid users are accepted by default.
-            server.SessionManager.ImpersonateUser
-                += new ImpersonateEventHandler(SessionManager_ImpersonateUser);
+            // 注册自定义身份认证器（替代已过时的 ImpersonateUser 事件）
+            server.IdentityRegistry.Register(new SnetUserTokenAuthenticator(this));
 
             try
             {
@@ -254,9 +261,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <remarks>
         /// Sample to show how to override default user token policies.
         /// </remarks>
-        public override UserTokenPolicyCollection GetUserTokenPolicies(ApplicationConfiguration configuration, EndpointDescription description)
+        public override ArrayOf<UserTokenPolicy> GetUserTokenPolicies(ApplicationConfiguration configuration, EndpointDescription description)
         {
-            UserTokenPolicyCollection policies = base.GetUserTokenPolicies(
+            ArrayOf<UserTokenPolicy> policies = base.GetUserTokenPolicies(
                 configuration,
                 description);
 
@@ -264,17 +271,17 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
             if (description.SecurityPolicyUri == SecurityPolicies.Aes256_Sha256_RsaPss &&
                 description.SecurityMode == MessageSecurityMode.SignAndEncrypt)
             {
-                return [.. policies.Where(u => u.TokenType != UserTokenType.Certificate)];
+                return policies.Filter(u => u.TokenType != UserTokenType.Certificate);
             }
             else if (description.SecurityPolicyUri == SecurityPolicies.Aes128_Sha256_RsaOaep &&
                 description.SecurityMode == MessageSecurityMode.Sign)
             {
-                return [.. policies.Where(u => u.TokenType != UserTokenType.Anonymous)];
+                return policies.Filter(u => u.TokenType != UserTokenType.Anonymous);
             }
             else if (description.SecurityPolicyUri == SecurityPolicies.Aes128_Sha256_RsaOaep &&
                 description.SecurityMode == MessageSecurityMode.SignAndEncrypt)
             {
-                return [.. policies.Where(u => u.TokenType != UserTokenType.UserName)];
+                return policies.Filter(u => u.TokenType != UserTokenType.UserName);
             }
             return policies;
         }
@@ -297,60 +304,89 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                     if (configuration.SecurityConfiguration.TrustedUserCertificates != null &&
                         configuration.SecurityConfiguration.UserIssuerCertificates != null)
                     {
-                        var certificateValidator = new CertificateValidator(MessageContext.Telemetry);
-                        certificateValidator.UpdateAsync(configuration.SecurityConfiguration)
-                            .Wait();
-                        certificateValidator.Update(
-                            configuration.SecurityConfiguration.UserIssuerCertificates,
-                            configuration.SecurityConfiguration.TrustedUserCertificates,
-                            configuration.SecurityConfiguration.RejectedCertificateStore);
+                        // 服务端 CertificateManager 在启动时已把 TrustedUserCertificates /
+                        // UserIssuerCertificates 映射到 Users 信任列表，直接按 Users 信任列表校验。
+                        m_userCertificateValidator = CertificateManager;
 
                         // 用户证书验证必须严格校验，关闭自动接受未受信任证书，
-                        // 否则 UpdateAsync 带入的 AutoAcceptUntrustedCertificates 会放行任意用户证书。
-                        certificateValidator.AutoAcceptUntrustedCertificates = false;
-                        // set custom validator for user certificates.
-                        m_userCertificateValidator = certificateValidator.GetChannelValidator();
+                        // 否则配置中的 AutoAcceptUntrustedCertificates 会放行任意用户证书。
+                        m_userCertificateValidator.AutoAcceptUntrustedCertificates = false;
                     }
                 }
             }
         }
 
         /// <summary>
-        /// 当客户端试图更改身份时调用
+        /// 自定义身份认证器：替代已过时的 SessionManager.ImpersonateUser 事件，
+        /// 按 AType 校验匿名/用户名/证书三种用户令牌，逻辑与原事件完全一致。
         /// </summary>
-        private void SessionManager_ImpersonateUser(ISession session, ImpersonateEventArgs args)
+        private sealed class SnetUserTokenAuthenticator : IUserTokenAuthenticator
         {
-            switch (AType)
+            private readonly ReferenceServer m_server;
+
+            public SnetUserTokenAuthenticator(ReferenceServer server)
             {
-                case AuType.Anonymous:
-                    //匿名
-                    if (args.NewIdentity is AnonymousIdentityToken)
-                    {
-                        args.Identity = new RoleBasedIdentity(new UserIdentity(), new List<Role>() { Role.Anonymous });
-                        return;
-                    }
-                    break;
-                case AuType.UserName:
-                    // 账号密码
-                    UserNameIdentityToken userNameToken = args.NewIdentity as UserNameIdentityToken;
-                    if (userNameToken != null)
-                    {
-                        args.Identity = VerifyPassword(userNameToken);
-                        return;
-                    }
-                    break;
-                case AuType.Certificate:
-                    //证书
-                    X509IdentityToken x509Token = args.NewIdentity as X509IdentityToken;
-                    if (x509Token != null)
-                    {
-                        VerifyUserTokenCertificate(x509Token.GetOrCreateCertificate(MessageContext.Telemetry));
-                        args.Identity = new RoleBasedIdentity(new UserIdentity(x509Token), new List<Role>() { Role.AuthenticatedUser });
-                        return;
-                    }
-                    break;
+                m_server = server;
             }
-            throw ServiceResultException.Create(StatusCodes.BadIdentityTokenInvalid, "不支持用户令牌类型: {0}.", args.NewIdentity);
+
+            public UserTokenType TokenType => m_server.AType switch
+            {
+                AuType.Anonymous => UserTokenType.Anonymous,
+                AuType.UserName => UserTokenType.UserName,
+                _ => UserTokenType.Certificate
+            };
+
+            public string? IssuedTokenProfileUri => null;
+
+            public ValueTask<AuthenticationResult> AuthenticateAsync(
+                AuthenticationContext context,
+                CancellationToken ct = default)
+            {
+                switch (m_server.AType)
+                {
+                    case AuType.Anonymous:
+                        //匿名
+                        if (context.TokenHandler.Token is AnonymousIdentityToken)
+                        {
+                            return new ValueTask<AuthenticationResult>(AuthenticationResult.Accept(
+                                new RoleBasedIdentity(
+                                    new UserIdentity(),
+                                    [Role.Anonymous],
+                                    context.MessageContext.NamespaceUris)));
+                        }
+                        break;
+                    case AuType.UserName:
+                        // 账号密码
+                        if (context.TokenHandler is UserNameIdentityTokenHandler userNameHandler)
+                        {
+                            return new ValueTask<AuthenticationResult>(AuthenticationResult.Accept(
+                                m_server.VerifyPassword(
+                                    userNameHandler.UserName,
+                                    userNameHandler.DecryptedPassword,
+                                    context.MessageContext.NamespaceUris)));
+                        }
+                        break;
+                    case AuType.Certificate:
+                        //证书
+                        if (context.TokenHandler is X509IdentityTokenHandler x509Handler &&
+                            x509Handler.Token is X509IdentityToken x509Token)
+                        {
+                            ct.ThrowIfCancellationRequested();
+                            using var userCertificate = Certificate.FromRawData(x509Token.CertificateData);
+                            m_server.VerifyUserTokenCertificate(userCertificate);
+                            return new ValueTask<AuthenticationResult>(AuthenticationResult.Accept(
+                                new RoleBasedIdentity(
+                                    new UserIdentity(x509Token),
+                                    [Role.AuthenticatedUser],
+                                    context.MessageContext.NamespaceUris)));
+                        }
+                        break;
+                }
+                return new ValueTask<AuthenticationResult>(
+                    AuthenticationResult.Reject(ServiceResult.Create(
+                        StatusCodes.BadIdentityTokenInvalid,
+                        "不支持用户令牌类型")));
+            }
         }
 
         /// <summary>
@@ -358,17 +394,16 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// </summary>
         /// <param name="certificate"></param>
         /// <exception cref="ServiceResultException"></exception>
-        private void VerifyUserTokenCertificate(X509Certificate2 certificate)
+        private void VerifyUserTokenCertificate(Certificate userCertificate)
         {
             try
             {
-                if (m_userCertificateValidator != null)
+                CertificateValidationResult result = (m_userCertificateValidator ?? CertificateManager!)
+                    .ValidateAsync(userCertificate, TrustListIdentifier.Users, default)
+                    .GetAwaiter().GetResult();
+                if (!result.IsValid)
                 {
-                    m_userCertificateValidator.ValidateAsync(certificate, default).GetAwaiter().GetResult();
-                }
-                else
-                {
-                    CertificateValidator.ValidateAsync(certificate, default).GetAwaiter().GetResult();
+                    throw new ServiceResultException(result.StatusCode);
                 }
             }
             catch (Exception e)
@@ -382,7 +417,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         "InvalidCertificate",
                         "en-US",
                         "'{0}' 是无效的用户证书",
-                        certificate.Subject);
+                        userCertificate.Subject);
 
                     result = StatusCodes.BadIdentityTokenInvalid;
                 }
@@ -392,7 +427,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                         "UntrustedCertificate",
                         "en-US",
                         "'{0}' 不是受信任用户证书",
-                        certificate.Subject);
+                        userCertificate.Subject);
                 }
 
                 // create an exception with a vendor defined sub-code.
@@ -407,10 +442,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <summary>
         /// 验证账号密码
         /// </summary>
-        private IUserIdentity VerifyPassword(UserNameIdentityToken userNameToken)
+        private IUserIdentity VerifyPassword(string userName, byte[] password, NamespaceTable namespaces)
         {
-            string userName = userNameToken.UserName;
-            byte[] password = userNameToken.DecryptedPassword;
             if (string.IsNullOrEmpty(userName))
             {
                 throw ServiceResultException.Create(StatusCodes.BadIdentityTokenInvalid,
@@ -435,18 +468,20 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
                 throw new ServiceResultException(
                     new ServiceResult(
                         LoadServerProperties().ProductUri,
-                        new StatusCode(StatusCodes.BadUserAccessDenied, "账号或密码错误"),
+                        new StatusCode(StatusCodes.BadUserAccessDenied.Code, "账号或密码错误"),
                         new LocalizedText(info)));
             }
             return new RoleBasedIdentity(
-                new UserIdentity(userNameToken),
-                [Role.AuthenticatedUser]);
+                new UserIdentity(
+                    new UserNameIdentityToken { UserName = userName }),
+                [Role.AuthenticatedUser],
+                namespaces);
         }
 
         #endregion
 
         #region Private Fields
-        private ICertificateValidator m_userCertificateValidator;
+        private CertificateManager? m_userCertificateValidator;
         #endregion
     }
 }

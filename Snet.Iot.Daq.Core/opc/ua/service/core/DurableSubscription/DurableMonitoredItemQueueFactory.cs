@@ -47,7 +47,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
 
         private static readonly JsonSerializerSettings s_settings = new()
         {
-            TypeNameHandling = TypeNameHandling.All
+            TypeNameHandling = TypeNameHandling.All,
+            SerializationBinder = new SafeSerializationBinder()
         };
 
         private const string kQueueDirectory = "Queues";
@@ -280,11 +281,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
             {
                 foreach (DurableEventMonitoredItemQueue queue in m_eventQueues.Values)
                 {
-                    Utils.SilentDispose(queue);
+                    queue?.Dispose();
                 }
                 foreach (DurableDataChangeMonitoredItemQueue queue in m_dataChangeQueues.Values)
                 {
-                    Utils.SilentDispose(queue);
+                    queue?.Dispose();
                 }
                 m_dataChangeQueues = null;
                 m_eventQueues = null;
