@@ -114,6 +114,16 @@
                 await Localization.SetLanguageAsync(saved);
         }
         catch { }
+
+        // 同步服务端主题：实际配色由前端 JS（localStorage + data-theme）决定，服务器重启后服务端
+        // ThemeService 回到默认 dark，不同步会导致主题切换按钮的图标与真实主题不一致（需点一次才纠正）
+        try
+        {
+            var savedTheme = await JS.InvokeAsync<string>("snet.getTheme");
+            if (savedTheme is "dark" or "light")
+                Theme.SetDark(savedTheme == "dark");
+        }
+        catch { }
     }
 
     private Task SetZhAsync() => SetLangAsync("zh");
