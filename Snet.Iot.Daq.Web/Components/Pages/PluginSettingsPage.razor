@@ -1,4 +1,4 @@
-@page "/plugins/settings"
+﻿@page "/plugins/settings"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -70,7 +70,7 @@
                             <span class="spacer"></span>
                             <span class="tree-actions">
                                 <span class="tree-actions-expand @(IsPluginActionsOpen(item) ? "open" : "")">
-                                    <button class="btn btn-sm btn-primary" @onclick="() => AddConfigForPluginAsync(item)"><i class="bi bi-plus-circle"></i>@T("添加配置")</button>
+                                    <button class="btn btn-sm" @onclick="() => AddConfigForPluginAsync(item)"><i class="bi bi-plus-circle"></i>@T("添加配置")</button>
                                     <button class="btn btn-sm btn-danger" @onclick="() => RemovePluginAsync(item)"><i class="bi bi-trash"></i>@T("移除")</button>
                                 </span>
                                 <button class="btn btn-icon tree-actions-toggle" @onclick:stopPropagation @onclick="() => TogglePluginActions(item)" title="@T("操作")">
@@ -117,7 +117,7 @@
                             <span class="spacer"></span>
                             <span class="tree-actions">
                                 <span class="tree-actions-expand @(IsConfigActionsOpen(item) ? "open" : "")">
-                                    <button class="btn btn-sm btn-primary" @onclick="() => EditConfigAsync(item)"><i class="bi bi-pencil"></i>@T("修改")</button>
+                                    <button class="btn btn-sm" @onclick="() => EditConfigAsync(item)"><i class="bi bi-pencil"></i>@T("修改")</button>
                                     @if (item.Type == PluginType.Daq)
                                     {
                                         <button class="btn btn-sm" @onclick="@(() => OpenDaqTest(item, "read"))"><i class="bi bi-eye"></i>@T("读取")</button>

@@ -31,12 +31,16 @@
     --primary: #0EA5E9;
     --primary-hover: #38BDF8;
     --primary-soft: rgba(14, 165, 233, .14);
+    --focus-ring: var(--primary); /* 键盘焦点外框统一颜色（随明暗主色） */
     /* 状态色：运行绿 / 警告深橙（比主色更红一档）/ 报警红 / 信息中性灰 */
     --success: #4ADE80;
+    --success-strong: #86EFAC;
     --success-soft: rgba(74, 222, 128, .12);
     --warning: #FB923C;
+    --warning-strong: #FDBA74;
     --warning-soft: rgba(251, 146, 60, .12);
     --danger: #F87171;
+    --danger-strong: #FCA5A5;
     --danger-soft: rgba(248, 113, 113, .12);
     --info: #A1A1AA;
     --info-soft: rgba(255, 255, 255, .08);
@@ -130,17 +134,20 @@
     --primary: #0369A1;
     --primary-hover: #0C4A6E;
     --primary-soft: rgba(3, 105, 161, .10);
-    --success: #3F6212;
-    --success-soft: rgba(63, 98, 18, .10);
-    --warning: #C2410C;
-    --warning-soft: rgba(194, 65, 12, .10);
-    --danger: #B91C1C;
-    --danger-soft: rgba(185, 28, 28, .10);
+    --success: #15803D;
+    --success-strong: #166534;
+    --success-soft: rgba(21, 128, 61, .10);
+    --warning: #B45309;
+    --warning-strong: #92400E;
+    --warning-soft: rgba(180, 83, 9, .10);
+    --danger: #BE123C;
+    --danger-strong: #881337;
+    --danger-soft: rgba(190, 18, 60, .10);
     --info: #52525B;
     --info-soft: rgba(82, 82, 91, .10);
     --led-on: #15803D;
     --led-off: #A1A1AA;
-    --led-error: #B91C1C;
+    --led-error: #BE123C;
     --shadow-sm: 0 1px 2px rgba(24, 24, 27, .06);
     --shadow: 0 6px 24px rgba(24, 24, 27, .08);
     --shadow-lg: 0 20px 48px rgba(24, 24, 27, .16);
@@ -195,7 +202,7 @@ body {
 ::selection { background: var(--selection); }
 /* 键盘焦点：全局统一可见焦点环（无障碍） */
 :focus-visible {
-    outline: 2px solid var(--primary);
+    outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
 }
 /* 表单控件除外：选中态仅用边框变色表达（同旧版行为），不画四周辉光环 */
@@ -565,14 +572,16 @@ a:hover { color: var(--primary-hover); }
     border-color: var(--primary);
     color: var(--primary);
 }
-.btn-primary:hover { background: color-mix(in srgb, var(--primary) 20%, transparent); border-color: var(--primary); }
+.btn-primary:hover { background: color-mix(in srgb, var(--primary) 26%, transparent); border-color: var(--primary); }
+.btn-primary:active { background: color-mix(in srgb, var(--primary) 36%, transparent); border-color: var(--primary); }
 
 .btn-danger {
     background: var(--danger-soft);
     border-color: var(--danger);
     color: var(--danger);
 }
-.btn-danger:hover { background: color-mix(in srgb, var(--danger) 20%, transparent); border-color: var(--danger); }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 26%, transparent); border-color: var(--danger); }
+.btn-danger:active { background: color-mix(in srgb, var(--danger) 36%, transparent); border-color: var(--danger); }
 
 .btn-icon {
     width: 34px;
@@ -708,9 +717,9 @@ html[lang^="zh"] .modal .form-field > label::after { content: "\FF1A"; }
     white-space: nowrap;
 }
 .tag-primary { color: var(--primary); border-color: var(--primary); background: var(--primary-soft); }
-.tag-success { color: var(--success); border-color: var(--success); background: var(--success-soft); }
-.tag-warning { color: var(--warning); border-color: var(--warning); background: var(--warning-soft); }
-.tag-danger { color: var(--danger); border-color: var(--danger); background: var(--danger-soft); }
+.tag-success { color: var(--success-strong); border-color: var(--success); background: var(--success-soft); }
+.tag-warning { color: var(--warning-strong); border-color: var(--warning); background: var(--warning-soft); }
+.tag-danger { color: var(--danger-strong); border-color: var(--danger); background: var(--danger-soft); }
 
 /* 空态 / 骨架屏 */
 .empty {
