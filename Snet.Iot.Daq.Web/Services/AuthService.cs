@@ -38,7 +38,8 @@ public class AuthService
             int FailedAttempts,
             DateTime? LockoutUntil,
             string Role = RoleAdmin,
-            bool IsDisabled = false);
+            bool IsDisabled = false,
+            string? SecurityStamp = null);
 
     private sealed record UsersFile(List<UserRecord> Users);
 
@@ -48,11 +49,11 @@ public class AuthService
     #endregion
 
     #region 加载与持久化
-    private List<UserRecord>? _cache;
+    private volatile UserRecord[]? _cache;
 
     private List<UserRecord> Load()
     {
-        if (_cache is not null) return _cache;
+        if (_cache is not null) return _cache.ToList();
         if (File.Exists(_path))
         {
             try
@@ -64,27 +65,28 @@ public class AuthService
                     var legacy = JsonSerializer.Deserialize<UserRecord>(json);
                     if (legacy is not null && !string.IsNullOrEmpty(legacy.Username) && !string.IsNullOrEmpty(legacy.PasswordHash))
                     {
-                        _cache = new List<UserRecord> { legacy with { Role = RoleAdmin } };
-                        Save();
-                        return _cache;
+                        var migrated = new List<UserRecord> { legacy with { Role = RoleAdmin } };
+                        Save(migrated);
+                        return migrated;
                     }
                 }
                 var file = JsonSerializer.Deserialize<UsersFile>(json);
                 if (file?.Users is { Count: > 0 })
                 {
-                    _cache = file.Users;
-                    return _cache;
+                    _cache = file.Users.ToArray();
+                    return file.Users;
                 }
             }
             catch (Exception ex)
             {
-                // 凭据文件损坏：自愈重建为默认账号（snet/123456 + 强制改密），避免登录接口持续 500
-                Console.Error.WriteLine($"[AuthService] User.json 损坏，已重建默认账号: {ex.Message}");
+                // 已存在的凭据损坏必须保留并拒绝加载，不能恢复公开默认密码。
+                throw new InvalidDataException("无法读取 User.json，已保留原文件；请恢复凭据备份。", ex);
             }
+            throw new InvalidDataException("User.json 中没有有效用户，已保留原文件。请恢复凭据备份。");
         }
-        _cache = new List<UserRecord> { CreateDefault() };
-        Save();
-        return _cache;
+        var initial = new List<UserRecord> { CreateDefault() };
+        Save(initial);
+        return initial;
     }
 
     private UserRecord CreateDefault()
@@ -100,11 +102,10 @@ public class AuthService
             Role: RoleAdmin);
     }
 
-    private void Save()
+    private void Save(List<UserRecord> users)
     {
-        if (_cache is null) return;
         Directory.CreateDirectory(Path.GetDirectoryName(_path)!);
-        var json = JsonSerializer.Serialize(new UsersFile(_cache), new JsonSerializerOptions
+        var json = JsonSerializer.Serialize(new UsersFile(users), new JsonSerializerOptions
         {
             WriteIndented = true,
             Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
@@ -113,6 +114,7 @@ public class AuthService
         var tmp = _path + ".tmp";
         File.WriteAllText(tmp, json);
         File.Move(tmp, _path, overwrite: true);
+        _cache = users.ToArray();
     }
 
     #endregion
@@ -176,7 +178,7 @@ public class AuthService
                 return (false, "UserDisabled");
             // 登录成功：清零失败计数
             users[index] = user with { FailedAttempts = 0, LockoutUntil = null };
-            Save();
+            Save(users);
             return (true, null);
         }
         finally
@@ -194,10 +196,24 @@ public class AuthService
         users[index] = failed >= MaxFailedAttempts
             ? user with { FailedAttempts = failed, LockoutUntil = DateTime.UtcNow + LockoutDuration }
             : user with { FailedAttempts = failed };
-        Save();
+        Save(users);
     }
 
     public bool MustChangePassword(string username) => FindUser(username)?.MustChangePassword ?? false;
+
+    internal async Task<bool> IsSessionValidAsync(System.Security.Claims.ClaimsPrincipal principal)
+    {
+        await _fileLock.WaitAsync();
+        try
+        {
+            var user = FindUser(principal.Identity?.Name ?? "");
+            return user is not null && !user.IsDisabled
+                && principal.IsInRole(user.Role)
+                && principal.FindFirst("securityStamp")?.Value == (user.SecurityStamp ?? user.Salt)
+                && principal.HasClaim("mustChangePassword", "true") == user.MustChangePassword;
+        }
+        finally { _fileLock.Release(); }
+    }
 
     #endregion
 
@@ -208,10 +224,22 @@ public class AuthService
         try
         {
             var user = FindUser(username);
+            if (user?.IsDisabled == true) return (false, "UserDisabled");
+            if (user?.LockoutUntil > DateTime.UtcNow) return (false, "AccountLocked");
             if (user is null
                 || !TryParseSalt(user.Salt, out var oldSalt)
                 || user.PasswordHash != HashPassword(oldPassword, oldSalt))
+            {
+                if (user is not null)
+                {
+                    var records = Load();
+                    var failureIndex = records.FindIndex(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
+                    if (user.LockoutUntil <= DateTime.UtcNow)
+                        user = user with { FailedAttempts = 0, LockoutUntil = null };
+                    RegisterFailure(user, records, failureIndex);
+                }
                 return (false, "InvalidOldPassword");
+            }
             if (newPassword.Length < 6)
                 return (false, "PasswordTooShort");
             var salt = RandomNumberGenerator.GetBytes(SaltSize);
@@ -223,11 +251,12 @@ public class AuthService
             {
                 PasswordHash = HashPassword(newPassword, salt),
                 Salt = Convert.ToBase64String(salt),
+                SecurityStamp = Guid.NewGuid().ToString("N"),
                 MustChangePassword = false,
                 FailedAttempts = 0,
                 LockoutUntil = null
             };
-            Save();
+            Save(users);
             return (true, null);
         }
         finally
@@ -272,7 +301,7 @@ public class AuthService
                 FailedAttempts: 0,
                 LockoutUntil: null,
                 Role: role == RoleAdmin ? RoleAdmin : RoleUser));
-            Save();
+            Save(users);
             return (true, null);
         }
         finally
@@ -290,12 +319,12 @@ public class AuthService
             var users = Load();
             var target = users.FirstOrDefault(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
             if (target is null) return (false, "UserNotFound");
-            if (target.Role == RoleAdmin && users.Count(u => u.Role == RoleAdmin) <= 1)
+            if (target.Role == RoleAdmin && !target.IsDisabled && users.Count(u => u.Role == RoleAdmin && !u.IsDisabled) <= 1)
                 return (false, "LastAdmin");
             if (string.Equals(username, currentUser, StringComparison.OrdinalIgnoreCase))
                 return (false, "CannotRemoveSelf");
             users.Remove(target);
-            Save();
+            Save(users);
             return (true, null);
         }
         finally
@@ -320,11 +349,12 @@ public class AuthService
             {
                 PasswordHash = HashPassword(newPassword, salt),
                 Salt = Convert.ToBase64String(salt),
-                MustChangePassword = false, // 管理员已输入新密码，用户直接可用，无需再强制首登改密
+                SecurityStamp = Guid.NewGuid().ToString("N"),
+                MustChangePassword = false,
                 FailedAttempts = 0,
                 LockoutUntil = null
             };
-            Save();
+            Save(users);
             return (true, null);
         }
         finally
@@ -343,12 +373,12 @@ public class AuthService
             var index = users.FindIndex(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
             if (index < 0) return (false, "UserNotFound");
             var target = users[index];
-            if (disabled && target.Role == RoleAdmin && users.Count(u => u.Role == RoleAdmin) <= 1)
+            if (disabled && target.Role == RoleAdmin && !target.IsDisabled && users.Count(u => u.Role == RoleAdmin && !u.IsDisabled) <= 1)
                 return (false, "LastAdmin");
             if (disabled && string.Equals(username, currentUser, StringComparison.OrdinalIgnoreCase))
                 return (false, "CannotDisableSelf");
-            users[index] = target with { IsDisabled = disabled };
-            Save();
+            users[index] = target with { IsDisabled = disabled, SecurityStamp = Guid.NewGuid().ToString("N") };
+            Save(users);
             return (true, null);
         }
         finally
@@ -367,10 +397,10 @@ public class AuthService
             var index = users.FindIndex(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
             if (index < 0) return (false, "UserNotFound");
             var target = users[index];
-            if (target.Role == RoleAdmin && role != RoleAdmin && users.Count(u => u.Role == RoleAdmin) <= 1)
+            if (target.Role == RoleAdmin && !target.IsDisabled && role != RoleAdmin && users.Count(u => u.Role == RoleAdmin && !u.IsDisabled) <= 1)
                 return (false, "LastAdmin");
-            users[index] = target with { Role = role == RoleAdmin ? RoleAdmin : RoleUser };
-            Save();
+            users[index] = target with { Role = role == RoleAdmin ? RoleAdmin : RoleUser, SecurityStamp = Guid.NewGuid().ToString("N") };
+            Save(users);
             return (true, null);
         }
         finally
@@ -384,7 +414,7 @@ public class AuthService
     #region 默认账号初始化
     private void EnsureDefaultUser()
     {
-        if (!File.Exists(_path)) Load();
+        Load();
     }
     #endregion
 }

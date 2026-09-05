@@ -769,4 +769,7 @@
   <data name="修改设备配置" xml:space="preserve">
     <value>ModifyDeviceConfiguration</value>
   </data>
+  <data name="插件默认路径：" xml:space="preserve">
+    <value>Default path for plugins:</value>
+  </data>
 </root>

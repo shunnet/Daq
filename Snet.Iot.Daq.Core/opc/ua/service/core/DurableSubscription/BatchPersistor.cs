@@ -105,38 +105,33 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.DurableSubscription
             string filePath = Path.Combine(
                 s_storage_path,
                 $"{batch.MonitoredItemId}_{batch.Id}{kBaseFilename}");
-            object result = null;
             try
             {
-                if (File.Exists(filePath))
+                // 缺文件或损坏数据不能在后台任务中解引用 null，也不能删除未恢复的数据。
+                string json = File.ReadAllText(filePath);
+                var restored = JsonConvert.DeserializeObject(json, batch.GetType(), s_settings);
+                lock (batch)
                 {
-                    string json = File.ReadAllText(filePath);
-                    result = JsonConvert.DeserializeObject(json, batch.GetType(), s_settings);
-                    File.Delete(filePath);
+                    if (batch is DataChangeBatch data && restored is DataChangeBatch restoredData)
+                        data.Restore(restoredData.Values);
+                    else if (batch is EventBatch events && restored is EventBatch restoredEvents)
+                        events.Restore(restoredEvents.Events);
+                    else
+                        throw new InvalidDataException("Unexpected persisted batch data.");
                 }
+                File.Delete(filePath);
             }
             catch (Exception ex)
             {
                 m_logger.LogError(ex, "Failed to restore batch");
-
-                batch.RestoreInProgress = false;
-                m_batchesToRestore.TryRemove(batch.Id, out _);
-
-                return;
             }
-            lock (batch)
+            finally
             {
-                if (batch is DataChangeBatch dataChangeBatch)
+                lock (batch)
                 {
-                    var newBatch = result as DataChangeBatch;
-                    dataChangeBatch.Restore(newBatch.Values);
+                    batch.RestoreInProgress = false;
+                    m_batchesToRestore.TryRemove(batch.Id, out _);
                 }
-                else if (batch is EventBatch eventBatch)
-                {
-                    var newBatch = result as EventBatch;
-                    eventBatch.Restore(newBatch.Events);
-                }
-                m_batchesToRestore.TryRemove(batch.Id, out _);
             }
         }
 

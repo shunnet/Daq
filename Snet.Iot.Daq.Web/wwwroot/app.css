@@ -535,6 +535,11 @@ a:hover { color: var(--primary-hover); }
     font-size: 0.9rem;
     letter-spacing: 0.02em;
 }
+/* 主页面标题栏统一采用“插件设置”的 36px 控件基准：36px 内容 + 20px 内边距 + 1px 分隔线。
+   结构选择器让已运行的开发实例只刷新 CSS 即可生效；class 用于新编译页面明确表达用途。 */
+.app-main > .card > .card-header,
+.console-devices > .card-header,
+.page-card-header { min-height: 57px; }
 .card-title {
     font-size: 0.9rem;
     font-weight: 600;
@@ -857,7 +862,7 @@ html[lang^="zh"] .modal .form-field > label::after { content: "\FF1A"; }
 /* 表头区：固定满宽，不被竖向滚动条压住 */
 .snet-table-head {
     flex: none;
-    background: var(--surface-2);
+    background: var(--surface);
     overflow: hidden;
     /* 预留与数据区滚动条等宽的右内边距，保证表头/正文各列纵向对齐（webkit 细滚动条 8px） */
     padding-right: 8px;
@@ -893,7 +898,7 @@ table.snet-table th, table.snet-table td {
 table.snet-table th {
     color: var(--text-secondary);
     font-weight: 600;
-    background: var(--surface-2);
+    background: var(--surface);
 }
 table.snet-table th i {
     margin-right: 5px;
@@ -1308,10 +1313,20 @@ html[lang^="zh"] .config-summary-label::after { content: "\FF1A"; }
     padding: 4px 8px;
     border-radius: var(--radius-sm);
     cursor: pointer;
+    transition: background-color var(--dur-fast), color var(--dur-fast), box-shadow var(--dur-fast);
 }
 .tree-node-row:hover { background: var(--bg-hover); color: var(--text); }
-/* 选中态：仅加粗（不用蓝色背景/指示条/文字/图标，图标保持默认次要色） */
-.tree-node-row.selected { font-weight: 600; }
+/* 所有树共用选中态：软色底 + 左侧指示条 + 字重，兼顾明暗主题与非颜色识别。 */
+.tree-node-row.selected {
+    background: var(--primary-soft);
+    color: var(--text);
+    font-weight: 600;
+    box-shadow: inset 3px 0 0 var(--primary);
+}
+.tree-node-row.selected:hover {
+    background: color-mix(in srgb, var(--primary) 18%, transparent);
+}
+.tree-node-row.selected .tree-icon { color: var(--primary); }
 .tree-toggle {
     width: 24px;
     height: 24px;
@@ -1425,9 +1440,8 @@ html[lang^="zh"] .config-summary-label::after { content: "\FF1A"; }
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
     margin-bottom: 10px;
-    /* 玻璃卡面 + 顶部高光：与项目设置卡片同一质感，不再用纯灰底 */
-    background: linear-gradient(180deg, var(--tint), transparent), var(--glass-card);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, .05);
+    /* 与项目详情主体使用同一中性表面色，避免形成额外的灰色渐变色块。 */
+    background: var(--surface);
 }
 /* 设备图标：品牌色软底圆角容器（与 device-head / modal-title 图标同语言） */
 .detail-toolbar > svg {
@@ -2305,7 +2319,7 @@ table.snet-table th {
     font-size: 12px;
     letter-spacing: .03em;
     border-bottom-color: var(--border-strong);
-    background: linear-gradient(180deg, var(--tint), transparent), var(--surface-2);
+    background: var(--surface);
 }
 table.snet-table td { transition: background-color var(--dur-fast); }
 

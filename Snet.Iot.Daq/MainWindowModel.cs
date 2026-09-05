@@ -28,7 +28,8 @@ namespace Snet.Iot.Daq
 
             this._settings = settings;
             LanguageHandler.OnLanguageEventAsync += LanguageHandler_OnLanguageEventAsync;
-            LanguageHandler_OnLanguageEventAsync(this, new EventLanguageResult()).Wait();
+            SystemTitle = LanguageHandler.GetLanguageValue("SystemTitle", App.LanguageOperate)
+                + (_settings.IsRunAsAdmin() ? " [ " + LanguageHandler.GetLanguageValue("管理员运行", App.LanguageOperate) + " ]" : string.Empty);
         }
 
         /// <summary>

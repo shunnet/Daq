@@ -1,3 +1,4 @@
+@implements IDisposable
 @namespace Snet.Iot.Daq.Web.Components.Shared
 @using Snet.Iot.Daq.Web.Services
 @inject LocalizationService Localization
@@ -7,20 +8,20 @@
     <nav class="pagebar-nav" aria-label="@T("分页")">
         <ul class="pagination justify-content-center mb-0">
             <li class="page-item @(PageIndex <= 1 ? "disabled" : "")">
-                <a class="page-link" @onclick="() => OnPageChange.InvokeAsync(PageIndex - 1)" aria-label="Previous">
+                <button type="button" class="page-link" disabled="@(PageIndex <= 1)" @onclick="() => OnPageChange.InvokeAsync(PageIndex - 1)" aria-label="Previous">
                     <i class="bi bi-chevron-double-left"></i>
-                </a>
+                </button>
             </li>
             @foreach (var item in PageItems)
             {
                 <li class="page-item @(item == PageIndex ? "active" : "")">
-                    <a class="page-link" @onclick="() => OnPageChange.InvokeAsync(item)">@item</a>
+                    <button type="button" class="page-link" @onclick="() => OnPageChange.InvokeAsync(item)">@item</button>
                 </li>
             }
             <li class="page-item @(PageIndex >= TotalPages ? "disabled" : "")">
-                <a class="page-link" @onclick="() => OnPageChange.InvokeAsync(PageIndex + 1)" aria-label="Next">
+                <button type="button" class="page-link" disabled="@(PageIndex >= TotalPages)" @onclick="() => OnPageChange.InvokeAsync(PageIndex + 1)" aria-label="Next">
                     <i class="bi bi-chevron-double-right"></i>
-                </a>
+                </button>
             </li>
         </ul>
         <div class="pagebar-meta">
@@ -57,7 +58,7 @@
 
     private string T(string key) => Localization.T(key);
 
-    private int TotalPages => Total == 0 ? 1 : (int)Math.Ceiling(Total / (double)PageSize);
+    private int TotalPages => Total == 0 ? 1 : (int)Math.Ceiling(Total / (double)Math.Max(1, PageSize));
 
     /// <summary>页码窗口：当前页前后各 2 页（对齐 Snet.Blog PageSplit 分块思想）</summary>
     private IEnumerable<int> PageItems
@@ -66,7 +67,7 @@
         {
             var start = Math.Max(1, PageIndex - 2);
             var end = Math.Min(TotalPages, PageIndex + 2);
-            return Enumerable.Range(start, end - start + 1);
+            return Enumerable.Range(start, Math.Max(0, end - start + 1));
         }
     }
 

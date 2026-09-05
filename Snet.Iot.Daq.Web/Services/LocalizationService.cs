@@ -1,5 +1,4 @@
-﻿using Snet.Core.handler;
-using System.Collections;
+﻿using System.Collections;
 using System.Globalization;
 using System.Resources;
 
@@ -379,16 +378,13 @@ public class LocalizationService
     #endregion
 
     #region 语言切换
-    public async Task SetLanguageAsync(string lang)
+    public Task SetLanguageAsync(string lang)
     {
-        if (lang == CurrentLanguage) return;
+        if (lang == CurrentLanguage) return Task.CompletedTask;
         CurrentLanguage = lang == "en" ? "en" : "zh";
-        // 对齐 WPF：先同步切换 Core 全局语言（LanguageHandler 静态 cultureInfo），
-        // 插件 / 服务端 / 采集错误等底层 GetLanguageValue 消息全部跟随
-        await (CurrentLanguage == "en" ? LanguageType.en : LanguageType.zh).SetLanguageAsync();
-        CultureInfo.DefaultThreadCurrentUICulture = CurrentLanguage == "en" ? CultureInfo.GetCultureInfo("en") : _zhCulture;
-        CultureInfo.DefaultThreadCurrentCulture = CultureInfo.GetCultureInfo("zh-CN");
+        // 浏览器语言仅属于当前电路，不能修改进程级 Core 语言和数值格式。
         LanguageChanged?.Invoke();
+        return Task.CompletedTask;
     }
     #endregion
 }

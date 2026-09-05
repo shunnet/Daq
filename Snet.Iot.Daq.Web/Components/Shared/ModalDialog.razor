@@ -1,5 +1,7 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 <div class="modal-overlay">
-    <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal" role="dialog" aria-modal="true" aria-label="@Title" tabindex="-1" @ref="_dialog" @onkeydown="OnKeyDown">
         <div class="modal-header">
             <span class="modal-title-text">
                 @if (!string.IsNullOrEmpty(TitleIcon))
@@ -27,6 +29,22 @@
 </div>
 
 @code {
+    private ElementReference _dialog;
+    private string? _focusId;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _focusId = await JS.InvokeAsync<string>("snet.modalFocus.open", _dialog);
+    }
+
+    private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? Close() : Task.CompletedTask;
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (_focusId is not null) await JS.InvokeVoidAsync("snet.modalFocus.close", _focusId); }
+        catch (JSDisconnectedException) { }
+    }
+
     [Parameter] public string Title { get; set; } = "";
     /// <summary>标题左侧图标（bootstrap icons 类名，如 bi-plus-circle），空则无图标</summary>
     [Parameter] public string? TitleIcon { get; set; }

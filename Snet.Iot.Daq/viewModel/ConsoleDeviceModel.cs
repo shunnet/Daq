@@ -172,6 +172,8 @@ namespace Snet.Iot.Daq.viewModel
         /// 数据事件通道
         /// </summary>
         private Channel<EventDataResult> DataSyncChannel;
+        private Task? _dataConsumerTask;
+        private Task? _uaConsumerTask;
 
         /// <summary>
         /// 全局消息取消通知
@@ -460,7 +462,7 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     if (folderStates.Count > 0)
                     {
-                        GlobalConfigModel.uaService.RemoveFolder([folderStates[0].NodeId]);
+                        GlobalConfigModel.uaService.RemoveFolder([folderStates[^1].NodeId]);
                         folderStates.Clear();
                         folderState = null;
                     }
@@ -489,13 +491,13 @@ namespace Snet.Iot.Daq.viewModel
                     if (UaSyncChannel == null)
                     {
                         UaSyncChannel = Channel.CreateBounded<AddressValue>(channel);
-                        _ = UaSyncChannelDataEventAsync(TokenSource.Token);
+                        _uaConsumerTask = UaSyncChannelDataEventAsync(TokenSource.Token);
                     }
 
                     if (DataSyncChannel == null)
                     {
                         DataSyncChannel = Channel.CreateBounded<EventDataResult>(channel);
-                        _ = DataSyncChannelDataEventAsync(TokenSource.Token);
+                        _dataConsumerTask = DataSyncChannelDataEventAsync(TokenSource.Token);
                     }
 
                     IsRun = true;
@@ -530,9 +532,14 @@ namespace Snet.Iot.Daq.viewModel
             if (TokenSource != null)
             {
                 TokenSource.Cancel();
-                TokenSource.Dispose();
-                TokenSource = null;
+
             }
+
+            await Task.WhenAll(_dataConsumerTask ?? Task.CompletedTask, _uaConsumerTask ?? Task.CompletedTask);
+            _dataConsumerTask = null;
+            _uaConsumerTask = null;
+            TokenSource?.Dispose();
+            TokenSource = null;
 
             if (DaqData.WebApi != null)
             {
@@ -695,7 +702,7 @@ namespace Snet.Iot.Daq.viewModel
                             {
                                 foreach (var nodeId in res)
                                 {
-                                    if (nodeId.Contains(format, StringComparison.Ordinal))
+                                    if (NodeId.TryParse(nodeId, out var parsedNodeId) && parsedNodeId.TryGetValue(out string identifier) && string.Equals(identifier, format[2..], StringComparison.Ordinal))
                                     {
                                         _addressMap[addressName] = nodeId;
                                         break;

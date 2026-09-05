@@ -1,5 +1,7 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 <div class="modal-overlay">
-    <div class="modal" role="alertdialog" aria-modal="true">
+    <div class="modal" role="alertdialog" aria-modal="true" aria-label="@Title" tabindex="-1" @ref="_dialog" @onkeydown="OnKeyDown">
         <div class="modal-header">
             <span class="modal-title-text">
                 <span class="modal-title-icon modal-title-icon-warning"><i class="bi bi-question-circle"></i></span>
@@ -22,6 +24,22 @@
 </div>
 
 @code {
+    private ElementReference _dialog;
+    private string? _focusId;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) _focusId = await JS.InvokeAsync<string>("snet.modalFocus.open", _dialog);
+    }
+
+    private Task OnKeyDown(KeyboardEventArgs e) => e.Key == "Escape" ? Cancel() : Task.CompletedTask;
+
+    public async ValueTask DisposeAsync()
+    {
+        try { if (_focusId is not null) await JS.InvokeVoidAsync("snet.modalFocus.close", _focusId); }
+        catch (JSDisconnectedException) { }
+    }
+
     [Parameter] public string Title { get; set; } = "确认";
     [Parameter] public string Message { get; set; } = "";
     [Parameter] public string CancelText { get; set; } = "取消";

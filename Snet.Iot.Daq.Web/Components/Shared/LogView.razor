@@ -1,6 +1,6 @@
 @namespace Snet.Iot.Daq.Web.Components.Shared
 
-<div class="log-view" @ref="_element" @onscroll="OnScroll">
+<div class="log-view" @ref="_element">
     @foreach (var line in Lines.TakeLast(MaxLines))
     {
         <div class="@Classify(line)">@line</div>
@@ -14,24 +14,24 @@
 
     private ElementReference _element;
     private List<string>? _renderedLines;
+    private int _renderedMaxLines;
 
     /// <summary>日志文本不随语言变化：仅当日志快照引用变化时才重渲染，隔离语言切换/父组件无关重渲染
     /// （2000 条日志全量渲染是页面最大开销，父组件每次 StateHasChanged 都会级联触发，ShouldRender 拦截后大幅提速）</summary>
-    protected override bool ShouldRender() => !ReferenceEquals(_renderedLines, Lines);
+    protected override bool ShouldRender() => !ReferenceEquals(_renderedLines, Lines) || _renderedMaxLines != MaxLines;
 
-    protected override void OnAfterRender(bool firstRender) => _renderedLines = Lines;
+    protected override void OnAfterRender(bool firstRender)
+    {
+        _renderedLines = Lines;
+        _renderedMaxLines = MaxLines;
+    }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
         // 新日志到达时自动滚到底部（默认跟随最新消息；用户上滚回溯时暂停跟随，回到底部恢复）
         if (firstRender)
-            await JS.InvokeVoidAsync("snet.logScroll.init");
+            await JS.InvokeVoidAsync("snet.logScroll.init", _element);
         await JS.InvokeVoidAsync("snet.logScroll.stick", _element);
-    }
-
-    private async Task OnScroll()
-    {
-        await JS.InvokeVoidAsync("snet.logScroll.onScroll", _element);
     }
 
     /// <summary>日志着色规则（与 WPF TextEditorControl 对齐）：[Info]→绿 / Error→红 / Mq·Daq·Service→蓝 / TRUE→绿 / FALSE→红</summary>

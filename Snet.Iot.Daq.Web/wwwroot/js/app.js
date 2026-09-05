@@ -1,4 +1,38 @@
 window.snet = {
+    modalFocus: {
+        entries: new Map(),
+        nextId: 0,
+        open: function (el) {
+            var id = String(++this.nextId);
+            var previous = document.activeElement;
+            var candidates = function () {
+                return Array.from(el.querySelectorAll('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), a[href], [tabindex="0"]'))
+                    .filter(function (node) { return node.getClientRects().length > 0; });
+            };
+            var handler = function (event) {
+                if (event.key !== 'Tab') return;
+                var items = candidates();
+                if (!items.length) { event.preventDefault(); el.focus(); return; }
+                var first = items[0], last = items[items.length - 1];
+                if (event.shiftKey && (document.activeElement === first || document.activeElement === el)) {
+                    event.preventDefault(); last.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault(); first.focus();
+                }
+            };
+            el.addEventListener('keydown', handler);
+            this.entries.set(id, { element: el, previous: previous, handler: handler });
+            (candidates()[0] || el).focus();
+            return id;
+        },
+        close: function (id) {
+            var entry = this.entries.get(id);
+            if (!entry) return;
+            entry.element.removeEventListener('keydown', entry.handler);
+            this.entries.delete(id);
+            if (entry.previous && entry.previous.isConnected) entry.previous.focus();
+        }
+    },
     /* 外部点击关闭：点击 .tree-actions 区域外任意处 → 回调全部注册方收起（移出不关闭，区域外点击才关闭） */
     outsideClick: {
         handlers: [],
@@ -56,14 +90,16 @@ window.snet = {
     },
     /* 日志自动跟随滚动：新日志到达时滚到底部；用户上滚回溯时暂停跟随 */
     logScroll: {
-        _auto: true,
-        init: function () { this._auto = true; },
-        stick: function (el) {
-            if (this._auto && el) el.scrollTop = el.scrollHeight;
+        init: function (el) {
+            if (!el || el._snetLogScroll) return;
+            el._snetLogAuto = true;
+            el._snetLogScroll = function () {
+                el._snetLogAuto = el.scrollHeight - (el.scrollTop + el.clientHeight) < 60;
+            };
+            el.addEventListener('scroll', el._snetLogScroll, { passive: true });
         },
-        onScroll: function (el) {
-            // 距底 < 60px 视为已回到底部，恢复自动跟随
-            this._auto = el.scrollHeight - (el.scrollTop + el.clientHeight) < 60;
+        stick: function (el) {
+            if (el && el._snetLogAuto) el.scrollTop = el.scrollHeight;
         }
     }
 };

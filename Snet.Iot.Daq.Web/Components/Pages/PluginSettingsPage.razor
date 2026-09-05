@@ -1,4 +1,5 @@
-﻿@page "/plugins/settings"
+@inject MenuCoordinator MenuCoordinator
+@page "/plugins/settings"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -828,7 +829,7 @@
             {
                 foreach (var old in _plugins.Where(p => Path.GetFullPath(p.PluginDetails.Path) == Path.GetFullPath(libPath)).ToList())
                 {
-                    try { PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
+                    try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
                 }
                 GC.Collect();
                 GC.WaitForPendingFinalizers();
@@ -841,7 +842,7 @@
             var iName = string.Format("Snet.Model.interface.I{0}", type);
             foreach (var name in names)
             {
-                try { PluginHandlerCore.PluginOperate.RemovePluginAsync(name); } catch { /* 未注册忽略 */ }
+                try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(name); } catch { /* 未注册忽略 */ }
             }
             try
             {

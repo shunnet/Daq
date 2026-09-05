@@ -1,3 +1,4 @@
+@implements IDisposable
 @inherits LayoutComponentBase
 @using System.Reflection
 @using System.Security.Claims
@@ -97,7 +98,7 @@
 
     private string T(string key) => Localization.T(key);
 
-    protected override async Task OnInitializedAsync()
+    protected override async Task OnParametersSetAsync()
     {
         if (AuthState is not null)
         {
@@ -105,6 +106,11 @@
             _isAdmin = state.User.Identity?.IsAuthenticated == true
                 && state.User.IsInRole(AuthService.RoleAdmin);
         }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
         // 同步服务端语言：UI 语言持久化在 localStorage（JS），服务器重启后服务端 Localization 回到默认 zh，
         // 不恢复会导致服务层消息（设备日志/Toast）始终中文
         try
@@ -124,6 +130,7 @@
                 Theme.SetDark(savedTheme == "dark");
         }
         catch { }
+        StateHasChanged();
     }
 
     private Task SetZhAsync() => SetLangAsync("zh");

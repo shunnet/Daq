@@ -1,4 +1,4 @@
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using System.Collections.Concurrent;
 
@@ -14,16 +14,15 @@ public class DeviceRuntimeManager
     #region 字段与事件
     private readonly ConcurrentDictionary<string, DeviceRuntime> _runtimes = new();
     private readonly LoggerBuffer _logger;
-    private readonly LocalizationService _localization;
+    private readonly LocalizationService _localization = new();
     private readonly object _syncLock = new();
 
     public event Action? RuntimesChanged;
     public event Action<DeviceRuntime>? RuntimeStateChanged;
 
-    public DeviceRuntimeManager(LoggerBuffer logger, AppStateService appState, LocalizationService localization)
+    public DeviceRuntimeManager(LoggerBuffer logger, AppStateService appState)
     {
         _logger = logger;
-        _localization = localization;
         // 感知更新：插件/地址/项目修改后立即同步设备快照（SN、层级、地址集）
         appState.EntityChanged += () => SyncFromProjects(appState);
     }
@@ -49,16 +48,7 @@ public class DeviceRuntimeManager
                 valid.Add(device.DaqDetails.Guid);
                 var runtime = _runtimes.GetOrAdd(device.DaqDetails.Guid, guid =>
                     new DeviceRuntime(device, () => appState.UaService, _logger.Push, rt => RuntimeStateChanged?.Invoke(rt), _localization));
-                // 配置快照刷新：参数/地址集变化时运行中设备自动重订阅（对齐 WPF 修改后自动 Retry）
-                var changed = runtime.RefreshSettings(device);
-                // 软启设备（IsSoftStart 持久化于项目树）：宿主启动/配置同步时自动恢复采集
-                if (device.IsSoftStart && !runtime.IsRun)
-                    _ = runtime.CollectAsync();
-                else if (changed && runtime.IsRun)
-                    _ = runtime.RetryAsync();
-                else if (changed && !runtime.IsRun)
-                    // 配置变更且未运行：清理旧 handler（插件实例缓存旧参数快照），下次手动采集用最新配置重建
-                    _ = runtime.ResetHandlerAsync();
+                _ = ApplySettingsAsync(runtime, device);
             }
             foreach (var guid in _runtimes.Keys.Where(g => !valid.Contains(g)).ToList())
             {
@@ -67,6 +57,12 @@ public class DeviceRuntimeManager
             }
             RuntimesChanged?.Invoke();
         }
+    }
+
+    private async Task ApplySettingsAsync(DeviceRuntime runtime, IProjectTreeViewModel device)
+    {
+        try { await runtime.ApplySettingsAsync(device); }
+        catch (Exception ex) { _logger.Push($"[Error] 设备配置更新失败 {runtime.DeviceName}: {ex.Message}"); }
     }
 
     public DeviceRuntime? Get(string guid) => _runtimes.TryGetValue(guid, out var rt) ? rt : null;

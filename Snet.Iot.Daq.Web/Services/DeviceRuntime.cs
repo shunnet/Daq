@@ -66,12 +66,16 @@ public class DeviceRuntime : IAsyncDisposable
     private readonly ConcurrentDictionary<string, MqHandler> _mqHandlers = new();
     private readonly RuntimeSecondsRecorderHandler _runtime = new();
     private CancellationTokenSource? _cts;
+    private bool _disposed;
+    private Task? _consumeTask;
+    private Task? _uaTask;
     private readonly SemaphoreSlim _collectGate = new(1, 1);
     private readonly ConcurrentDictionary<string, IAddressModel> _addressIndex = new();
 
     // UA 地址空间转发状态（对齐 WPF ConsoleDeviceModel.UaSyncChannelDataEventAsync）
     private Channel<AddressValue>? _uaSyncChannel;
     private FolderState? _uaFolder;
+    private OpcUaServiceOperate? _uaFolderService;
     private readonly List<FolderState> _uaFolderStates = new();
     private string _uaAddressSpaceName = "";
     private readonly Dictionary<string, string> _uaAddressMap = new();
@@ -164,14 +168,7 @@ public class DeviceRuntime : IAsyncDisposable
         _daqConfig = deviceNode.DaqDetails!;
         _deviceNode = deviceNode;
         var newDict = ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new());
-        // 变更签名：参数 + 组包 + WebApi + 地址集（对齐 WPF SettingsAsync 每次刷新都重启运行设备——
-        // 组包/WebApi 不在 Param JSON 里，必须单独纳入签名，否则修改后运行设备不会自动重订阅）
-        var ap = _daqConfig.AutoPack;
-        var wa = _daqConfig.WebApi;
-        var autoPackSig = ap is null ? "0" : $"{ap.MaxByteLength}|{ap.Format}|{ap.IsStringReverseByteWord}";
-        var webApiSig = wa is null ? "0" : $"{wa.IpAddress}|{wa.Port}|{wa.CrossDomain}";
-        var signature = _daqConfig.Param + "|" + autoPackSig + "|" + webApiSig + "|"
-            + string.Join("|", newDict.Keys.Select(k => k.Guid).OrderBy(g => g, StringComparer.Ordinal));
+        var signature = SettingsSignature(deviceNode, newDict);
         var changed = signature != _settingsSignature;
         _settingsSignature = signature;
         _addressDatas = newDict;
@@ -183,6 +180,59 @@ public class DeviceRuntime : IAsyncDisposable
         DeviceVersion = ResolvePluginVersion(DeviceType);
         AddressCount = CountAddressNodes(deviceNode.Details);
         return changed;
+    }
+
+    private static string SettingsSignature(IProjectTreeViewModel deviceNode,
+        ConcurrentDictionary<IAddressModel, List<PluginConfigModel>> newDict)
+    {
+        var config = deviceNode.DaqDetails!;
+        // 变更签名：参数 + 组包 + WebApi + 地址集（对齐 WPF SettingsAsync 每次刷新都重启运行设备——
+        // 组包/WebApi 不在 Param JSON 里，必须单独纳入签名，否则修改后运行设备不会自动重订阅）
+        var ap = config.AutoPack;
+        var wa = config.WebApi;
+        var autoPackSig = ap is null ? "0" : $"{ap.MaxByteLength}|{ap.Format}|{ap.IsStringReverseByteWord}";
+        var webApiSig = wa is null ? "0" : $"{wa.IpAddress}|{wa.Port}|{wa.CrossDomain}";
+        return System.Text.Json.JsonSerializer.Serialize(new
+        {
+            config.Name,
+            config.SN,
+            config.Param,
+            autoPackSig,
+            webApiSig,
+            Path = deviceNode.GetHierarchyPath(),
+            Addresses = newDict.OrderBy(kv => kv.Key.Guid, StringComparer.Ordinal).Select(kv => new
+            {
+                kv.Key.Guid,
+                kv.Key.Address,
+                kv.Key.Type,
+                kv.Key.Length,
+                kv.Key.EncodingType,
+                kv.Key.ExpandParam,
+                kv.Key.Topic,
+                kv.Key.SimplifyValue,
+                kv.Key.Describe,
+                Mq = kv.Value.OrderBy(m => m.Guid, StringComparer.Ordinal).Select(m => new { m.Guid, m.Name, m.SN, m.Param })
+            })
+        });
+    }
+
+    /// <summary>配置变更与启停共用同一把门，旧任务退出后才替换索引和配置。</summary>
+    public async Task ApplySettingsAsync(IProjectTreeViewModel deviceNode)
+    {
+        await _collectGate.WaitAsync();
+        try
+        {
+            if (_disposed) return;
+            var first = string.IsNullOrEmpty(_settingsSignature);
+            var changed = SettingsSignature(deviceNode,
+                ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new())) != _settingsSignature;
+            var restart = changed && IsRun;
+            if (changed) await StopInternalAsync();
+            RefreshSettings(deviceNode);
+            if (restart || (first && deviceNode.IsSoftStart)) await CollectInternalAsync();
+            _pushState(this);
+        }
+        finally { _collectGate.Release(); }
     }
 
     /// <summary>按插件类名查 PluginList.json 的包版本（热更新后版本号变化，控制台一目了然）</summary>
@@ -209,6 +259,13 @@ public class DeviceRuntime : IAsyncDisposable
     {
         if (IsRun) return;
         await _collectGate.WaitAsync();
+        try { await CollectInternalAsync(); }
+        finally { _collectGate.Release(); }
+    }
+
+    private async Task CollectInternalAsync()
+    {
+        if (_disposed) return;
         try
         {
             if (IsRun) return;
@@ -238,6 +295,21 @@ public class DeviceRuntime : IAsyncDisposable
             if (missingPartial.Count > 0)
                 _pushLog(string.Format(T("[{0}] {1}"), DeviceName,
                     string.Format(T("警告: {0} 个地址未配置传输设备，不参与采集: {1}"), missingPartial.Count, string.Join("、", missingPartial))));
+            // 对齐 WPF CollectAsync：再次采集时先清理旧 UA 层级与地址映射（UA 服务重启/配置变更后旧 FolderState 失效）
+            if (_uaFolderStates.Count > 0)
+            {
+                var srv = _uaService();
+                if (srv is not null)
+                {
+                    try { srv.RemoveFolder([_uaFolderStates[^1].NodeId]); } catch { }
+                }
+                _uaFolderStates.Clear();
+                _uaFolder = null;
+            }
+            _uaAddressMap.Clear();
+            _uaFailedAddresses.Clear();
+            _failedBytesModels.Clear();
+
             if (_daqHandler is null)
             {
                 // 对齐 WPF CollectAsync：InstanceAsync 单例（CoreUnify 静态容器，同配置复用）
@@ -249,7 +321,10 @@ public class DeviceRuntime : IAsyncDisposable
                 _cts = new CancellationTokenSource();
                 // 消费循环整体脱离电路同步上下文（Task.Run 入口 + 内部 await 沿用线程池）：
                 // 插件失败风暴/阻塞调用不会占住 Blazor 电路线程，停止按钮始终可响应
-                _ = Task.Run(() => ConsumeAsync(_cts.Token));
+                var token = _cts.Token;
+                _uaSyncChannel = Channel.CreateBounded<AddressValue>(ChannelCapacity);
+                _uaTask = Task.Run(() => UaSyncChannelDataEventAsync(token));
+                _consumeTask = Task.Run(() => ConsumeAsync(token));
             }
             var result = await _daqHandler.SubscribeAsync(_daqConfig.Guid, _addressDatas.Keys.ToList(), _daqConfig.AutoPack);
             if (!result.Status)
@@ -270,21 +345,6 @@ public class DeviceRuntime : IAsyncDisposable
                 return;
             }
 
-            // 对齐 WPF CollectAsync：再次采集时先清理旧 UA 层级与地址映射（UA 服务重启/配置变更后旧 FolderState 失效）
-            if (_uaFolderStates.Count > 0)
-            {
-                var srv = _uaService();
-                if (srv is not null)
-                {
-                    try { srv.RemoveFolder([_uaFolderStates[0].NodeId]); } catch { }
-                }
-                _uaFolderStates.Clear();
-                _uaFolder = null;
-            }
-            _uaAddressMap.Clear();
-            _uaFailedAddresses.Clear();
-            _failedBytesModels.Clear();
-
             IsRun = true;
             CollectStatus = "正常";
             LedGreen = true;
@@ -298,7 +358,8 @@ public class DeviceRuntime : IAsyncDisposable
             if (_uaSyncChannel is null)
             {
                 _uaSyncChannel = Channel.CreateBounded<AddressValue>(ChannelCapacity);
-                _ = Task.Run(() => UaSyncChannelDataEventAsync(_cts.Token));
+                var token = _cts!.Token;
+                _uaTask = Task.Run(() => UaSyncChannelDataEventAsync(token));
             }
 
             if (_daqConfig.WebApi is not null)
@@ -320,15 +381,16 @@ public class DeviceRuntime : IAsyncDisposable
         }
         catch (Exception ex)
         {
+            await ReleaseHandlerInternalAsync();
+            IsRun = false;
+            _runtime.Stop();
             CollectStatus = "异常";
+            LedGreen = false;
             LedRed = true;
             _pushState(this);
             _pushLog(string.Format(T("[{0}] 启动采集异常: {1}"), DeviceName, ex.Message));
         }
-        finally
-        {
-            _collectGate.Release();
-        }
+
     }
 
     /// <summary>释放采集 handler 及相关资源（无锁版，须在 _collectGate 持有内调用）。
@@ -338,9 +400,7 @@ public class DeviceRuntime : IAsyncDisposable
     #region 停止与资源释放
     private async Task ReleaseHandlerInternalAsync()
     {
-        _cts?.Cancel();
-        _cts?.Dispose();
-        _cts = null;
+        await StopConsumersAsync();
         if (_daqHandler is not null)
         {
             _daqHandler.OnDataEventAsync -= OnDataEvent;
@@ -365,6 +425,28 @@ public class DeviceRuntime : IAsyncDisposable
         foreach (var mq in _mqHandlers.Values)
             await mq.DisposeAsync();
         _mqHandlers.Clear();
+        if (_bytesHandler is not null)
+        {
+            await _bytesHandler.DisposeAsync();
+            _bytesHandler = null;
+        }
+        _bytesModels.Clear();
+        _failedBytesModels.Clear();
+    }
+
+    private async Task StopConsumersAsync()
+    {
+        _cts?.Cancel();
+        _dataChannel?.Writer.TryComplete();
+        _uaSyncChannel?.Writer.TryComplete();
+        if (_daqHandler is not null)
+            _daqHandler.OnDataEventAsync -= OnDataEvent;
+        // 旧消费任务完全退出后才允许释放 handler 或创建下一代通道。
+        await Task.WhenAll(_consumeTask ?? Task.CompletedTask, _uaTask ?? Task.CompletedTask);
+        _consumeTask = null;
+        _uaTask = null;
+        _cts?.Dispose();
+        _cts = null;
     }
 
     /// <summary>带锁释放采集 handler（供配置变更时未运行设备清理旧实例，对齐 WPF 改配置后重新采集语义）</summary>
@@ -386,12 +468,16 @@ public class DeviceRuntime : IAsyncDisposable
     public async Task StopAsync()
     {
         await _collectGate.WaitAsync();
+        try { await StopInternalAsync(); }
+        finally { _collectGate.Release(); }
+    }
+
+    private async Task StopInternalAsync()
+    {
         try
         {
             if (!IsRun && _daqHandler is null) return;
-            _cts?.Cancel();
-            _cts?.Dispose();
-            _cts = null;
+            await StopConsumersAsync();
             _runtime.Stop();
 
             if (_daqHandler is not null)
@@ -417,29 +503,8 @@ public class DeviceRuntime : IAsyncDisposable
                         _pushLog(string.Format(T("[{0}] WebApi 关闭异常: {1}"), DeviceName, ex.Message));
                     }
                 }
-                _daqHandler.OnDataEventAsync -= OnDataEvent;
-                _daqHandler.OnInfoEventAsync -= OnInfoEvent;
-                await _daqHandler.DisposeAsync();
-                _daqHandler = null;
             }
-            if (_dataChannel is not null)
-            {
-                _dataChannel.Writer.TryComplete();
-                // 对齐 WPF StopAsync：消费循环退出后清空队列滞留元素
-                while (_dataChannel.Reader.TryRead(out _)) { }
-            }
-            _dataChannel = null;
-            if (_uaSyncChannel is not null)
-            {
-                _uaSyncChannel.Writer.TryComplete();
-                // 对齐 WPF StopAsync：消费循环退出后清空队列滞留元素
-                while (_uaSyncChannel.Reader.TryRead(out _)) { }
-            }
-            _uaSyncChannel = null;
-
-            foreach (var mq in _mqHandlers.Values)
-                await mq.DisposeAsync();
-            _mqHandlers.Clear();
+            await ReleaseHandlerInternalAsync();
 
             IsRun = false;
             CollectStatus = "未采集";
@@ -450,16 +515,22 @@ public class DeviceRuntime : IAsyncDisposable
         }
         finally
         {
-            _collectGate.Release();
+            IsRun = false;
+            _runtime.Stop();
         }
     }
 
     /// <summary>重试：重置计时后停止并重新启动</summary>
     public async Task RetryAsync()
     {
-        _runtime.Reset();
-        await StopAsync();
-        await CollectAsync();
+        await _collectGate.WaitAsync();
+        try
+        {
+            _runtime.Reset();
+            await StopInternalAsync();
+            await CollectInternalAsync();
+        }
+        finally { _collectGate.Release(); }
     }
 
     /// <summary>随软启状态（对齐 WPF ConsoleDeviceModel.IsSoftStart：持久化于项目树，宿主启动/配置同步时自动恢复采集）</summary>
@@ -886,7 +957,7 @@ public class DeviceRuntime : IAsyncDisposable
                         {
                             foreach (var nodeId in list)
                             {
-                                if (nodeId.Contains(format, StringComparison.Ordinal))
+                                if (NodeId.TryParse(nodeId, out var parsedNodeId) && parsedNodeId.TryGetValue(out string identifier) && string.Equals(identifier, format[2..], StringComparison.Ordinal))
                                 {
                                     _uaAddressMap[addressName] = nodeId;
                                     break;
@@ -943,6 +1014,15 @@ public class DeviceRuntime : IAsyncDisposable
             if (service is null)
                 return null;
 
+            if (!ReferenceEquals(_uaFolderService, service))
+            {
+                _uaFolderService = service;
+                _uaFolder = null;
+                _uaFolderStates.Clear();
+                _uaAddressMap.Clear();
+                _uaFailedAddresses.Clear();
+                _uaAddressSpaceName = "";
+            }
             if (_uaFolder != null)
             {
                 return _uaFolder;
@@ -1001,7 +1081,13 @@ public class DeviceRuntime : IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
-        await StopAsync();
+        await _collectGate.WaitAsync();
+        try
+        {
+            _disposed = true;
+            await StopInternalAsync();
+        }
+        finally { _collectGate.Release(); }
         GC.SuppressFinalize(this);
     }
     #endregion

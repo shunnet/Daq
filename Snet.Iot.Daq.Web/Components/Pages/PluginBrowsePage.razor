@@ -1,3 +1,4 @@
+@inject MenuCoordinator MenuCoordinator
 @page "/plugins/browse"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
@@ -12,7 +13,7 @@
 @inject IJSRuntime JS
 
 <div class="card">
-    <div class="card-header">
+    <div class="card-header page-card-header">
         <h1 class="card-title"><i class="bi bi-box-seam me-2"></i>@T("插件浏览")</h1>
         <span class="plugin-path-hint" title="@WebPaths.FilePath">@T("插件下载位置")：@WebPaths.FilePath</span>
     </div>
@@ -167,6 +168,7 @@
 
     public override void Dispose()
     {
+        MenuCoordinator.Unregister(CloseMenu);
         base.Dispose();
         DownloadManager.JobChanged -= OnJobChanged;
         // 注销 document 上的外部点击监听：否则切页后旧 handler 残留会清掉新页面的监听（菜单失去失焦关闭能力）

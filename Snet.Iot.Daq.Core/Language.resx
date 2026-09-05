@@ -769,4 +769,7 @@
   <data name="修改设备配置" xml:space="preserve">
     <value>修改设备配置</value>
   </data>
+  <data name="插件默认路径：" xml:space="preserve">
+    <value>插件默认路径：</value>
+  </data>
 </root>

@@ -21,19 +21,33 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
         options.Cookie.SameSite = SameSiteMode.Lax;
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/login";
+        options.Events.OnValidatePrincipal = async context =>
+        {
+            var auth = context.HttpContext.RequestServices.GetRequiredService<AuthService>();
+            if (context.Principal is null || !await auth.IsSessionValidAsync(context.Principal))
+            {
+                context.RejectPrincipal();
+                await context.HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+            }
+        };
     });
 builder.Services.AddAuthorization(options =>
 {
-    options.AddPolicy(AuthService.AdminPolicy, policy => policy.RequireRole(AuthService.RoleAdmin));
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .RequireAssertion(ctx => !ctx.User.HasClaim("mustChangePassword", "true"))
+        .Build();
+    options.AddPolicy(AuthService.AdminPolicy, policy => policy.RequireRole(AuthService.RoleAdmin).RequireAssertion(ctx => !ctx.User.HasClaim("mustChangePassword", "true")));
 });
 // Blazor 认证状态：SSR 阶段从 HttpContext 读取并持久化到 circuit（布局按角色渲染导航）
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddScoped<Microsoft.AspNetCore.Components.Authorization.AuthenticationStateProvider, Snet.Iot.Daq.Web.Services.ServerAuthStateProvider>();
 
-builder.Services.AddSingleton<LocalizationService>();
-builder.Services.AddSingleton<ThemeService>();
+builder.Services.AddScoped<LocalizationService>();
+builder.Services.AddScoped<ThemeService>();
+builder.Services.AddScoped<MenuCoordinator>();
 builder.Services.AddSingleton<AuthService>();
-builder.Services.AddSingleton<Snet.Iot.Daq.Web.Components.Shared.ToastService>();
+builder.Services.AddScoped<Snet.Iot.Daq.Web.Components.Shared.ToastService>();
 builder.Services.AddSingleton<DbGate>();
 builder.Services.AddSingleton<AppStateService>();
 builder.Services.AddSingleton<LoggerBuffer>();
@@ -119,7 +133,7 @@ app.UseAntiforgery();
 app.MapStaticAssets();
 
 // 登录/退出走服务端 endpoint：Blazor circuit 内无 HttpContext，Cookie 操作必须在请求管道中完成。
-// DisableAntiforgery：匿名凭证提交端点，CSRF 危害仅限"替受害者登录"（无状态变更面），可接受。
+// 登录与改密表单均校验防伪令牌。
 app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService auth) =>
 {
     var mode = form["mode"].ToString();
@@ -128,6 +142,9 @@ app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService 
 
     if (mode == "change")
     {
+        if (ctx.User.Identity?.IsAuthenticated != true)
+            return Results.Redirect("/login");
+        username = ctx.User.Identity.Name ?? "";
         var newPassword = form["newPassword"].ToString();
         var confirm = form["confirmPassword"].ToString();
         if (newPassword != confirm)
@@ -141,7 +158,7 @@ app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService 
         if (!ok) return Results.Redirect($"/login?mode=change&error={err}");
         var changedUser = auth.FindUser(username);
         await SignInAsync(ctx, username, changedUser?.Role ?? AuthService.RoleUser);
-        await Snet.Log.LogHelper.InfoAsync($"{username} - {changedUser?.Role ?? AuthService.RoleUser} - 修改密码成功", foldername: Path.Combine("operate", username));
+        await Snet.Log.LogHelper.InfoAsync($"{username} - {changedUser?.Role ?? AuthService.RoleUser} - 修改密码成功", foldername: OperateLog.UserFolder(username));
         return Results.Redirect("/console");
     }
 
@@ -150,7 +167,7 @@ app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService 
     var (valid, err2) = await auth.ValidateAsync(username, password);
     if (!valid)
     {
-        await Snet.Log.LogHelper.WarningAsync($"{username} - 登录失败：{err2}", foldername: Path.Combine("operate", username));
+        await Snet.Log.LogHelper.WarningAsync($"{username} - 登录失败：{err2}", foldername: Path.Combine("operate", "login-failures"));
         return Results.Redirect($"/login?error={err2}");
     }
     var user = auth.FindUser(username);
@@ -159,19 +176,19 @@ app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService 
     {
         // 带"必须改密"声明的受限会话：只能访问登录/改密页（见下方强制改密中间件）
         await SignInAsync(ctx, username, role, mustChangePassword: true);
-        await Snet.Log.LogHelper.InfoAsync($"{username} - {role} - 登录成功（首次需修改密码）", foldername: Path.Combine("operate", username));
+        await Snet.Log.LogHelper.InfoAsync($"{username} - {role} - 登录成功（首次需修改密码）", foldername: OperateLog.UserFolder(username));
         return Results.Redirect("/login?mode=change");
     }
     await SignInAsync(ctx, username, role);
-    await Snet.Log.LogHelper.InfoAsync($"{username} - {role} - 登录成功", foldername: Path.Combine("operate", username));
+    await Snet.Log.LogHelper.InfoAsync($"{username} - {role} - 登录成功", foldername: OperateLog.UserFolder(username));
     return Results.Redirect("/console");
-}).DisableAntiforgery().RequireRateLimiting("login");
+}).RequireRateLimiting("login");
 
 app.MapGet("/logout", async (HttpContext ctx) =>
 {
     var name = ctx.User.Identity?.Name ?? "anonymous";
     await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
-    await Snet.Log.LogHelper.InfoAsync($"{name} - 退出登录", foldername: Path.Combine("operate", name));
+    await Snet.Log.LogHelper.InfoAsync($"{name} - 退出登录", foldername: OperateLog.UserFolder(name));
     return Results.Redirect("/login");
 }).DisableAntiforgery();
 
@@ -182,11 +199,14 @@ app.Run();
 
 static async Task SignInAsync(HttpContext ctx, string username, string role, bool mustChangePassword = false)
 {
+    var user = ctx.RequestServices.GetRequiredService<AuthService>().FindUser(username)
+        ?? throw new InvalidOperationException("User no longer exists.");
     var claims = new List<Claim>
     {
         new(ClaimTypes.Name, username),
         new("displayName", username),
-        new(ClaimTypes.Role, role)
+        new(ClaimTypes.Role, role),
+        new("securityStamp", user.SecurityStamp ?? user.Salt)
     };
     if (mustChangePassword)
         claims.Add(new Claim("mustChangePassword", "true"));

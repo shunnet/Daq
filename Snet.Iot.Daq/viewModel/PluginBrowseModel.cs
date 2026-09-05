@@ -32,8 +32,8 @@ namespace Snet.Iot.Daq.viewModel
         {
             uiMessage.OnInfoEventAsync += async (object? sender, EventInfoResult e) => Info = e.Message;
             await uiMessage.StartAsync();
-
             await QueryAsync();
+            await uiMessage.ShowAsync("插件默认路径：".GetLanguageValue(App.LanguageOperate) + PluginPath);
         }
 
         /// <summary>
@@ -49,7 +49,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 插件存储路径
         /// </summary>
-        private string PluginPath;
+        private string PluginPath = Path.Combine(AppContext.BaseDirectory, "lib");
 
         /// <summary>
         /// 更新插件

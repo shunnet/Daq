@@ -18,6 +18,7 @@ public class MonitorSampler : IDisposable
     private long _prevTotal;
     private long _prevIdle;
     private bool _firstCpu = true;
+    private int _disposed;
 
     public event Action<MonitorSample>? Sample;
 
@@ -47,6 +48,7 @@ public class MonitorSampler : IDisposable
 
     public void Start()
     {
+        if (_loop is not null) return;
         if (OperatingSystem.IsWindows())
         {
             try
@@ -67,21 +69,25 @@ public class MonitorSampler : IDisposable
     #region 采样循环
     private async Task LoopAsync()
     {
-        while (await _timer.WaitForNextTickAsync(_cts.Token))
+        try
         {
-            // 订阅者（页面电路）异常不能杀死采样循环，否则监控永久停摆
-            try
+            while (await _timer.WaitForNextTickAsync(_cts.Token))
             {
-                Sample?.Invoke(new MonitorSample(
-                    Math.Clamp(ReadCpu(), 0, 100),
-                    Math.Clamp(ReadRamPercent(), 0, 100),
-                    ReadTotalRamMb()));
-            }
-            catch (Exception ex)
-            {
-                Console.Error.WriteLine($"[MonitorSampler] 采样订阅者异常（循环继续）: {ex.Message}");
+                // 订阅者（页面电路）异常不能杀死采样循环，否则监控永久停摆
+                try
+                {
+                    Sample?.Invoke(new MonitorSample(
+                        Math.Clamp(ReadCpu(), 0, 100),
+                        Math.Clamp(ReadRamPercent(), 0, 100),
+                        ReadTotalRamMb()));
+                }
+                catch (Exception ex)
+                {
+                    Console.Error.WriteLine($"[MonitorSampler] 采样订阅者异常（循环继续）: {ex.Message}");
+                }
             }
         }
+        catch (OperationCanceledException) when (_cts.IsCancellationRequested) { }
     }
 
     #endregion
@@ -89,7 +95,7 @@ public class MonitorSampler : IDisposable
     #region 指标读取
     private double ReadCpu()
     {
-        if (_cpuCounter is not null)
+        if (OperatingSystem.IsWindows() && _cpuCounter is not null)
             return _cpuCounter.NextValue();
         if (!OperatingSystem.IsLinux())
             return 0;
@@ -117,7 +123,8 @@ public class MonitorSampler : IDisposable
             if (line is null || !line.StartsWith("cpu "))
                 return (0, 0);
             var parts = line.Split(' ', StringSplitOptions.RemoveEmptyEntries).Skip(1).Select(long.Parse).ToArray();
-            return (parts.Sum(), parts.Length > 4 ? parts[3] + parts[4] : parts.Sum());
+            // guest 和 guest_nice 已计入 user/nice，不能重复累加。
+            return (parts.Take(8).Sum(), parts.Length > 4 ? parts[3] + parts[4] : parts.Sum());
         }
         catch
         {
@@ -183,6 +190,7 @@ public class MonitorSampler : IDisposable
     #region 释放
     public void Dispose()
     {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _cts.Cancel();
         _timer.Dispose();
         _cpuCounter?.Dispose();

@@ -8,15 +8,26 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public static class OperateLog
 {
+    // 登录失败的用户名来自匿名输入，不允许作为任意路径或新增无限日志目录。
+    public static string UserFolder(string username)
+    {
+        if (string.IsNullOrWhiteSpace(username) || username.Length > 64
+            || username is "." or ".." || username.Contains('/') || username.Contains('\\')
+            || username.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0
+            || username.Any(char.IsControl))
+            return Path.Combine("operate", "invalid-user");
+        return Path.Combine("operate", username);
+    }
+
     #region 日志写入
     public static Task Info(string username, string role, string action)
-            => Snet.Log.LogHelper.InfoAsync($"{username} - {role} - {action}", foldername: Path.Combine("operate", username));
+            => Snet.Log.LogHelper.InfoAsync($"{username} - {role} - {action}", foldername: UserFolder(username));
 
     public static Task Warning(string username, string role, string action)
-        => Snet.Log.LogHelper.WarningAsync($"{username} - {role} - {action}", foldername: Path.Combine("operate", username));
+        => Snet.Log.LogHelper.WarningAsync($"{username} - {role} - {action}", foldername: UserFolder(username));
 
     public static Task Error(string username, string role, string action, Exception? exception = null)
-        => Snet.Log.LogHelper.ErrorAsync($"{username} - {role} - {action}", foldername: Path.Combine("operate", username), exception: exception);
+        => Snet.Log.LogHelper.ErrorAsync($"{username} - {role} - {action}", foldername: UserFolder(username), exception: exception);
 
     /// <summary>从认证状态提取 用户名/角色（Role claim 缺失时按空字符串处理）</summary>
     #endregion

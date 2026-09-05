@@ -1,4 +1,4 @@
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Model.data;
@@ -14,11 +14,12 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class DaqHostedService : BackgroundService
 {
+    private readonly SemaphoreSlim _serverGate = new(1, 1);
     private readonly AppStateService _appState;
     private readonly DeviceRuntimeManager _runtimeManager;
     private readonly MonitorSampler _sampler;
     private readonly LoggerBuffer _loggerBuffer;
-    private readonly LocalizationService _localization;
+    private readonly LocalizationService _localization = new();
     private readonly ILogger<DaqHostedService> _logger;
 
     #region 字段与构造
@@ -27,14 +28,12 @@ public class DaqHostedService : BackgroundService
             DeviceRuntimeManager runtimeManager,
             MonitorSampler sampler,
             LoggerBuffer loggerBuffer,
-            LocalizationService localization,
             ILogger<DaqHostedService> logger)
     {
         _appState = appState;
         _runtimeManager = runtimeManager;
         _sampler = sampler;
         _loggerBuffer = loggerBuffer;
-        _localization = localization;
         _logger = logger;
     }
 
@@ -120,6 +119,13 @@ public class DaqHostedService : BackgroundService
     #region 服务端启动
     public async Task InitServerServicesAsync()
     {
+        await _serverGate.WaitAsync();
+        try { await InitServerServicesInternalAsync(); }
+        finally { _serverGate.Release(); }
+    }
+
+    private async Task InitServerServicesInternalAsync()
+    {
         // 对齐 WPF ConsoleModel.InitAsync：OPC UA 服务端先启动，再启动 MQTT
         await InitUaServerAsync();
         await InitMqttServerAsync();
@@ -128,6 +134,13 @@ public class DaqHostedService : BackgroundService
 
     /// <summary>启动单个服务端（供控制台按钮调用：已启动则忽略）</summary>
     public async Task<(bool Ok, string Message)> StartServerAsync(string kind)
+    {
+        await _serverGate.WaitAsync();
+        try { return await StartServerInternalAsync(kind); }
+        finally { _serverGate.Release(); }
+    }
+
+    private async Task<(bool Ok, string Message)> StartServerInternalAsync(string kind)
     {
         if (kind == "mqtt")
         {
@@ -162,6 +175,13 @@ public class DaqHostedService : BackgroundService
 
     #region 服务端停止
     public async Task<(bool Ok, string Message)> StopServerAsync(string kind)
+    {
+        await _serverGate.WaitAsync();
+        try { return await StopServerInternalAsync(kind); }
+        finally { _serverGate.Release(); }
+    }
+
+    private async Task<(bool Ok, string Message)> StopServerInternalAsync(string kind)
     {
         try
         {
@@ -199,6 +219,7 @@ public class DaqHostedService : BackgroundService
     #region 内嵌服务端初始化
     private async Task<bool> InitMqttServerAsync()
     {
+        if (_appState.MqttService is not null) return true;
         if (!File.Exists(WebPaths.MqttServerConfigPath)) return false;
         try
         {
@@ -226,6 +247,7 @@ public class DaqHostedService : BackgroundService
 
     private async Task<bool> InitUaServerAsync()
     {
+        if (_appState.UaService is not null) return true;
         if (!File.Exists(WebPaths.UaServerConfigPath)) return false;
         try
         {
@@ -256,6 +278,13 @@ public class DaqHostedService : BackgroundService
     #region 停服与事件转发
     /// <summary>停止全部服务端（热更新插件时需在卸载程序集前调用：优雅释放监听端口，防僵尸 socket 占用）</summary>
     public async Task StopServerServicesAsync()
+    {
+        await _serverGate.WaitAsync();
+        try { await StopServerServicesInternalAsync(); }
+        finally { _serverGate.Release(); }
+    }
+
+    private async Task StopServerServicesInternalAsync()
     {
         try
         {

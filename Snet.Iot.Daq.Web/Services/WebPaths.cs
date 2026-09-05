@@ -38,7 +38,9 @@ public static class WebPaths
             ?? config["Daq:DataDir"]
             ?? AppContext.BaseDirectory;
         DataDir = Path.GetFullPath(dataDir);
-        MigrateLegacyDataDir();
+        // 显式指定目录时不能搬走默认实例的历史数据（测试/多实例部署亦如此）。
+        if (Environment.GetEnvironmentVariable("SNET_IOT_DAQ_DATA") is null && config["Daq:DataDir"] is null)
+            MigrateLegacyDataDir();
         Directory.CreateDirectory(FilePath);
         Directory.CreateDirectory(UiConfigPath);
         Directory.CreateDirectory(ServerConfigPath);
@@ -46,6 +48,10 @@ public static class WebPaths
         // 插件参数文件目录（对齐 WPF config/daq、config/mq）
         Directory.CreateDirectory(DaqPluginConfigPath);
         Directory.CreateDirectory(MqPluginConfigPath);
+        // LogHelper 默认使用 AppContext.BaseDirectory，改变 CWD 不会改变日志输出路径。
+        var logConfig = Snet.Log.LogHelper.Get();
+        logConfig.FileLocation = DataDir;
+        Snet.Log.LogHelper.Set(logConfig);
     }
 
     /// <summary>旧版 Web 数据在 BaseDirectory/data/：整体迁移到程序根目录（与 WPF 布局一致），一次性</summary>

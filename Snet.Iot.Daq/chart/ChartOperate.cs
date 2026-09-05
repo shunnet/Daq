@@ -143,9 +143,10 @@ namespace Snet.Iot.Daq.chart
         /// 4. 在 Cancel 时 Dispose TokenSource，避免资源泄漏。<br/>
         /// 注意：此方法会在内部启动一个后台任务；如果外部已经在 UI 线程周期性刷新，则可不启用。<br/>
         /// </summary>
-        private async Task AutoRefreshAsync(CancellationToken token, int millisecond)
+        private async Task AutoRefreshAsync(CancellationTokenSource source, int millisecond)
         {
-            if (millisecond == 0)
+            var token = source.Token;
+            if (millisecond <= 0)
                 return;
 
             // 防止并发调用同时启动多个循环
@@ -172,10 +173,13 @@ namespace Snet.Iot.Daq.chart
             catch (OperationCanceledException) { }
             finally
             {
-                AutoRefreshStatus = false;
-                // 在外部取消后尽量释放 CTS
-                try { AutoRefreshTokenSource?.Dispose(); } catch { }
-                AutoRefreshTokenSource = null;
+                // 旧循环退出时不能清理新循环的取消源或运行状态。
+                if (ReferenceEquals(AutoRefreshTokenSource, source))
+                {
+                    AutoRefreshStatus = false;
+                    source.Dispose();
+                    AutoRefreshTokenSource = null;
+                }
             }
         }
 
@@ -253,7 +257,7 @@ namespace Snet.Iot.Daq.chart
             {
                 AutoRefreshTokenSource = new CancellationTokenSource();
                 // 不在 UI 线程等待 AutoRefreshAsync 完成；让其后台运行
-                _ = AutoRefreshAsync(AutoRefreshTokenSource.Token, basics.RefreshTime);
+                _ = AutoRefreshAsync(AutoRefreshTokenSource, basics.RefreshTime);
             }
         }
         /// <summary>

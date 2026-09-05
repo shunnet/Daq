@@ -1,3 +1,4 @@
+@inject MenuCoordinator MenuCoordinator
 @page "/console"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inherits LocalizedComponentBase
@@ -29,7 +30,7 @@
 
 <div class="console-page">
 <div class="card console-devices">
-    <div class="card-header">
+    <div class="card-header page-card-header">
         <h1 class="card-title"><i class="bi bi-activity me-2"></i>@T("控制台")</h1>
         @if (_isAdmin)
         {
@@ -211,6 +212,7 @@
 
     protected override void OnInitialized()
     {
+        base.OnInitialized();
         RuntimeManager.RuntimesChanged += OnRuntimesChanged;
         RuntimeManager.RuntimeStateChanged += OnRuntimeStateChanged;
         AppState.ServerStateChanged += OnServerStateChanged;
@@ -234,16 +236,17 @@
         _totalRamMb = sample.TotalRamMb;
         InvokeAsync(StateHasChanged);
     }
-    private bool _logRenderPending;
+    private int _logRenderPending;
+    private bool _disposed;
     private void OnLogChanged()
     {
         // 高频日志合并渲染：200ms 窗口内多次推送只渲染一次，避免逐条全量快照的 O(n²) 开销
-        if (_logRenderPending) return;
-        _logRenderPending = true;
+        if (Interlocked.Exchange(ref _logRenderPending, 1) != 0) return;
         InvokeAsync(async () =>
         {
             await Task.Delay(200);
-            _logRenderPending = false;
+            Interlocked.Exchange(ref _logRenderPending, 0);
+            if (_disposed) return;
             _logLines = LogBuffer.Snapshot();
             StateHasChanged();
         });
@@ -441,6 +444,7 @@
 
     public override void Dispose()
     {
+        _disposed = true;
         base.Dispose();
         MenuCoordinator.Unregister(CloseMenu);
         RuntimeManager.RuntimesChanged -= OnRuntimesChanged;

@@ -1,3 +1,4 @@
+@inject MenuCoordinator MenuCoordinator
 @page "/addresses"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
@@ -13,7 +14,7 @@
 @inject IJSRuntime JS
 
 <div class="card">
-    <div class="card-header">
+    <div class="card-header page-card-header">
         <h1 class="card-title"><i class="bi bi-geo-alt me-2"></i>@T("地址设置")</h1>
     </div>
 

@@ -1,4 +1,5 @@
-﻿@page "/projects"
+@inject MenuCoordinator MenuCoordinator
+@page "/projects"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
@@ -16,7 +17,7 @@
 @inject IJSRuntime JS
 
 <div class="card project-card">
-    <div class="card-header">
+    <div class="card-header page-card-header">
         <h1 class="card-title"><i class="bi bi-diagram-3 me-2"></i>@T("项目设置")</h1>
         <div class="toolbar">
             <InputFile OnChange="@OnImportProjectAsync" accept=".json" multiple="false" class="upload-input-hidden" />
@@ -401,6 +402,11 @@
         AppState.EntityChanged += OnEntityChanged;
         MenuCoordinator.Register(CloseMenu);
         base.OnInitialized();
+
+        // 项目树的选中状态会随配置恢复；页面首次进入时同步右侧详情，无需再次点击设备。
+        var selectedNode = ProjectHandlerCore.GetFirstSelectItem(AppState.ProjectDict);
+        if (selectedNode?.NodeType == ProjectNodeType.Device)
+            ShowDeviceDetails(selectedNode);
     }
 
     /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
@@ -461,11 +467,7 @@
         AppState.ProjectDict.EnsureSingleSelection(node);
         if (node.NodeType == ProjectNodeType.Device)
         {
-            _selectedDevice = node;
-            _detailPage = 1; // 切换设备重置详情分页
-            if (node.Details is null)
-                node.Details = new ObservableCollection<IProjectDetailsTreeViewModel>();
-            node.Details.InitChildrenParent();
+            ShowDeviceDetails(node);
         }
         else
         {
@@ -473,11 +475,22 @@
         }
     }
 
+    private void ShowDeviceDetails(IProjectTreeViewModel node)
+    {
+        _selectedDevice = node;
+        _detailPage = 1;
+        node.Details ??= new ObservableCollection<IProjectDetailsTreeViewModel>();
+        node.Details.InitChildrenParent();
+
+        // 保留第一个已选详情节点，同时清除旧版本可能遗留的其他选中状态。
+        var selectedDetail = ProjectHandlerCore.GetFirstSelectItem(node.Details);
+        node.Details.EnsureSingleSelection(selectedDetail);
+    }
+
     private void OnDetailNodeClick(IProjectDetailsTreeViewModel node)
     {
         // 对齐 WPF ProjectDetailsModel.TreeView_SelectedItemChanged：只更新选中态，不弹提示
-        node.IsSelected = true;
-        node.UpdateSpecialData();
+        _selectedDevice?.Details?.EnsureSingleSelection(node);
         node.ExpandParents();
     }
 
@@ -632,7 +645,7 @@
         RuntimeManager.SyncFromProjects(AppState);
         _showDeviceDialog = false;
         _targetParent = null;
-        _selectedDevice = node;
+        OnNodeClick(node);
         ToastSvc.Success(T("设备添加成功"));
     }
 

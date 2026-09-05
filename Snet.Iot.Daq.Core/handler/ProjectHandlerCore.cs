@@ -517,8 +517,18 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="data">待写入的字符串内容</param>
         public static async Task WriteToFileAsync(string path, string data)
         {
-            await using var writer = new StreamWriter(path, false, Encoding.UTF8);
-            await writer.WriteAsync(data);
+            var destination = Path.GetFullPath(path);
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            var temporary = destination + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            try
+            {
+                await File.WriteAllTextAsync(temporary, data, Encoding.UTF8);
+                File.Move(temporary, destination, overwrite: true);
+            }
+            finally
+            {
+                if (File.Exists(temporary)) File.Delete(temporary);
+            }
         }
 
         /// <summary>

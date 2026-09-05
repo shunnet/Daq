@@ -107,52 +107,61 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         /// <param name="guid">设备唯一标识符</param>
         /// <returns>MQ 实例和操作结果的元组</returns>
+        private readonly SemaphoreSlim _openGate = new(1, 1);
+
         private async Task<(IMq operate, OperateResult result)> OpenAsync(string guid)
         {
-            if (!icoMq.TryGetValue(guid, out IMq? operate))
+            await _openGate.WaitAsync();
+            try
             {
-                IMq? newOperate = await basics.CreateNewObjectAsync<IMq>();
-                operate = icoMq.GetOrAdd(guid, newOperate!);
-                // 若竞态导致当前实例未被采用，释放多余实例
-                if (!ReferenceEquals(operate, newOperate) && newOperate != null)
+                if (!icoMq.TryGetValue(guid, out IMq? operate))
                 {
-                    await newOperate.DisposeAsync();
+                    IMq? newOperate = await basics.CreateNewObjectAsync<IMq>();
+                    if (newOperate is null)
+                        return (default!, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(Core.LanguageOperate)));
+                    operate = icoMq.GetOrAdd(guid, newOperate!);
+                    // 若竞态导致当前实例未被采用，释放多余实例
+                    if (!ReferenceEquals(operate, newOperate) && newOperate != null)
+                    {
+                        await newOperate.DisposeAsync();
+                    }
                 }
+
+                if (operate == null)
+                {
+                    return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(Core.LanguageOperate)));
+                }
+
+                // 获取驱动状态
+                OperateResult result = await operate.GetStatusAsync();
+
+                // 未连接时执行事件注册和打开操作
+                if (!result.Status)
+                {
+                    // 注销该 guid 旧的数据事件处理程序，避免重复订阅
+                    if (_dataHandlers.TryRemove(guid, out var oldDataHandler))
+                        operate.OnDataEventAsync -= oldDataHandler;
+
+                    // 创建并缓存该 guid 专属的数据事件委托
+                    EventHandlerAsync<EventDataResult> newDataHandler = async (sender, e) => await Operate_OnDataEventAsync(sender, e, guid);
+                    _dataHandlers[guid] = newDataHandler;
+                    operate.OnDataEventAsync += newDataHandler;
+
+                    // 注销该 guid 旧的信息事件处理程序，避免重复订阅
+                    if (_infoHandlers.TryRemove(guid, out var oldInfoHandler))
+                        operate.OnInfoEventAsync -= oldInfoHandler;
+
+                    // 创建并缓存该 guid 专属的信息事件委托
+                    EventHandlerAsync<EventInfoResult> newInfoHandler = async (sender, e) => await Operate_OnInfoEventAsync(sender, e, guid);
+                    _infoHandlers[guid] = newInfoHandler;
+                    operate.OnInfoEventAsync += newInfoHandler;
+
+                    // 执行打开操作
+                    result = await operate.OnAsync();
+                }
+                return (operate, result);
             }
-
-            if (operate == null)
-            {
-                return (default, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(Core.LanguageOperate)));
-            }
-
-            // 获取驱动状态
-            OperateResult result = await operate.GetStatusAsync();
-
-            // 未连接时执行事件注册和打开操作
-            if (!result.Status)
-            {
-                // 注销该 guid 旧的数据事件处理程序，避免重复订阅
-                if (_dataHandlers.TryRemove(guid, out var oldDataHandler))
-                    operate.OnDataEventAsync -= oldDataHandler;
-
-                // 创建并缓存该 guid 专属的数据事件委托
-                EventHandlerAsync<EventDataResult> newDataHandler = async (sender, e) => await Operate_OnDataEventAsync(sender, e, guid);
-                _dataHandlers[guid] = newDataHandler;
-                operate.OnDataEventAsync += newDataHandler;
-
-                // 注销该 guid 旧的信息事件处理程序，避免重复订阅
-                if (_infoHandlers.TryRemove(guid, out var oldInfoHandler))
-                    operate.OnInfoEventAsync -= oldInfoHandler;
-
-                // 创建并缓存该 guid 专属的信息事件委托
-                EventHandlerAsync<EventInfoResult> newInfoHandler = async (sender, e) => await Operate_OnInfoEventAsync(sender, e, guid);
-                _infoHandlers[guid] = newInfoHandler;
-                operate.OnInfoEventAsync += newInfoHandler;
-
-                // 执行打开操作
-                result = await operate.OnAsync();
-            }
-            return (operate, result);
+            finally { _openGate.Release(); }
         }
 
         /// <summary>

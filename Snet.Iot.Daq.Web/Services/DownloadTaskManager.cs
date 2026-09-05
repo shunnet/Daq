@@ -1,4 +1,4 @@
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 
 namespace Snet.Iot.Daq.Web.Services;
@@ -14,7 +14,8 @@ public class DownloadTaskManager
     private readonly DeviceRuntimeManager _runtimeManager;
     private readonly AppStateService _appState;
     private readonly DaqHostedService _hosted;
-    private readonly SemaphoreSlim _gate = new(1, 1);
+    private readonly object _gate = new();
+    private readonly SemaphoreSlim _runGate = new(1, 1);
     private readonly List<DownloadJob> _jobs = new();
     private CancellationTokenSource? _stopCts;
 
@@ -27,6 +28,7 @@ public class DownloadTaskManager
         lock (_gate)
         {
             _stopCts?.Cancel();
+            _stopCts?.Dispose();
             _stopCts = null;
         }
     }
@@ -85,12 +87,14 @@ public class DownloadTaskManager
         }
     }
 
-    public async Task<string> EnqueueAsync(IEnumerable<PluginBrowseDataGridModel> models)
+    public Task<string> EnqueueAsync(IEnumerable<PluginBrowseDataGridModel> models)
     {
         var id = Guid.NewGuid().ToString("N")[..8];
-        var names = models.Select(m => m.PackName).ToList();
-        await _gate.WaitAsync();
-        try
+        var packages = models.Select(m => new PluginBrowseDataGridModel
+        { PackName = m.PackName, Version = m.Version }).ToList();
+        var names = packages.Select(m => m.PackName).ToList();
+        if (names.Count == 0) throw new ArgumentException("请选择至少一个插件", nameof(models));
+        lock (_gate)
         {
             // 入队前清理终态任务（否则第 10 次下载后队列永久满）
             _jobs.RemoveAll(j => j.Status is "完成" or "失败" or "已取消");
@@ -98,7 +102,7 @@ public class DownloadTaskManager
             if (_jobs.Any(j => j.PackName == string.Join(", ", names.Take(3)) && j.Status is "排队" or "下载中"))
             {
                 _logger.Push($"[Warn] 同名插件下载任务已存在: {names.FirstOrDefault()}");
-                return _jobs.First(j => j.PackName == string.Join(", ", names.Take(3))).Id;
+                return Task.FromResult(_jobs.First(j => j.PackName == string.Join(", ", names.Take(3))).Id);
             }
             if (_jobs.Count >= 10)
                 throw new InvalidOperationException("下载队列已满（上限 10）");
@@ -107,44 +111,34 @@ public class DownloadTaskManager
             var job = new DownloadJob(id, string.Join(", ", names.Take(3)), "排队", 0, null);
             _jobs.Add(job);
             JobChanged?.Invoke(job);
-            _ = RunAsync(job, names);
+            _ = RunAsync(job, packages, _stopCts.Token);
         }
-        finally
-        {
-            _gate.Release();
-        }
-        return id;
+        return Task.FromResult(id);
     }
 
     #endregion
 
     #region 下载作业执行
-    private async Task RunAsync(DownloadJob job, List<string> names)
+    private async Task RunAsync(DownloadJob job, List<PluginBrowseDataGridModel> packages, CancellationToken token)
     {
-        if (!await IsSdkAvailableAsync())
-        {
-            Update(job with { Status = "失败", Error = "服务器未安装 .NET SDK，无法下载插件" });
-            _logger.Push("[Error] 插件下载失败：.NET SDK 不可用");
-            return;
-        }
-        CancellationToken token;
-        lock (_gate)
-        {
-            _stopCts ??= new CancellationTokenSource();
-            token = _stopCts.Token;
-        }
-        // 探测前已停止则不再进入下载（令牌在 EnqueueAsync 即创建，探测期间点「停止下载」也能取消）
-        if (token.IsCancellationRequested)
-        {
-            Update(job with { Status = "已取消", Error = null });
-            return;
-        }
+        var names = packages.Select(m => m.PackName).ToList();
+        var entered = false;
         try
         {
+            await _runGate.WaitAsync(token);
+            entered = true;
+            token.ThrowIfCancellationRequested();
+            if (!await IsSdkAvailableAsync())
+            {
+                Update(job with { Status = "失败", Error = "服务器未安装 .NET SDK，无法下载插件" });
+                return;
+            }
+            token.ThrowIfCancellationRequested();
             Update(job with { Status = "下载中", Progress = 10 });
             _logger.Push($"[Info] 开始下载插件: {job.PackName}");
             using var handler = new PluginDownloadHandler(WebPaths.FilePath);
-            var ok = await handler.DownloadAsync(names, zip: true, token);
+            var ok = await handler.DownloadAsync(packages, zip: true, token);
+            token.ThrowIfCancellationRequested();
             if (!ok)
             {
                 Update(job with { Status = "失败", Error = "下载失败" });
@@ -175,6 +169,10 @@ public class DownloadTaskManager
         {
             Update(job with { Status = "失败", Error = ex.Message });
             _logger.Push($"[Error] 插件下载异常: {ex.Message}");
+        }
+        finally
+        {
+            if (entered) _runGate.Release();
         }
     }
 
@@ -215,14 +213,14 @@ public class DownloadTaskManager
                             // 停用使用该插件的运行设备：设备插件类型是插件类名（如 SiemensOperate），
                             // 下载名是包名（如 Snet.Siemens），类名→包名映射由 RuntimeManager 统一处理
                             // （对齐 WPF libPath == DaqPluginPath 语义）
-                            stopped = await _runtimeManager.StopDevicesUsingPluginAsync(type, name);
+                            stopped.AddRange(await _runtimeManager.StopDevicesUsingPluginAsync(type, name));
                             // 卸载程序集前优雅停止 UA/MQTT 服务端：释放监听端口，防僵尸 socket 占用导致新服务端绑定失败
                             try { await _hosted.StopServerServicesAsync(); }
                             catch (Exception ex) { _logger.Push($"[Error] 服务端停止失败: {ex.Message}"); }
                             // 卸载旧程序集并回收，避免文件锁/旧实例残留（对齐 WPF PrivateRemovalPlugin）
                             foreach (var old in LoadPluginList().Where(p => p.Name == name))
                             {
-                                try { PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
+                                try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
                             }
                             GC.Collect();
                             GC.WaitForPendingFinalizers();
@@ -244,7 +242,7 @@ public class DownloadTaskManager
                         // 不重注册则设备启动采集报"插件尚未加载"（对齐 WPF InitPlugin(libPath) 流程）
                         foreach (var (model, _) in result)
                         {
-                            try { PluginHandlerCore.PluginOperate.RemovePluginAsync(model.Name); } catch { /* 未注册忽略 */ }
+                            try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(model.Name); } catch { /* 未注册忽略 */ }
                         }
                         try
                         {
@@ -274,7 +272,7 @@ public class DownloadTaskManager
             // 恢复热更新前正在运行的设备（只恢复本次停掉的）。
             // 对齐 WPF PrivateInit：更新完成后走 Retry（重置计时 → 停止 → 用新插件重建 handler 后启动采集）
             // 单个设备恢复失败不影响其他设备与安装结果（异常不外抛覆盖 installed 计数）
-            foreach (var rt in stopped)
+            foreach (var rt in stopped.Distinct())
             {
                 try { await rt.RetryAsync(); }
                 catch (Exception ex)
