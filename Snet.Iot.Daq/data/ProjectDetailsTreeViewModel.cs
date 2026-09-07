@@ -52,17 +52,10 @@ namespace Snet.Iot.Daq.data
         /// <inheritdoc/>
         public override async Task SetAsync(ObservableCollection<IProjectDetailsTreeViewModel> models)
         {
-            //设置父级关系
             models.InitChildrenParent();
-            //让程序都响应完成后
-            await Task.Delay(50);
-            await Task.Run(async () =>
-            {
-                //设置选中
-                models.EnsureSingleSelection(this);
-                //展开父级
-                this.ExpandParents();
-            });
+            models.EnsureSingleSelection(this);
+            this.ExpandParents();
+            await Task.CompletedTask;
         }
     }
 }

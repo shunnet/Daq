@@ -195,7 +195,7 @@ public class AppStateService
             ExpandAll(child);
     }
 
-    public async Task SaveProjectsAsync()
+    public async Task<bool> SaveProjectsAsync()
     {
         await ConfigSaveGate.WaitAsync();
         try
@@ -205,7 +205,9 @@ public class AppStateService
             {
                 // 重试已耗尽：写入失败不中断电路，但必须让用户可见（控制台信息区），否则静默丢更新
                 _logger.Push("[Error] 项目配置写入失败（已重试 5 次）：ProjectConfig.json 可能被占用");
+                return false;
             }
+            return true;
         }
         finally
         {

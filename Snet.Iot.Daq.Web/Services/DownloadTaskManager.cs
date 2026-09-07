@@ -1,5 +1,6 @@
 ﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
+using Snet.Utility;
 
 namespace Snet.Iot.Daq.Web.Services;
 
@@ -188,6 +189,7 @@ public class DownloadTaskManager
     {
         var installed = 0;
         var stopped = new List<DeviceRuntime>();
+        var serverServicesNeedRestart = false;
         try
         {
             foreach (var name in names)
@@ -207,8 +209,10 @@ public class DownloadTaskManager
                         var targetPath = Path.Combine(typePath, name);
                         Directory.CreateDirectory(typePath);
                         var isHotUpdate = Directory.Exists(targetPath) || LoadPluginList().Any(p => p.Name == name);
+                        string? backupPath = null;
                         if (isHotUpdate)
                         {
+                            serverServicesNeedRestart = true;
                             _logger.Push($"[Info] 检测到同名插件 {name}，执行热更新");
                             // 停用使用该插件的运行设备：设备插件类型是插件类名（如 SiemensOperate），
                             // 下载名是包名（如 Snet.Siemens），类名→包名映射由 RuntimeManager 统一处理
@@ -222,21 +226,33 @@ public class DownloadTaskManager
                             {
                                 try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
                             }
-                            GC.Collect();
-                            GC.WaitForPendingFinalizers();
                         }
-                        if (Directory.Exists(targetPath)) Directory.Delete(targetPath, true);
-                        Directory.Move(srcPath, targetPath);
-                        foreach (var (model, _) in result)
+                        if (Directory.Exists(targetPath))
                         {
-                            model.Path = targetPath;
-                            var plugin = new PluginListModel(model.Name, type, model.Version, DateTime.Now, model);
-                            var list = LoadPluginList();
-                            // 热更新：替换同名旧条目（刷新路径/版本/时间）；新插件：追加
-                            var index = list.FindIndex(p => p.Name == plugin.Name);
-                            if (index >= 0) list[index] = plugin;
-                            else list.Add(plugin);
-                            PluginHandlerCore.SavePluginUIConfig(new System.Collections.ObjectModel.ObservableCollection<PluginListModel>(list), WebPaths.PluginListConfigPath);
+                            backupPath = targetPath + ".backup-" + Guid.NewGuid().ToString("N");
+                            try
+                            {
+                                Directory.Move(targetPath, backupPath);
+                            }
+                            catch (IOException)
+                            {
+                                await Task.Run(() =>
+                                {
+                                    GC.Collect();
+                                    GC.WaitForPendingFinalizers();
+                                });
+                                Directory.Move(targetPath, backupPath);
+                            }
+                        }
+                        try
+                        {
+                            Directory.Move(srcPath, targetPath);
+                        }
+                        catch
+                        {
+                            if (backupPath is not null && Directory.Exists(backupPath) && !Directory.Exists(targetPath))
+                                Directory.Move(backupPath, targetPath);
+                            throw;
                         }
                         // 重新注册最终路径：探测注册的是下载临时目录（Move 后失效），
                         // 不重注册则设备启动采集报"插件尚未加载"（对齐 WPF InitPlugin(libPath) 流程）
@@ -246,16 +262,58 @@ public class DownloadTaskManager
                         }
                         try
                         {
-                            PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                            var registered = PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                            if (registered.Count == 0)
+                                throw new InvalidDataException($"插件 {name} 在最终目录中未发现 {iName} 实现");
                         }
                         catch (Exception ex)
                         {
                             _logger.Push($"[Error] 插件运行时重新注册失败 {name}: {ex.Message}");
+                            if (Directory.Exists(targetPath)) Directory.Delete(targetPath, true);
+                            if (backupPath is not null && Directory.Exists(backupPath))
+                            {
+                                Directory.Move(backupPath, targetPath);
+                                PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                            }
+                            throw;
                         }
-                        // 服务端重启（仅热更新：程序集卸载波及服务端，此时端口已释放可重新绑定）
-                        if (isHotUpdate)
+                        var pluginList = LoadPluginList();
+                        foreach (var (model, _) in result)
                         {
-                            await _hosted.InitServerServicesAsync();
+                            model.Path = targetPath;
+                            var plugin = new PluginListModel(model.Name, type, model.Version, DateTime.Now, model);
+                            var index = pluginList.FindIndex(p => p.Name == plugin.Name);
+                            if (index >= 0) pluginList[index] = plugin;
+                            else pluginList.Add(plugin);
+                        }
+                        await _appState.ConfigSaveGate.WaitAsync();
+                        try
+                        {
+                            if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginListConfigPath, pluginList.ToJson(true)))
+                                throw new IOException($"插件列表配置写入失败: {name}");
+                        }
+                        catch
+                        {
+                            foreach (var (model, _) in result)
+                            {
+                                try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(model.Name); } catch { /* 回滚继续 */ }
+                            }
+                            if (Directory.Exists(targetPath)) Directory.Delete(targetPath, true);
+                            if (backupPath is not null && Directory.Exists(backupPath))
+                            {
+                                Directory.Move(backupPath, targetPath);
+                                PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                            }
+                            throw;
+                        }
+                        finally
+                        {
+                            _appState.ConfigSaveGate.Release();
+                        }
+                        if (backupPath is not null && Directory.Exists(backupPath))
+                        {
+                            try { Directory.Delete(backupPath, true); }
+                            catch (Exception ex) { _logger.Push($"[Warning] 插件备份目录清理失败 {backupPath}: {ex.Message}"); }
                         }
                         installed += result.Count;
                         break;
@@ -269,6 +327,11 @@ public class DownloadTaskManager
         }
         finally
         {
+            if (serverServicesNeedRestart)
+            {
+                try { await _hosted.InitServerServicesAsync(); }
+                catch (Exception ex) { _logger.Push($"[Error] 热更新后恢复服务端失败: {ex.Message}"); }
+            }
             // 恢复热更新前正在运行的设备（只恢复本次停掉的）。
             // 对齐 WPF PrivateInit：更新完成后走 Retry（重置计时 → 停止 → 用新插件重建 handler 后启动采集）
             // 单个设备恢复失败不影响其他设备与安装结果（异常不外抛覆盖 installed 计数）

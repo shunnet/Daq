@@ -542,6 +542,11 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                 {
                     return await EndOperateAsync(false, message, token: token);
                 }
+                if (basics.AType == Data.AuType.UserName &&
+                    (string.IsNullOrWhiteSpace(basics.UserName) || string.IsNullOrWhiteSpace(basics.Password)))
+                {
+                    return await EndOperateAsync(false, "用户名认证已启用，请先配置非空用户名和密码", token: token);
+                }
                 string tag = basics.Tag;
                 //实例化对象
                 AI = new ApplicationInstance(Telemetry)
@@ -549,7 +554,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     ApplicationName = basics.Tag,
                     ApplicationType = ApplicationType.Server,
                     ConfigSectionName = basics.Tag,
-                    CertificatePasswordProvider = new CertificatePasswordProvider(basics.Password.ToCharArray())
+                    CertificatePasswordProvider = new CertificatePasswordProvider((basics.Password ?? string.Empty).ToCharArray())
                 };
 
                 //拼接地址
@@ -565,6 +570,9 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     .SetChannelLifetime(30000)
                     .SetSecurityTokenLifetime(3600000)
                     .AsServer([uri]);
+
+                // 用户名和证书令牌只允许通过签名并加密的安全通道传输。
+                serverConfig.AddPolicy(MessageSecurityMode.SignAndEncrypt, SecurityPolicies.Basic256Sha256);
 
                 //添加验证方式
                 //serverConfig.AddPolicy(MessageSecurityMode.SignAndEncrypt, SecurityPolicies.Basic256Sha256)
@@ -643,7 +651,7 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="NistP384"},
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="BrainpoolP256r1"},
                     new CertificateIdentifier{StoreType="Directory", StorePath=cerRoot,SubjectName=$"CN={tag}, C=US, S=Arizona, O=OPC Foundation, DC=localhost",CertificateTypeString="BrainpoolP384r1"},
-                }).SetAutoAcceptUntrustedCertificates(true)
+                }).SetAutoAcceptUntrustedCertificates(false)
                     .SetRejectSHA1SignedCertificates(true)
                     .SetRejectUnknownRevocationStatus(true)
                     .SetMinimumCertificateKeySize(2048)

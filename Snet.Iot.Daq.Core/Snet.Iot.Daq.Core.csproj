@@ -13,7 +13,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Snet.Mqtt" Version="26.236.1" />
+		<PackageReference Include="Snet.Mqtt" Version="26.250.1" />
 		<PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="2.0.0-preview.3" />
 		<PackageReference Include="Serilog.Expressions" Version="5.0.0" />
 		<PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />

@@ -58,6 +58,39 @@ window.snet = {
             snet.outsideClick.handlers = [];
         }
     },
+    /* 设备/用户列表 ⋯ 操作菜单：菜单脱离滚动容器，按视口锚定。
+       菜单绝对定位于 .device-more 内，而容器（如 .snet-table-wrap）带 overflow：
+       - 向下弹出在滚动视口底部被裁剪（视觉上像被下方卡片遮挡）；
+       - 即使向上/向下翻转，视口内剩余空间不足时（如半个视口行数）仍会被裁。
+       因此这里改为一律使用 position:fixed 按视口坐标摆放：
+       fixed 不受祖先 overflow 裁剪（.card 无 backdrop-filter/transform，不含固定包含块），
+       若上方空间不足则贴视口底边，避免越界。 */
+    deviceMenu: {
+        place: function (root) {
+            var menu = root && root.querySelector('.device-more-menu');
+            if (!menu) return;
+            var toggle = menu.parentElement ? menu.parentElement.querySelector('.device-more-toggle') : null;
+            if (!toggle) return;
+            var tr = toggle.getBoundingClientRect();
+            var w = menu.offsetWidth || 170;
+            var h = menu.offsetHeight || 150;
+            // 视口上下剩余空间：空间大的一侧弹出
+            var downSpace = window.innerHeight - tr.bottom - 4;
+            var upSpace = tr.top - 4;
+            var useUp = upSpace > downSpace;
+            // 用 Math.max/min 夹住视口边界，任何情况下菜单都完整可见
+            var top = useUp
+                ? Math.max(8, tr.top - h - 4)
+                : Math.min(window.innerHeight - h - 8, tr.bottom + 4);
+            var left = Math.min(Math.max(8, tr.right - w), Math.max(8, window.innerWidth - w - 8));
+            menu.classList.remove('menu-down', 'menu-up');
+            menu.style.position = 'fixed';
+            menu.style.top = top + 'px';
+            menu.style.left = left + 'px';
+            menu.style.right = 'auto';
+            menu.style.bottom = 'auto';
+        }
+    },
     clickFileInput: function () {
         var input = document.querySelector('input.upload-input-hidden');
         if (input) input.click();

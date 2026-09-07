@@ -10,13 +10,14 @@ namespace Snet.Iot.Daq.handler
             if (value == null)
                 return string.Empty;
 
-            return value.ToString().Split('.')[^4];
+            var parts = value.ToString()?.Split('.') ?? [];
+            return parts.Length >= 4 ? parts[^4] : value.ToString() ?? string.Empty;
         }
 
         // 从界面 -> 数据源（双向绑定时回写，如果只显示可以不实现）
         public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
         {
-            throw new NotImplementedException();
+            return Binding.DoNothing;
         }
     }
 }

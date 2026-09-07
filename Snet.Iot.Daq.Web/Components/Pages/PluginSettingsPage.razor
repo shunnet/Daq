@@ -716,16 +716,20 @@
                 long totalBytes = 0;
                 if (zip.Entries.Count > MaxExtractEntries)
                     throw new InvalidDataException(T("压缩包条目过多"));
+                var extractRoot = Path.GetFullPath(tempPath);
+                var extractPrefix = extractRoot + Path.DirectorySeparatorChar;
                 foreach (var entry in zip.Entries)
                 {
                     totalBytes += entry.Length;
                     if (totalBytes > MaxExtractBytes)
                         throw new InvalidDataException(T("解压后体积超过限制"));
                     var dest = Path.GetFullPath(Path.Combine(tempPath, entry.FullName));
-                    if (!dest.StartsWith(Path.GetFullPath(tempPath), StringComparison.OrdinalIgnoreCase))
+                    if (!dest.Equals(extractRoot, StringComparison.OrdinalIgnoreCase) &&
+                        !dest.StartsWith(extractPrefix, StringComparison.OrdinalIgnoreCase))
                         throw new InvalidDataException("非法的压缩包路径");
                 }
                 ZipFile.ExtractToDirectory(zipPath, tempPath, true);
+                File.Delete(zipPath);
             }
 
             // 2. 在临时目录先 InitPlugin 探测验证，成功后才进入 lib 目录
@@ -819,49 +823,74 @@
                 newList.Add(new PluginListModel(model.Name, type, model.Version, DateTime.Now, model));
                 names.Add(model.Name);
             }
-            await SavePluginListAsync(newList);
+            var iName = string.Format("Snet.Model.interface.I{0}", type);
+            try
+            {
+                // 探测阶段注册的是临时路径；先移除旧/临时注册，再从最终目录注册并验证。
+                foreach (var name in names.Concat(
+                    _plugins.Where(p => SamePluginPath(p.PluginDetails?.Path, libPath)).Select(p => p.Name)).Distinct())
+                {
+                    try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(name); } catch { /* 未注册忽略 */ }
+                }
+                var registered = PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
+                if (registered.Count == 0)
+                    throw new InvalidDataException(string.Format(T("插件最终目录未检索到接口：{0}"), iName));
+                await SavePluginListAsync(newList);
+            }
+            catch
+            {
+                foreach (var name in names)
+                {
+                    try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(name); } catch { /* 回滚继续 */ }
+                }
+                if (Directory.Exists(libPath))
+                {
+                    try { Directory.Delete(libPath, true); }
+                    catch (IOException)
+                    {
+                        await Task.Run(() =>
+                        {
+                            GC.Collect();
+                            GC.WaitForPendingFinalizers();
+                        });
+                        Directory.Delete(libPath, true);
+                    }
+                }
+                if (backupPath is not null && Directory.Exists(backupPath))
+                {
+                    Directory.Move(backupPath, libPath);
+                    backupPath = null;
+                    PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
+                }
+                throw;
+            }
+
             _uploadStatus = new UploadStatus(string.Format(T("上传成功：{0}，已安装 {1}，点击刷新按钮查看"), zipName + ".zip", string.Join("、", names)), false);
             Toast.Success(string.Format(T("插件上传成功：{0}"), zipName + ".zip"));
             StateHasChanged();
 
-            // 新包就位后卸载旧插件程序集并清理备份（对齐 WPF PrivateRemovalPlugin：卸载 + GC，避免文件锁）
-            if (backupPath is not null)
+            if (backupPath is not null && Directory.Exists(backupPath))
             {
-                foreach (var old in _plugins.Where(p => Path.GetFullPath(p.PluginDetails.Path) == Path.GetFullPath(libPath)).ToList())
+                try { Directory.Delete(backupPath, true); }
+                catch (IOException)
                 {
-                    try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(old.Name); } catch { /* 未注册/已卸载忽略 */ }
+                    await Task.Run(() =>
+                    {
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
+                    });
+                    try { Directory.Delete(backupPath, true); } catch { /* 下次启动清理 */ }
                 }
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                try { Directory.Delete(backupPath, true); } catch { /* 备份清理失败不影响主流程 */ }
             }
 
-            // 在最终 libPath 重新注册运行时插件管理器（对齐 WPF：解压后直接 InitPlugin(libPath)）。
-            // 探测阶段注册的是临时目录（Move 后路径失效），热更新清理又移除了旧注册——
-            // 不重新注册会导致设备启动采集报"插件尚未加载"。
-            var iName = string.Format("Snet.Model.interface.I{0}", type);
-            foreach (var name in names)
-            {
-                try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(name); } catch { /* 未注册忽略 */ }
-            }
-            try
-            {
-                PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
-            }
-            catch (Exception ex)
-            {
-                // 上传本身已成功（文件/清单已落盘，重启后启动加载），仅本次运行内存注册失败
-                Toast.Warning(string.Format(T("插件已安装，但运行时加载失败：{0}"), ex.Message));
-            }
-
-            // 服务端重启（仅热更新：程序集卸载波及服务端，此时端口已释放可重新绑定）
-            if (hotUpdate)
-            {
-                await Hosted.InitServerServicesAsync();
-            }
         }
         finally
         {
+            if (hotUpdate)
+            {
+                try { await Hosted.InitServerServicesAsync(); }
+                catch (Exception ex) { Toast.Warning(T("热更新后服务端恢复失败") + ": " + ex.Message); }
+            }
             // 恢复热更新前正在运行的设备（只恢复本次停掉的，不复活用户手动停止的）。
             // 对齐 WPF PrivateInit：更新完成后走 Retry（重置计时 → 停止 → 用新插件重建 handler 后启动采集）
             foreach (var rt in stoppedDevices)
@@ -1595,8 +1624,13 @@
             Toast.Error(T("数据字节序格式不合法"));
             return;
         }
+        var previous = item.AutoPack;
         item.AutoPack = new AddressAutoPackModel { MaxByteLength = _autoPackMaxByteLength, Format = format, IsStringReverseByteWord = _isStringReverseByteWord };
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.AutoPack = previous;
+            return;
+        }
         // 感知更新：项目树引用/控制台设备同步刷新；运行中设备自动重启重订阅（对齐 WPF SetPlugin → RefreshAsync → Retry）
         AppState.NotifyEntityChanged();
         Toast.Success(T("组包设置已保存"));
@@ -1607,8 +1641,13 @@
         var item = _autoPackConfig;
         if (item is null) return;
         _autoPackConfig = null;
+        var previous = item.AutoPack;
         item.AutoPack = null;
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.AutoPack = previous;
+            return;
+        }
         AppState.NotifyEntityChanged();
         Toast.Success(T("组包已移除"));
     }
@@ -1633,8 +1672,13 @@
             Toast.Warning(T("Ip 地址不能为空"));
             return;
         }
+        var previous = item.WebApi;
         item.WebApi = new WAModel(_webApiIp, _webApiPort, _webApiCrossDomain);
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.WebApi = previous;
+            return;
+        }
         // 感知更新：同上，运行设备自动重启使新 WebApi 参数生效
         AppState.NotifyEntityChanged();
         Toast.Success(T("WebApi 设置已保存"));
@@ -1645,21 +1689,30 @@
         var item = _webApiConfig;
         if (item is null) return;
         _webApiConfig = null;
+        var previous = item.WebApi;
         item.WebApi = null;
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.WebApi = previous;
+            return;
+        }
         AppState.NotifyEntityChanged();
         Toast.Success(T("WebApi 已移除"));
     }
 
     /// <summary>落盘 PluginConfig.json（写门串行 + 重试写，供组包/WebApi 等轻量更新复用）</summary>
-    private async Task SavePluginConfigFileAsync()
+    private async Task<bool> SavePluginConfigFileAsync()
     {
         await AppState.ConfigSaveGate.WaitAsync();
         try
         {
             var list = new ObservableCollection<PluginConfigModel>(AppState.PluginDict.Values.OrderBy(p => p.Index));
             if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath, list.ToJson(true)))
+            {
                 Toast.Error(T("插件配置写入失败"));
+                return false;
+            }
+            return true;
         }
         finally
         {
@@ -1771,6 +1824,19 @@
             return;
         }
 
+        var candidateFileName = BuildConfigFileName(
+            _editingConfig is null
+                ? _plugins.FirstOrDefault(p => p.Name == _newConfigPluginName && p.Type.ToString() == _newConfigType)
+                : _plugins.FirstOrDefault(p => p.Name == _editingConfig.Name && p.Type == _editingConfig.Type),
+            sn);
+        var candidateDir = _editingConfig is null ? TypeConfigDir(Enum.Parse<PluginType>(_newConfigType)) :
+            (string.IsNullOrWhiteSpace(_editingConfig.ConfigPath) ? TypeConfigDir(_editingConfig.Type) : _editingConfig.ConfigPath);
+        if (!PluginConfigModel.TryResolveConfigFilePath(candidateDir, candidateFileName, out _))
+        {
+            Toast.Error(T("SN 不能包含路径或非法文件名字符"));
+            return;
+        }
+
         // 配置写门内完成：冲突检查 → per-SN 文件 → 字典 → PluginConfig.json（重试写，失败回滚内存与文件）
         PluginConfigModel? newConfig = null;
         string? newConfigFile = null;
@@ -1827,7 +1893,8 @@
                 // 对齐 WPF AddPluginConfigAsync：SN = 文件名，同步写入 per-SN 参数文件
                 var configDir = TypeConfigDir(plugin.Type);
                 var fileName = BuildConfigFileName(plugin, sn);
-                if (File.Exists(Path.Combine(configDir, fileName)) || AppState.PluginDict.Values.Any(p => p.SN == fileName))
+                if (!PluginConfigModel.TryResolveConfigFilePath(configDir, fileName, out var configFile) ||
+                    File.Exists(configFile) || AppState.PluginDict.Values.Any(p => p.SN == fileName))
                 {
                     Toast.Error(T("添加失败，插件配置文件已经存在"));
                     return;
@@ -1851,7 +1918,7 @@
                 }
                 AppState.PluginDict[config.Guid] = config;
                 newConfig = config;
-                newConfigFile = Path.Combine(configDir, fileName);
+                newConfigFile = configFile;
             }
             var list = new ObservableCollection<PluginConfigModel>(AppState.PluginDict.Values.OrderBy(p => p.Index));
             // 重试写（对齐 ProjectConfig 落盘方式）：注意 Core 该方法失败返回 false 而不抛异常，必须检查返回值
@@ -1906,7 +1973,11 @@
             AppStateService.NormalizeConfigPath(item);
             // 对齐 WPF RemovePluginConfigAsync：连同 per-SN 参数文件一起删除
             var configDir = string.IsNullOrWhiteSpace(item.ConfigPath) ? TypeConfigDir(item.Type) : item.ConfigPath;
-            var configFile = Path.Combine(configDir, item.SN);
+            if (!PluginConfigModel.TryResolveConfigFilePath(configDir, item.SN, out var configFile))
+            {
+                Toast.Error(T("插件配置文件路径不合法"));
+                return;
+            }
             AppState.PluginDict.Remove(item.Guid, out _);
             var list = new ObservableCollection<PluginConfigModel>(AppState.PluginDict.Values.OrderBy(p => p.Index));
             var saved = await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath, list.ToJson(true));

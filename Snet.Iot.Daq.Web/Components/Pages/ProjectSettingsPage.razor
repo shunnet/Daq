@@ -422,6 +422,17 @@
     /// <summary>感知更新：地址/插件信息变更后刷新树与详情区显示</summary>
     private void OnEntityChanged() => InvokeAsync(StateHasChanged);
 
+    private async Task<bool> SaveProjectsCheckedAsync()
+    {
+        if (await AppState.SaveProjectsAsync()) return true;
+        ToastSvc.Error(T("项目配置写入失败，请检查磁盘和文件占用情况"));
+        // 内存修改未落盘时立即恢复磁盘快照，避免界面显示一个重启后会丢失的状态。
+        await AppState.LoadAllAsync();
+        RuntimeManager.SyncFromProjects(AppState);
+        _selectedDevice = null;
+        return false;
+    }
+
     public override void Dispose()
     {
         AppState.EntityChanged -= OnEntityChanged;
@@ -550,7 +561,7 @@
             AppState.ProjectDict.Clear();
             foreach (var node in projects)
                 AppState.ProjectDict.Add(node);
-            await AppState.SaveProjectsAsync();
+            if (!await SaveProjectsCheckedAsync()) return;
             RuntimeManager.SyncFromProjects(AppState);
             ToastSvc.Success(string.Format(T("导入成功：{0} 个项目"), projects.Count));
         }
@@ -584,7 +595,7 @@
         {
             AppState.ProjectDict.Add(node);
         }
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         ToastSvc.Success(T("添加成功"));
         CloseAddDialog();
     }
@@ -605,7 +616,7 @@
             return;
         }
         _renameTarget.Name = _renameName.Trim();
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         ToastSvc.Success(T("重命名成功"));
         _showRenameDialog = false;
         _renameTarget = null;
@@ -641,7 +652,7 @@
             Parent = _targetParent
         };
         _targetParent.Children.Add(node);
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         _showDeviceDialog = false;
         _targetParent = null;
@@ -726,7 +737,7 @@
         }
         // 更新设备树节点 SpecialData（[ 插件 ] ( 地址数 )）：添加地址路径此前漏调用，左侧树数量不刷新
         _selectedDevice.UpdateSpecialData();
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(string.Format(T("已添加 {0} 个采集地址"), added));
         _showAddressPicker = false;
@@ -774,7 +785,7 @@
             ToastSvc.Warning(T("所有地址已添加该传输设备"));
             return;
         }
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(string.Format(T("已为 {0} 个地址添加传输设备"), added));
         _showMqDialog = false;
@@ -792,7 +803,7 @@
         }
         _mqTarget.Children.Add(new ProjectDetailsTreeViewModelCore(config));
         _mqTarget.UpdateSpecialData();
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("传输设备添加成功"));
         _showMqDialog = false;
@@ -844,8 +855,13 @@
             ToastSvc.Error(T("数据字节序格式不合法"));
             return;
         }
+        var previous = item.AutoPack;
         item.AutoPack = new AddressAutoPackModel { MaxByteLength = _autoPackMaxByteLength, Format = format, IsStringReverseByteWord = _isStringReverseByteWord };
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.AutoPack = previous;
+            return;
+        }
         // 感知更新：项目树引用/插件页同步刷新；运行中设备由 DeviceRuntimeManager 感知后自动重启重订阅（对齐 WPF SetPlugin → RefreshAsync → Retry）
         AppState.NotifyEntityChanged();
         ToastSvc.Success(T("组包设置已保存"));
@@ -856,8 +872,13 @@
         var item = _autoPackTarget;
         if (item is null) return;
         _autoPackTarget = null;
+        var previous = item.AutoPack;
         item.AutoPack = null;
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.AutoPack = previous;
+            return;
+        }
         AppState.NotifyEntityChanged();
         ToastSvc.Success(T("组包已移除"));
     }
@@ -889,8 +910,13 @@
             ToastSvc.Warning(T("Ip 地址不能为空"));
             return;
         }
+        var previous = item.WebApi;
         item.WebApi = new WAModel(_webApiIp, _webApiPort, _webApiCrossDomain);
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.WebApi = previous;
+            return;
+        }
         // 感知更新：同上，运行设备自动重启使新 WebApi 参数生效
         AppState.NotifyEntityChanged();
         ToastSvc.Success(T("WebApi 设置已保存"));
@@ -901,21 +927,30 @@
         var item = _webApiTarget;
         if (item is null) return;
         _webApiTarget = null;
+        var previous = item.WebApi;
         item.WebApi = null;
-        await SavePluginConfigFileAsync();
+        if (!await SavePluginConfigFileAsync())
+        {
+            item.WebApi = previous;
+            return;
+        }
         AppState.NotifyEntityChanged();
         ToastSvc.Success(T("WebApi 已移除"));
     }
 
     /// <summary>落盘 PluginConfig.json（写门串行 + 重试写，供组包/WebApi 轻量更新复用）</summary>
-    private async Task SavePluginConfigFileAsync()
+    private async Task<bool> SavePluginConfigFileAsync()
     {
         await AppState.ConfigSaveGate.WaitAsync();
         try
         {
             var list = new ObservableCollection<PluginConfigModel>(AppState.PluginDict.Values.OrderBy(p => p.Index));
             if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.PluginConfigPath, list.ToJson(true)))
+            {
                 ToastSvc.Error(T("插件配置写入失败"));
+                return false;
+            }
+            return true;
         }
         finally
         {
@@ -973,7 +1008,7 @@
         _confirmRemoveAll = false;
         if (_selectedDevice?.Details is null) return;
         _selectedDevice.Details.Clear();
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("已移除全部地址与传输设备"));
     }
@@ -1059,7 +1094,7 @@
             RemoveNodeRecursive(AppState.ProjectDict, target);
         if (_selectedDevice == target)
             _selectedDevice = null;
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("删除成功"));
     }
@@ -1086,7 +1121,7 @@
         // 只更新 Parent 会漏掉设备节点，必须显式刷新
         if (removed)
             _selectedDevice.UpdateSpecialData();
-        await AppState.SaveProjectsAsync();
+        if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("删除成功"));
     }

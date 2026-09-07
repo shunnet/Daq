@@ -15,6 +15,7 @@ namespace Snet.Iot.Daq.handler
     /// </summary>
     public static class ProjectHandler
     {
+        private static readonly SemaphoreSlim SaveGate = new(1, 1);
         /// <summary>
         /// 回灌项目详情树节点的全局数据（地址、MQ插件等）
         /// </summary>
@@ -50,11 +51,19 @@ namespace Snet.Iot.Daq.handler
         /// <returns>true 表示写入成功；false 表示达到最大重试次数或发生非 IO 异常</returns>
         public static async Task<bool> SaveConfigAsync(ObservableCollection<IProjectTreeViewModel> data, string path)
         {
-            return await ProjectHandlerCore.WriteToFileWithRetryAsync(
-                path,
-                data.ToJson(true),
-                onRetry: (retries, msg) => LogHelper.Error($"文件被占用，重试 {retries}/5：{msg}"),
-                onError: msg => LogHelper.Error($"配置保存失败: {msg}"));
+            await SaveGate.WaitAsync();
+            try
+            {
+                return await ProjectHandlerCore.WriteToFileWithRetryAsync(
+                    path,
+                    data.ToJson(true),
+                    onRetry: (retries, msg) => LogHelper.Error($"文件被占用，重试 {retries}/5：{msg}"),
+                    onError: msg => LogHelper.Error($"配置保存失败: {msg}"));
+            }
+            finally
+            {
+                SaveGate.Release();
+            }
         }
 
         /// <summary>

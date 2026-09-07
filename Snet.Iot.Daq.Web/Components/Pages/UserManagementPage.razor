@@ -11,7 +11,7 @@
 @inject ToastService Toast
 @inject IJSRuntime JS
 
-<div class="card">
+<div class="card" @ref="_root">
     <div class="card-header">
         <h1 class="card-title"><i class="bi bi-people me-2"></i>@T("用户管理")</h1>
         <button class="btn btn-primary btn-sm" @onclick="OpenAdd"><i class="bi bi-person-plus"></i>@T("添加用户")</button>
@@ -263,6 +263,7 @@
     private string? _menuUser;
     private bool _menuLog;
     private DotNetObjectReference<UserManagementPage>? _jsRef;
+    private ElementReference _root;
 
     // 操作日志查看区
     private List<string> _logDates = new();
@@ -316,6 +317,20 @@
     }
 
     [CascadingParameter] private Task<Microsoft.AspNetCore.Components.Authorization.AuthenticationState>? AuthState { get; set; }
+
+    /// <summary>
+    /// 菜单渲染完成后自动选择弹出方向（向上/向下），
+    /// 避免滚动容器内向下弹出被底边 overflow 裁剪（视觉上像被下方卡片遮挡）。
+    /// 每个菜单打开后都能随滚动/页面变化重新定位。
+    /// </summary>
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        await base.OnAfterRenderAsync(firstRender);
+        if (_menuUser is not null || _menuLog)
+        {
+            await JS.InvokeVoidAsync("snet.deviceMenu.place", _root);
+        }
+    }
 
     protected override async Task OnInitializedAsync()
     {

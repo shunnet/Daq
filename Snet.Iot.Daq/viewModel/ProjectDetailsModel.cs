@@ -162,7 +162,7 @@ namespace Snet.Iot.Daq.viewModel
                 if (DetailsNode.Count > 0)
                 {
                     DetailsNode.EnsureSingleSelection();
-                    _ = DetailsNode[DetailsNode.Count - 1].SetAsync(DetailsNode).ConfigureAwait(false);
+                    await DetailsNode[DetailsNode.Count - 1].SetAsync(DetailsNode);
                 }
                 ProjectTree.Details = DetailsNode;  //给父级赋值
                 await ProjectTree.SetAsync(BossProjectTree);  //父级保存（必须等待，避免与后续刷新并发叠加内存）
@@ -188,10 +188,11 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     DetailsNodeSelectedItem?.Children.Add(item);  //选中的节点添加子集
                     DetailsNodeSelectedItem = item; //在把子集设置为选中的节点
-                    _ = DetailsNodeSelectedItem?.SetAsync(DetailsNode).ConfigureAwait(false);
+                    if (DetailsNodeSelectedItem is not null)
+                        await DetailsNodeSelectedItem.SetAsync(DetailsNode);
 
                     ProjectTree.Details = DetailsNode;  //给父级赋值
-                    _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                    await ProjectTree.SetAsync(BossProjectTree);  //父级保存
                     await GlobalConfigModel.RefreshAsync();
                 }
                 else
@@ -266,7 +267,7 @@ namespace Snet.Iot.Daq.viewModel
                     DetailsNodeSelectedItem = null;
                     //保存配置
                     ProjectTree.Details = DetailsNode;  //给父级赋值
-                    _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                    await ProjectTree.SetAsync(BossProjectTree);  //父级保存
                     await GlobalConfigModel.RefreshAsync();
                     await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
@@ -290,7 +291,7 @@ namespace Snet.Iot.Daq.viewModel
                     DetailsNodeSelectedItem = null;
                     //保存配置
                     ProjectTree.Details = DetailsNode;  //给父级赋值
-                    _ = ProjectTree.SetAsync(BossProjectTree).ConfigureAwait(false);  //父级保存
+                    await ProjectTree.SetAsync(BossProjectTree);  //父级保存
                     await GlobalConfigModel.RefreshAsync();
                     await Windows.Controls.message.MessageBox.Show("移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
@@ -497,7 +498,7 @@ namespace Snet.Iot.Daq.viewModel
                 ProjectDetailsTreeViewModel? project = DetailsNode.FindByName(QueryContent) as ProjectDetailsTreeViewModel;
                 if (project is not null)
                 {
-                    _ = project?.SetAsync(DetailsNode).ConfigureAwait(false);
+                    await project.SetAsync(DetailsNode);
                 }
                 else
                 {

@@ -145,6 +145,7 @@
     private bool _browseActionsOpen;
     private bool IsBrowseActionsOpen => _browseActionsOpen;
     private DotNetObjectReference<PluginBrowsePage>? _jsRef;
+    private CancellationTokenSource? _refreshCts;
 
     protected override async Task OnInitializedAsync()
     {
@@ -168,6 +169,8 @@
 
     public override void Dispose()
     {
+        _refreshCts?.Cancel();
+        _refreshCts = null;
         MenuCoordinator.Unregister(CloseMenu);
         base.Dispose();
         DownloadManager.JobChanged -= OnJobChanged;
@@ -250,6 +253,10 @@
 
     private async Task RefreshAsync()
     {
+        var refreshCts = new CancellationTokenSource();
+        var previousCts = _refreshCts;
+        _refreshCts = refreshCts;
+        previousCts?.Cancel();
         _loading = true;
         _pageIndex = 1;
         // 不用 using：CoreUnify.Dispose 对无 SN 实例（无参构造）会从静态容器
@@ -259,7 +266,7 @@
         try
         {
             // 与 WPF 一致：按更新时间倒序（最新在前）
-            _all = (await handler.GetPluginBrowseDataGridModelsAsync(false))
+            _all = (await handler.GetPluginBrowseDataGridModelsAsync(false, refreshCts.Token))
                 .OrderByDescending(x => x.UpdateTime)
                 .ToList();
             for (var i = 0; i < _all.Count; i++) _all[i].Index = i + 1;
@@ -267,7 +274,11 @@
             try
             {
                 Directory.CreateDirectory(WebPaths.UiConfigPath);
-                await File.WriteAllTextAsync(WebPaths.PluginBrowseCachePath, _all.ToJson(true));
+                await File.WriteAllTextAsync(WebPaths.PluginBrowseCachePath, _all.ToJson(true), refreshCts.Token);
+            }
+            catch (OperationCanceledException) when (refreshCts.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception cacheEx)
             {
@@ -275,13 +286,22 @@
             }
             Toast.Success(T("插件列表刷新成功"));
         }
+        catch (OperationCanceledException) when (refreshCts.IsCancellationRequested)
+        {
+            // 页面关闭或用户再次刷新时，不显示失败提示。
+        }
         catch (Exception ex)
         {
             Toast.Error(T("刷新失败") + ": " + ex.Message);
         }
         finally
         {
-            _loading = false;
+            if (ReferenceEquals(_refreshCts, refreshCts))
+            {
+                _refreshCts = null;
+                _loading = false;
+            }
+            refreshCts.Dispose();
             try { handler.Dispose(); } catch { /* CoreUnify 无 SN Dispose 缺陷，忽略 */ }
         }
     }

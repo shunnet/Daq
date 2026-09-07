@@ -430,10 +430,20 @@ namespace Snet.Iot.Daq.viewModel
 
             if (await PluginHandlerCore.PluginOperate.RemovePluginAsync(details.Name))
             {
-                //强制 GC 回收可卸载的程序集上下文，确保释放所有文件句柄
-                GC.Collect();
-                GC.WaitForPendingFinalizers();
-                Directory.Delete(details.Path, true);  //删除插件文件夹
+                try
+                {
+                    Directory.Delete(details.Path, true);
+                }
+                catch (IOException)
+                {
+                    // 仅在程序集文件仍被占用时执行一次回收，并放在线程池避免阻塞 UI 消息循环。
+                    await Task.Run(() =>
+                    {
+                        GC.Collect();
+                        GC.WaitForPendingFinalizers();
+                    });
+                    Directory.Delete(details.Path, true);
+                }
             }
 
             //查询旧路径是否一致的，有的话一并删除
@@ -475,7 +485,11 @@ namespace Snet.Iot.Daq.viewModel
                 object? snValue = prop?.GetValue(obj);
                 //拼接文件名
                 string fileName = string.Format(details.ConfigFormat, snValue);
-                string path = Path.Combine(libConfigPath, fileName);
+                if (!PluginConfigModel.TryResolveConfigFilePath(libConfigPath, fileName, out string path))
+                {
+                    await MessageBox.Show("SN 不能包含路径或非法文件名字符".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
                 if (!File.Exists(path))
                 {
                     FileHandler.StringToFile(path, obj.ToJson(true));
@@ -523,11 +537,21 @@ namespace Snet.Iot.Daq.viewModel
         private async Task UpdatePluginConfigAsync()
         {
             object? obj = PluginHandlerCore.PluginOperate.ConvertPluginJsonParam(PluginConfigSelectedItem.Name, PluginConfigSelectedItem.Param);
+            if (obj is null)
+            {
+                await MessageBox.Show("插件参数无效或插件尚未加载".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
 
             //获取旧的唯一标识符
             Type type = obj.GetType();
             PropertyInfo? prop = type.GetProperty(GlobalConfigModel.LibConfigSNKey);
-            string oldSN = prop?.GetValue(obj).ToString();
+            string? oldSN = prop?.GetValue(obj)?.ToString();
+            if (string.IsNullOrWhiteSpace(oldSN))
+            {
+                await MessageBox.Show("插件参数中缺少 SN".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                return;
+            }
 
             GlobalConfigModel.param.SetBasics(obj);
             if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
@@ -537,7 +561,13 @@ namespace Snet.Iot.Daq.viewModel
                 //获取新的唯一标识符
                 type = obj.GetType();
                 prop = type.GetProperty(GlobalConfigModel.LibConfigSNKey);
-                string newSN = prop?.GetValue(obj).ToString();
+                string? newSN = prop?.GetValue(obj)?.ToString();
+                if (string.IsNullOrWhiteSpace(newSN) ||
+                    !PluginConfigModel.TryResolveConfigFilePath(PluginConfigSelectedItem.ConfigPath, PluginConfigSelectedItem.SN.Replace(oldSN, newSN), out _))
+                {
+                    await MessageBox.Show("SN 不能包含路径或非法文件名字符".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
 
 
                 if (PluginConfigSelectedItem.Check(newSN, oldSN))
@@ -583,7 +613,12 @@ namespace Snet.Iot.Daq.viewModel
             }
             if (await MessageBox.Show($"确定移除插件配置？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
             {
-                string path = Path.Combine(GlobalConfigModel.ConfigPath, PluginConfigSelectedItem.Type.ToString().ToLower(), PluginConfigSelectedItem.SN);
+                string configDir = Path.Combine(GlobalConfigModel.ConfigPath, PluginConfigSelectedItem.Type.ToString().ToLower());
+                if (!PluginConfigModel.TryResolveConfigFilePath(configDir, PluginConfigSelectedItem.SN, out string path))
+                {
+                    await MessageBox.Show("插件配置文件路径不合法".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+                    return;
+                }
                 if (File.Exists(path))
                 {
                     File.Delete(path);

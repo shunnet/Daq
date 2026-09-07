@@ -180,6 +180,10 @@ namespace Snet.Iot.Daq.Core.handler
                         if (metadata != null)
                             results.Add(metadata);
                     }
+                    catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                    {
+                        throw;
+                    }
                     catch (Exception ex)
                     {
                         System.Diagnostics.Debug.WriteLine($"获取包 {packageName} 信息失败: {ex.Message}");
@@ -196,7 +200,7 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="version">版本号（可选），为 null 时自动获取最新稳定版</param>
         /// <param name="includePrerelease">仅在 version 为 null 时生效，是否包含预发行版本</param>
         /// <returns>解析后的元数据对象</returns>
-        public async Task<NuspecMetadata> GetNuspecAsync(string packageName, string version = null, bool includePrerelease = false, CancellationToken cancellationToken = default)
+        public async Task<NuspecMetadata> GetNuspecAsync(string packageName, string? version = null, bool includePrerelease = false, CancellationToken cancellationToken = default)
         {
             if (string.IsNullOrWhiteSpace(packageName))
                 throw new ArgumentException("包名不能为空", nameof(packageName));
@@ -206,13 +210,13 @@ namespace Snet.Iot.Daq.Core.handler
             // 1. 若未指定版本，获取版本列表并选择最新版
             if (string.IsNullOrWhiteSpace(version))
             {
-                var versions = await GetVersionsAsync(lowerName);
+                var versions = await GetVersionsAsync(lowerName, cancellationToken);
                 if (versions == null || versions.Count == 0)
                     throw new InvalidOperationException($"未找到包 '{packageName}' 的任何版本。");
 
                 var candidates = versions
                     .Select(v => NuGetVersion.TryParse(v, out var nv) ? nv : null)
-                    .Where(v => v != null);
+                    .OfType<NuGetVersion>();
 
                 if (!includePrerelease)
                     candidates = candidates.Where(v => !v.IsPrerelease);
@@ -229,7 +233,7 @@ namespace Snet.Iot.Daq.Core.handler
             using var response = await _httpClient.GetAsync(nuspecUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            string xml = await response.Content.ReadAsStringAsync();
+            string xml = await response.Content.ReadAsStringAsync(cancellationToken);
             return ParseNuspec(xml);
         }
 
@@ -240,13 +244,13 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="version">版本号，为 null 时获取最新稳定版</param>
         /// <param name="includePrerelease">是否包含预发行版</param>
         /// <param name="index">序号（用于列表显示）</param>
-        public async Task<PluginBrowseDataGridModel> GetPluginBrowseDataGridModelAsync(string packageName, string version = null, bool includePrerelease = false, int index = 0, CancellationToken cancellationToken = default)
+        public async Task<PluginBrowseDataGridModel> GetPluginBrowseDataGridModelAsync(string packageName, string? version = null, bool includePrerelease = false, int index = 0, CancellationToken cancellationToken = default)
         {
             // 1. 获取 nuspec 元数据（包含作者、描述、图标等）
             var metadata = await GetNuspecAsync(packageName, version, includePrerelease, cancellationToken);
 
             // 2. 获取发布时间（利用缓存，GetNuspecAsync 内部已填充）
-            DateTime publishedTime = await GetPublishedTimeAsync(packageName, metadata.Version);
+            DateTime publishedTime = await GetPublishedTimeAsync(packageName, metadata.Version, cancellationToken);
 
             return new PluginBrowseDataGridModel
             {
@@ -263,15 +267,19 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         /// <param name="includePrerelease">是否包含预发行版</param>
         /// <returns>可用于 DataGrid 绑定的模型列表</returns>
-        public async Task<List<PluginBrowseDataGridModel>> GetPluginBrowseDataGridModelsAsync(bool includePrerelease = false)
+        public async Task<List<PluginBrowseDataGridModel>> GetPluginBrowseDataGridModelsAsync(bool includePrerelease = false, CancellationToken cancellationToken = default)
         {
-            var semaphore = new SemaphoreSlim(16); // 并发上限，避免被服务器限流
+            using var semaphore = new SemaphoreSlim(16); // 并发上限，避免被服务器限流
             var tasks = _plugins.Select(async (pkg, idx) =>
             {
-                await semaphore.WaitAsync();
+                await semaphore.WaitAsync(cancellationToken);
                 try
                 {
-                    return await GetPluginBrowseDataGridModelAsync(pkg, version: null, includePrerelease, idx + 1);
+                    return await GetPluginBrowseDataGridModelAsync(pkg, version: null, includePrerelease, idx + 1, cancellationToken);
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -294,7 +302,7 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="packageName">包名</param>
         /// <param name="version">精确版本号</param>
         /// <returns>发布时间；若未找到则返回 DateTime.MinValue</returns>
-        private async Task<DateTime> GetPublishedTimeAsync(string packageName, string version)
+        private async Task<DateTime> GetPublishedTimeAsync(string packageName, string version, CancellationToken cancellationToken)
         {
             try
             {
@@ -302,18 +310,22 @@ namespace Snet.Iot.Daq.Core.handler
 
                 // 单版本 registration leaf，轻量且不依赖注册索引的分页结构
                 string leafUrl = $"https://api.nuget.org/v3/registration5-gz-semver2/{lowerName}/{version}.json";
-                using var response = await _httpClient.GetAsync(leafUrl);
+                using var response = await _httpClient.GetAsync(leafUrl, cancellationToken);
                 if (!response.IsSuccessStatusCode)
                     return DateTime.MinValue;
 
-                string body = await response.Content.ReadAsStringAsync();
+                string body = await response.Content.ReadAsStringAsync(cancellationToken);
                 using var jsonDoc = JsonDocument.Parse(body);
                 if (jsonDoc.RootElement.TryGetProperty("published", out var pubProp))
                 {
-                    string pubStr = pubProp.GetString();
+                    string? pubStr = pubProp.GetString();
                     if (DateTime.TryParse(pubStr, out var pubTime))
                         return pubTime;
                 }
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -325,13 +337,13 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>
         /// 获取指定包的所有版本（通过 flatcontainer 索引，每次全新请求，不做缓存）
         /// </summary>
-        private async Task<List<string>> GetVersionsAsync(string lowerPackageName)
+        private async Task<List<string>> GetVersionsAsync(string lowerPackageName, CancellationToken cancellationToken)
         {
             string flatIndexUrl = $"https://api.nuget.org/v3-flatcontainer/{lowerPackageName}/index.json";
-            using var response = await _httpClient.GetAsync(flatIndexUrl);
+            using var response = await _httpClient.GetAsync(flatIndexUrl, cancellationToken);
             response.EnsureSuccessStatusCode();
 
-            string body = await response.Content.ReadAsStringAsync();
+            string body = await response.Content.ReadAsStringAsync(cancellationToken);
             using var jsonDoc = JsonDocument.Parse(body);
             var versions = jsonDoc.RootElement.GetProperty("versions")
                 .EnumerateArray()

@@ -3,7 +3,9 @@
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
+@using Snet.Iot.Daq.Core.handler
 @using Snet.Iot.Daq.Web.Components.Shared
+@using Snet.Utility
 @attribute [Authorize]
 @inject DeviceRuntimeManager RuntimeManager
 @inject MonitorSampler Sampler
@@ -359,7 +361,12 @@
         _moreOpen = null;
         await OperateInfoAsync($"{(on ? "添加软启采集" : "取消软启采集")}：{rt.DeviceName}");
         rt.SetSoftCollect(on);
-        await AppState.SaveProjectsAsync();
+        if (!await AppState.SaveProjectsAsync())
+        {
+            rt.SetSoftCollect(!on);
+            Toast.Error(T("项目配置写入失败"));
+            return;
+        }
         Toast.Success(on ? T("添加软启采集成功") : T("取消软启采集成功"));
     }
 
@@ -425,13 +432,45 @@
             }
             Directory.CreateDirectory(WebPaths.ServerConfigPath);
             var path = kind == "mqtt" ? WebPaths.MqttServerConfigPath : WebPaths.UaServerConfigPath;
-            await File.WriteAllTextAsync(path, _serverConfigJson);
+            // JSON 语法正确还不够，先确保可以反序列化为对应配置类型。
+            if (kind == "mqtt")
+                _ = _serverConfigJson.ToJsonEntity<Snet.Mqtt.service.MqttServiceData.Basics>()
+                    ?? throw new InvalidDataException(T("MQTT 配置无效"));
+            else
+                _ = _serverConfigJson.ToJsonEntity<Snet.Iot.Daq.Core.opc.ua.service.OpcUaServiceData.Basics>()
+                    ?? throw new InvalidDataException(T("OPC UA 配置无效"));
+
+            var existed = File.Exists(path);
+            var oldConfig = existed ? await File.ReadAllTextAsync(path) : null;
+            var wasRunning = (kind == "mqtt" && AppState.MqttService is not null)
+                || (kind == "ua" && AppState.UaService is not null);
+            await ProjectHandlerCore.WriteToFileAsync(path, _serverConfigJson);
             // 运行中修改：停止后按新配置重启（对齐 WPF 修改后需重启服务生效）
-            if ((kind == "mqtt" && AppState.MqttService is not null)
-                || (kind == "ua" && AppState.UaService is not null))
+            if (wasRunning)
             {
-                await Host.StopServerAsync(kind);
-                await Host.StartServerAsync(kind);
+                var (stopped, stopMessage) = await Host.StopServerAsync(kind);
+                if (!stopped)
+                {
+                    if (oldConfig is not null)
+                        await ProjectHandlerCore.WriteToFileAsync(path, oldConfig);
+                    else if (File.Exists(path))
+                        File.Delete(path);
+                    Toast.Error(T("服务停止失败，配置未应用") + ": " + stopMessage);
+                    return;
+                }
+                var (started, message) = await Host.StartServerAsync(kind);
+                if (!started)
+                {
+                    if (oldConfig is not null)
+                        await ProjectHandlerCore.WriteToFileAsync(path, oldConfig);
+                    else if (File.Exists(path))
+                        File.Delete(path);
+                    var (restored, restoreMessage) = await Host.StartServerAsync(kind);
+                    Toast.Error(restored
+                        ? T("新配置启动失败，已恢复原配置") + ": " + message
+                        : T("新配置启动失败，原配置恢复后仍无法启动") + $": {message}; {restoreMessage}");
+                    return;
+                }
             }
             CloseServerConfig();
             Toast.Success(T("保存成功"));

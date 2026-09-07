@@ -174,7 +174,9 @@ namespace Snet.Iot.Daq.Core.data
         {
             try
             {
-                FileHandler.StringToFile(Path.Combine(ConfigPath, SN), Param);
+                if (!TryResolveConfigFilePath(ConfigPath, SN, out var path))
+                    throw new InvalidDataException($"非法的插件配置文件名：{SN}");
+                FileHandler.StringToFile(path, Param);
                 return true;
             }
             catch (Exception ex)
@@ -206,7 +208,11 @@ namespace Snet.Iot.Daq.Core.data
                 return true;
             }
             string newFileName = SN.Replace(oldSn, newSn);
-            if (File.Exists(Path.Combine(ConfigPath, newFileName)))
+            if (!TryResolveConfigFilePath(ConfigPath, newFileName, out var newPath))
+            {
+                return false;
+            }
+            if (File.Exists(newPath))
             {
                 return false;  // 文件名已存在，不能修改
             }
@@ -225,6 +231,12 @@ namespace Snet.Iot.Daq.Core.data
             string oldFileName = SN;
             string newFileName = SN.Replace(oldSn, newSn);
 
+            if (!TryResolveConfigFilePath(ConfigPath, oldFileName, out var oldPath) ||
+                !TryResolveConfigFilePath(ConfigPath, newFileName, out _))
+            {
+                return false;
+            }
+
             SN = newFileName;
             if (!UpdateLocalConfig())
             {
@@ -237,7 +249,7 @@ namespace Snet.Iot.Daq.Core.data
             {
                 try
                 {
-                    File.Delete(Path.Combine(ConfigPath, oldFileName));
+                    File.Delete(oldPath);
                 }
                 catch (Exception ex)
                 {
@@ -246,6 +258,33 @@ namespace Snet.Iot.Daq.Core.data
                 }
             }
             return true;
+        }
+
+        /// <summary>验证配置文件名并解析到指定目录，禁止绝对路径和目录穿越。</summary>
+        public static bool TryResolveConfigFilePath(string configPath, string fileName, out string path)
+        {
+            path = string.Empty;
+            if (string.IsNullOrWhiteSpace(configPath) || string.IsNullOrWhiteSpace(fileName) ||
+                Path.IsPathRooted(fileName) || fileName is "." or ".." ||
+                fileName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0 ||
+                fileName.Contains(Path.DirectorySeparatorChar) || fileName.Contains(Path.AltDirectorySeparatorChar))
+            {
+                return false;
+            }
+
+            try
+            {
+                var root = Path.GetFullPath(configPath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                var candidate = Path.GetFullPath(Path.Combine(root, fileName));
+                if (!candidate.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    return false;
+                path = candidate;
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
         }
     }
 }

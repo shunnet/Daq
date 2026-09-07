@@ -1660,6 +1660,11 @@ html[lang^="zh"] .device-info .row span.label::after { content: "\FF1A"; }
     top: calc(100% + 4px);
     bottom: auto;
 }
+/* JS 按剩余空间自动选择的向上弹出方向（须在 .menu-down 之后声明以覆盖同名属性） */
+.device-more-menu.menu-up {
+    top: auto;
+    bottom: calc(100% + 4px);
+}
 .device-more-menu {
     position: absolute;
     right: 0;

@@ -475,10 +475,10 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand TreeView_PreviewMouseRightButtonDown => treeView_PreviewMouseRightButtonDown ??= new AsyncRelayCommand<MouseButtonEventArgs>(TreeView_PreviewMouseRightButtonDownAsync);
         private IAsyncRelayCommand? treeView_PreviewMouseRightButtonDown;
-        private Task TreeView_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
+        private async Task TreeView_PreviewMouseRightButtonDownAsync(MouseButtonEventArgs? e)
         {
             if (e?.OriginalSource is not DependencyObject source)
-                return Task.CompletedTask;
+                return;
 
             System.Windows.DependencyObject dep = (System.Windows.DependencyObject)e.OriginalSource;
 
@@ -491,7 +491,8 @@ namespace Snet.Iot.Daq.viewModel
                 {
                     IProjectTreeViewModel? model = treeItem?.DataContext.GetSource<IProjectTreeViewModel>();
                     ProjectNodeSelectedItem = model;
-                    _ = ProjectNodeSelectedItem?.SetAsync(ProjectNode).ConfigureAwait(false);
+                    if (ProjectNodeSelectedItem is not null)
+                        await ProjectNodeSelectedItem.SetAsync(ProjectNode);
                 }
                 treeItem?.Focus();
                 e.Handled = true;
@@ -502,7 +503,6 @@ namespace Snet.Iot.Daq.viewModel
                 ProjectNodeSelectedItem = null;
                 e.Handled = true; // 阻止默认右键
             }
-            return Task.CompletedTask;
         }
 
         /// <summary>
@@ -510,17 +510,16 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand TreeView_SelectedItemChanged => treeView_SelectedItemChanged ??= new AsyncRelayCommand<RoutedPropertyChangedEventArgs<object>>(TreeView_SelectedItemChangedAsync);
         private IAsyncRelayCommand? treeView_SelectedItemChanged;
-        private Task TreeView_SelectedItemChangedAsync(RoutedPropertyChangedEventArgs<object>? e)
+        private async Task TreeView_SelectedItemChangedAsync(RoutedPropertyChangedEventArgs<object>? e)
         {
             if (e?.NewValue is not IProjectTreeViewModel model)
-                return Task.CompletedTask;
-            _ = model?.SetAsync(ProjectNode).ConfigureAwait(false);
+                return;
+            await model.SetAsync(ProjectNode);
             if (model?.NodeType == ProjectNodeType.Device)
             {
                 ProjectNode.CreateDetails(model);
-                _ = AddSelectDeviceNodeAsync(model).ConfigureAwait(false);
+                await AddSelectDeviceNodeAsync(model);
             }
-            return Task.CompletedTask;
         }
 
 
@@ -675,7 +674,7 @@ namespace Snet.Iot.Daq.viewModel
                 IProjectTreeViewModel? project = ProjectNode.FindByName(QueryContent);
                 if (project is not null)
                 {
-                    _ = project?.SetAsync(ProjectNode).ConfigureAwait(false);
+                    await project.SetAsync(ProjectNode);
                 }
                 else
                 {
