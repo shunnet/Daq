@@ -19,7 +19,7 @@
                 var theme = localStorage.getItem('snet-theme');
                 document.documentElement.setAttribute('data-theme', theme || 'dark');
                 var lang = localStorage.getItem('snet-lang');
-                if (lang) document.documentElement.setAttribute('lang', lang);
+                if (lang) document.documentElement.setAttribute('lang', lang === 'en' ? 'en' : 'zh-Hans');
             } catch (e) { }
         })();
     </script>

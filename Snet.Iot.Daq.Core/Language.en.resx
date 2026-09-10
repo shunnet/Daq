@@ -772,4 +772,931 @@
   <data name="插件默认路径：" xml:space="preserve">
     <value>Default path for plugins:</value>
   </data>
+  <data name="AccountLocked" xml:space="preserve">
+    <value>Account locked, try again later</value>
+  </data>
+  <data name="InvalidOldPassword" xml:space="preserve">
+    <value>Invalid old password</value>
+  </data>
+  <data name="InvalidUsernameOrPassword" xml:space="preserve">
+    <value>Invalid username or password</value>
+  </data>
+  <data name="Ip 地址" xml:space="preserve">
+    <value>IP address</value>
+  </data>
+  <data name="Ip 地址不能为空" xml:space="preserve">
+    <value>IP address cannot be empty</value>
+  </data>
+  <data name="JSON" xml:space="preserve">
+    <value>JSON</value>
+  </data>
+  <data name="MQ 传输设备" xml:space="preserve">
+    <value>MQ Transfer Device</value>
+  </data>
+  <data name="MQ 转发失败 {0}: {1}" xml:space="preserve">
+    <value>MQ forward failed {0}: {1}</value>
+  </data>
+  <data name="MQTT 服务启动失败" xml:space="preserve">
+    <value>MQTT service failed to start</value>
+  </data>
+  <data name="MQTT 服务启动成功" xml:space="preserve">
+    <value>MQTT service started</value>
+  </data>
+  <data name="MQTT 服务已停止" xml:space="preserve">
+    <value>MQTT service stopped</value>
+  </data>
+  <data name="MQTT 配置无效" xml:space="preserve">
+    <value>Invalid MQTT configuration</value>
+  </data>
+  <data name="OPC UA 服务启动失败" xml:space="preserve">
+    <value>OPC UA service failed to start</value>
+  </data>
+  <data name="OPC UA 服务启动成功" xml:space="preserve">
+    <value>OPC UA service started</value>
+  </data>
+  <data name="OPC UA 服务已停止" xml:space="preserve">
+    <value>OPC UA service stopped</value>
+  </data>
+  <data name="OPC UA 配置无效" xml:space="preserve">
+    <value>Invalid OPC UA configuration</value>
+  </data>
+  <data name="PasswordMismatch" xml:space="preserve">
+    <value>Passwords do not match</value>
+  </data>
+  <data name="PasswordTooShort" xml:space="preserve">
+    <value>Password must be at least 6 characters</value>
+  </data>
+  <data name="SN 不能包含路径或非法文件名字符" xml:space="preserve">
+    <value>SN cannot contain a path or invalid filename characters</value>
+  </data>
+  <data name="SN 已存在" xml:space="preserve">
+    <value>SN already exists</value>
+  </data>
+  <data name="String解包是否按字反转字节" xml:space="preserve">
+    <value>Does String unpacking reverse bytes by word</value>
+  </data>
+  <data name="Topic" xml:space="preserve">
+    <value>Topic</value>
+  </data>
+  <data name="Topic 不能为空" xml:space="preserve">
+    <value>Topic cannot be empty</value>
+  </data>
+  <data name="UA 写入失败 {0}: {1}" xml:space="preserve">
+    <value>UA write failed {0}: {1}</value>
+  </data>
+  <data name="UA 地址创建失败 {0}: {1}" xml:space="preserve">
+    <value>UA address creation failed {0}: {1}</value>
+  </data>
+  <data name="UA 地址映射失败 {0}（AddressSpaceName={1}）" xml:space="preserve">
+    <value>UA address mapping failed {0} (AddressSpaceName={1})</value>
+  </data>
+  <data name="UA 层级创建失败 {0}: {1}" xml:space="preserve">
+    <value>UA folder creation failed {0}: {1}</value>
+  </data>
+  <data name="UA 层级创建失败，跳过转发" xml:space="preserve">
+    <value>UA folder creation failed, skip forwarding</value>
+  </data>
+  <data name="UA 层级创建异常: {0}" xml:space="preserve">
+    <value>UA folder creation error: {0}</value>
+  </data>
+  <data name="UA 服务端未启动，跳过转发" xml:space="preserve">
+    <value>UA server not started, skip forwarding</value>
+  </data>
+  <data name="UA 服务端未运行，跳过转发" xml:space="preserve">
+    <value>UA server is not running; forwarding skipped</value>
+  </data>
+  <data name="UA 服务端未运行，跳过转发：{0}" xml:space="preserve">
+    <value>UA server not running, skip forwarding: {0}</value>
+  </data>
+  <data name="UA 转发异常 {0}: {1}" xml:space="preserve">
+    <value>UA forward error {0}: {1}</value>
+  </data>
+  <data name="UA 转发异常: {0}" xml:space="preserve">
+    <value>UA forwarding error: {0}</value>
+  </data>
+  <data name="UserDisabled" xml:space="preserve">
+    <value>Account disabled, please contact the administrator</value>
+  </data>
+  <data name="WebApi 停止" xml:space="preserve">
+    <value>WebApi Stop</value>
+  </data>
+  <data name="WebApi 启动" xml:space="preserve">
+    <value>WebApi Start</value>
+  </data>
+  <data name="WebApi 已移除" xml:space="preserve">
+    <value>WebApi removed</value>
+  </data>
+  <data name="WebApi 设置" xml:space="preserve">
+    <value>WebApi Settings</value>
+  </data>
+  <data name="WebApi 设置已保存" xml:space="preserve">
+    <value>WebApi settings saved</value>
+  </data>
+  <data name="WebApi 请求示例" xml:space="preserve">
+    <value>WebApi Example</value>
+  </data>
+  <data name="[Error] Daq 宿主初始化失败: {0}" xml:space="preserve">
+    <value>[Error] Daq host init failed: {0}</value>
+  </data>
+  <data name="[Error] MQTT 服务端停止异常: {0}" xml:space="preserve">
+    <value>[Error] MQTT server stop error: {0}</value>
+  </data>
+  <data name="[Error] MQTT 服务端启动失败: {0}" xml:space="preserve">
+    <value>[Error] MQTT server start failed: {0}</value>
+  </data>
+  <data name="[Error] MQTT 服务端启动异常: {0}" xml:space="preserve">
+    <value>[Error] MQTT server start error: {0}</value>
+  </data>
+  <data name="[Error] OPC UA 服务端停止异常: {0}" xml:space="preserve">
+    <value>[Error] OPC UA server stop error: {0}</value>
+  </data>
+  <data name="[Error] OPC UA 服务端启动失败: {0}" xml:space="preserve">
+    <value>[Error] OPC UA server start failed: {0}</value>
+  </data>
+  <data name="[Error] OPC UA 服务端启动异常: {0}" xml:space="preserve">
+    <value>[Error] OPC UA server start error: {0}</value>
+  </data>
+  <data name="[Error] 服务停止异常: {0}" xml:space="preserve">
+    <value>[Error] Service stop error: {0}</value>
+  </data>
+  <data name="[Info] Daq 宿主启动完成，设备 {0} 台" xml:space="preserve">
+    <value>[Info] Daq host started, {0} devices</value>
+  </data>
+  <data name="[Info] MQTT 服务端已启动" xml:space="preserve">
+    <value>[Info] MQTT server started</value>
+  </data>
+  <data name="[Info] OPC UA 服务端已启动" xml:space="preserve">
+    <value>[Info] OPC UA server started</value>
+  </data>
+  <data name="[{0}] WebApi 停止{1}: {2}" xml:space="preserve">
+    <value>[{0}] WebApi {1}: {2}</value>
+  </data>
+  <data name="[{0}] WebApi 关闭异常: {1}" xml:space="preserve">
+    <value>[{0}] WebApi close error: {1}</value>
+  </data>
+  <data name="[{0}] WebApi 启动{1}: {2}" xml:space="preserve">
+    <value>[{0}] WebApi {1}: {2}</value>
+  </data>
+  <data name="[{0}] WebApi 启动异常: {1}" xml:space="preserve">
+    <value>[{0}] WebApi start error: {1}</value>
+  </data>
+  <data name="[{0}] WebApi 状态查询异常: {1}" xml:space="preserve">
+    <value>[{0}] WebApi status query error: {1}</value>
+  </data>
+  <data name="[{0}] {1}" xml:space="preserve">
+    <value>[{0}] {1}</value>
+  </data>
+  <data name="[{0}] 停止采集" xml:space="preserve">
+    <value>[{0}] Collection stopped</value>
+  </data>
+  <data name="[{0}] 启动采集失败: {1}" xml:space="preserve">
+    <value>[{0}] Failed to start collection: {1}</value>
+  </data>
+  <data name="[{0}] 启动采集异常: {1}" xml:space="preserve">
+    <value>[{0}] Collection start error: {1}</value>
+  </data>
+  <data name="[{0}] 启动采集成功，地址数 {1}" xml:space="preserve">
+    <value>[{0}] Collection started, {1} addresses</value>
+  </data>
+  <data name="[{0}] 数据入队异常: {1}" xml:space="preserve">
+    <value>[{0}] Data enqueue error: {1}</value>
+  </data>
+  <data name="[{0}] 数据通道异常: {1}" xml:space="preserve">
+    <value>[{0}] Data channel error: {1}</value>
+  </data>
+  <data name="[{0}] 未设置 WebApi 参数" xml:space="preserve">
+    <value>[{0}] WebApi parameters not set</value>
+  </data>
+  <data name="[{0}] 退订异常: {1}" xml:space="preserve">
+    <value>[{0}] Unsubscribe error: {1}</value>
+  </data>
+  <data name="[{0}] 采集未启动，无法操作 WebApi" xml:space="preserve">
+    <value>[{0}] Collection not running, cannot operate WebApi</value>
+  </data>
+  <data name="{0} 台设备已加载" xml:space="preserve">
+    <value>{0} device(s) loaded</value>
+  </data>
+  <data name="上传中..." xml:space="preserve">
+    <value>Uploading...</value>
+  </data>
+  <data name="上传成功：{0}，已安装 {1}，点击刷新按钮查看" xml:space="preserve">
+    <value>Uploaded {0}, installed {1}. Click Refresh to view</value>
+  </data>
+  <data name="下载中" xml:space="preserve">
+    <value>Downloading</value>
+  </data>
+  <data name="下载失败" xml:space="preserve">
+    <value>Download failed</value>
+  </data>
+  <data name="下载完成" xml:space="preserve">
+    <value>Download complete</value>
+  </data>
+  <data name="下载选中" xml:space="preserve">
+    <value>Download selected</value>
+  </data>
+  <data name="不能停用当前登录用户" xml:space="preserve">
+    <value>Cannot disable the current user</value>
+  </data>
+  <data name="不能删除当前登录用户" xml:space="preserve">
+    <value>Cannot delete the current user</value>
+  </data>
+  <data name="主题" xml:space="preserve">
+    <value>Theme</value>
+  </data>
+  <data name="仅支持 .zip 插件包" xml:space="preserve">
+    <value>Only .zip plugin packages supported</value>
+  </data>
+  <data name="从地址库选择" xml:space="preserve">
+    <value>Select from Address Library</value>
+  </data>
+  <data name="以下地址未配置传输设备，无法采集：{0}" xml:space="preserve">
+    <value>The following addresses have no transmission device configured and cannot be collected: {0}</value>
+  </data>
+  <data name="传输设备添加成功" xml:space="preserve">
+    <value>Transfer device added</value>
+  </data>
+  <data name="使用" xml:space="preserve">
+    <value>Use</value>
+  </data>
+  <data name="保存" xml:space="preserve">
+    <value>Save</value>
+  </data>
+  <data name="保存成功" xml:space="preserve">
+    <value>Saved successfully</value>
+  </data>
+  <data name="修改失败，地址已不存在" xml:space="preserve">
+    <value>Update failed: the address no longer exists</value>
+  </data>
+  <data name="修改失败，插件配置文件名称已经存在，请修改SN" xml:space="preserve">
+    <value>Update failed: the config file name already exists, please change the SN</value>
+  </data>
+  <data name="修改密码" xml:space="preserve">
+    <value>Change password</value>
+  </data>
+  <data name="修改服务配置" xml:space="preserve">
+    <value>Edit server config</value>
+  </data>
+  <data name="值" xml:space="preserve">
+    <value>Value</value>
+  </data>
+  <data name="值不能为空" xml:space="preserve">
+    <value>Value cannot be empty</value>
+  </data>
+  <data name="停止下载" xml:space="preserve">
+    <value>Stop download</value>
+  </data>
+  <data name="停用" xml:space="preserve">
+    <value>Disable</value>
+  </data>
+  <data name="全部" xml:space="preserve">
+    <value>All</value>
+  </data>
+  <data name="共 {0} 条" xml:space="preserve">
+    <value>Total {0} items</value>
+  </data>
+  <data name="关键字" xml:space="preserve">
+    <value>Keyword</value>
+  </data>
+  <data name="内容" xml:space="preserve">
+    <value>Content</value>
+  </data>
+  <data name="写入测试" xml:space="preserve">
+    <value>Write Test</value>
+  </data>
+  <data name="分页" xml:space="preserve">
+    <value>Pagination</value>
+  </data>
+  <data name="到地址库选择" xml:space="preserve">
+    <value>Select from Address Library</value>
+  </data>
+  <data name="刷新失败" xml:space="preserve">
+    <value>Refresh failed</value>
+  </data>
+  <data name="前往插件设置" xml:space="preserve">
+    <value>Go to Plugin Settings</value>
+  </data>
+  <data name="加载" xml:space="preserve">
+    <value>Load</value>
+  </data>
+  <data name="单次批量读取的最大字节数" xml:space="preserve">
+    <value>Max bytes per batch read</value>
+  </data>
+  <data name="压缩包条目过多" xml:space="preserve">
+    <value>Archive has too many entries</value>
+  </data>
+  <data name="参数" xml:space="preserve">
+    <value>Parameters</value>
+  </data>
+  <data name="参数 JSON 错误" xml:space="preserve">
+    <value>Invalid parameter JSON</value>
+  </data>
+  <data name="参数中缺少 SN，请在参数 JSON 中填写 SN" xml:space="preserve">
+    <value>Missing SN in parameters, please fill SN in the JSON</value>
+  </data>
+  <data name="参数校验失败" xml:space="preserve">
+    <value>Parameter validation failed</value>
+  </data>
+  <data name="取消" xml:space="preserve">
+    <value>Cancel</value>
+  </data>
+  <data name="同名插件已存在，执行热更新" xml:space="preserve">
+    <value>Plugin with same name exists, performing hot update</value>
+  </data>
+  <data name="同名插件已存在，是否执行热更新？运行中的设备将暂停后恢复" xml:space="preserve">
+    <value>A plugin with the same name already exists. Perform a hot update? Running devices will be paused and resumed.</value>
+  </data>
+  <data name="同源" xml:space="preserve">
+    <value>Same origin</value>
+  </data>
+  <data name="名称不能为空" xml:space="preserve">
+    <value>Name cannot be empty</value>
+  </data>
+  <data name="启动失败" xml:space="preserve">
+    <value>Failed to start</value>
+  </data>
+  <data name="启用" xml:space="preserve">
+    <value>Enable</value>
+  </data>
+  <data name="地址 {0} 处理异常: {1}" xml:space="preserve">
+    <value>Address {0} error: {1}</value>
+  </data>
+  <data name="地址和别名不能为空" xml:space="preserve">
+    <value>Address and alias cannot be empty</value>
+  </data>
+  <data name="地址编辑" xml:space="preserve">
+    <value>Edit Address</value>
+  </data>
+  <data name="处理间隔" xml:space="preserve">
+    <value>Processing interval</value>
+  </data>
+  <data name="字体" xml:space="preserve">
+    <value>Font</value>
+  </data>
+  <data name="密码" xml:space="preserve">
+    <value>Password</value>
+  </data>
+  <data name="密码已重置" xml:space="preserve">
+    <value>Password reset</value>
+  </data>
+  <data name="导入失败：未识别到地址数据" xml:space="preserve">
+    <value>Import failed: no address data recognized</value>
+  </data>
+  <data name="导入失败：未识别到项目数据" xml:space="preserve">
+    <value>Import failed: no project data recognized</value>
+  </data>
+  <data name="导入完成：新增 {0} 个，重复跳过 {1} 个" xml:space="preserve">
+    <value>Import done: {0} added, {1} duplicates skipped</value>
+  </data>
+  <data name="导入成功：{0} 个地址" xml:space="preserve">
+    <value>Imported {0} addresses</value>
+  </data>
+  <data name="导入成功：{0} 个项目" xml:space="preserve">
+    <value>Imported {0} projects</value>
+  </data>
+  <data name="导出成功：{0} 个地址" xml:space="preserve">
+    <value>Exported {0} addresses</value>
+  </data>
+  <data name="导出成功：{0} 个项目" xml:space="preserve">
+    <value>Exported {0} projects</value>
+  </data>
+  <data name="将应用到该设备下的全部采集地址（已有相同 SN 的跳过）" xml:space="preserve">
+    <value>Applies to all collection addresses of this device (same SN skipped)</value>
+  </data>
+  <data name="已为 {0} 个地址添加传输设备" xml:space="preserve">
+    <value>Transfer device added to {0} addresses</value>
+  </data>
+  <data name="已停止下载" xml:space="preserve">
+    <value>Download stopped</value>
+  </data>
+  <data name="已停用" xml:space="preserve">
+    <value>Disabled</value>
+  </data>
+  <data name="已加入下载队列" xml:space="preserve">
+    <value>Added to download queue</value>
+  </data>
+  <data name="已添加 {0} 个采集地址" xml:space="preserve">
+    <value>{0} collection addresses added</value>
+  </data>
+  <data name="已清空" xml:space="preserve">
+    <value>Cleared</value>
+  </data>
+  <data name="已移除全部地址与传输设备" xml:space="preserve">
+    <value>All addresses and transfer devices removed</value>
+  </data>
+  <data name="已装插件" xml:space="preserve">
+    <value>Installed Plugins</value>
+  </data>
+  <data name="已选" xml:space="preserve">
+    <value>Selected</value>
+  </data>
+  <data name="当前登录" xml:space="preserve">
+    <value>Current User</value>
+  </data>
+  <data name="必填" xml:space="preserve">
+    <value>Required</value>
+  </data>
+  <data name="所有地址已添加该传输设备" xml:space="preserve">
+    <value>All addresses already have this transfer device</value>
+  </data>
+  <data name="打开方式" xml:space="preserve">
+    <value>Open method</value>
+  </data>
+  <data name="扩展参数" xml:space="preserve">
+    <value>Extended Parameters</value>
+  </data>
+  <data name="批量添加 MQ 传输设备" xml:space="preserve">
+    <value>Batch Add MQ Transfer Devices</value>
+  </data>
+  <data name="批量添加传输" xml:space="preserve">
+    <value>Batch Add Transfer</value>
+  </data>
+  <data name="折叠导航" xml:space="preserve">
+    <value>Toggle Navigation</value>
+  </data>
+  <data name="插件" xml:space="preserve">
+    <value>Plugins</value>
+  </data>
+  <data name="插件上传失败" xml:space="preserve">
+    <value>Plugin upload failed</value>
+  </data>
+  <data name="插件上传成功：{0}" xml:space="preserve">
+    <value>Plugin uploaded: {0}</value>
+  </data>
+  <data name="插件下载位置" xml:space="preserve">
+    <value>Plugin Download Location</value>
+  </data>
+  <data name="插件列表为空，点击刷新从 NuGet 市场拉取" xml:space="preserve">
+    <value>Plugin list is empty, click Refresh to fetch from NuGet</value>
+  </data>
+  <data name="插件列表刷新成功" xml:space="preserve">
+    <value>Plugin list refreshed</value>
+  </data>
+  <data name="插件包名不合法" xml:space="preserve">
+    <value>Invalid plugin package name</value>
+  </data>
+  <data name="插件包超过 100MB 限制" xml:space="preserve">
+    <value>Plugin package exceeds 100MB limit</value>
+  </data>
+  <data name="插件化工业物联网数据采集工具" xml:space="preserve">
+    <value>Plugin-based Industrial IoT Data Acquisition Tool</value>
+  </data>
+  <data name="插件已从列表移除，目录清理失败" xml:space="preserve">
+    <value>Plugin removed from list but directory cleanup failed</value>
+  </data>
+  <data name="插件已安装，但运行时加载失败：{0}" xml:space="preserve">
+    <value>Plugin installed, but failed to load at runtime: {0}</value>
+  </data>
+  <data name="插件已移除：{0}" xml:space="preserve">
+    <value>Plugin removed: {0}</value>
+  </data>
+  <data name="插件最终目录未检索到接口：{0}" xml:space="preserve">
+    <value>The plugin interface was not found in the final directory: {0}</value>
+  </data>
+  <data name="插件目录清理失败" xml:space="preserve">
+    <value>Plugin directory cleanup failed</value>
+  </data>
+  <data name="插件目录移除失败（列表已清理）：{0}" xml:space="preserve">
+    <value>Plugin directory removal failed (list already cleaned): {0}</value>
+  </data>
+  <data name="插件移除失败" xml:space="preserve">
+    <value>Plugin removal failed</value>
+  </data>
+  <data name="插件路径不合法" xml:space="preserve">
+    <value>Invalid plugin path</value>
+  </data>
+  <data name="插件配置写入失败" xml:space="preserve">
+    <value>Failed to write the plugin config file</value>
+  </data>
+  <data name="插件配置文件路径不合法" xml:space="preserve">
+    <value>Invalid plugin configuration file path</value>
+  </data>
+  <data name="搜索插件包名" xml:space="preserve">
+    <value>Search plugin package name</value>
+  </data>
+  <data name="搜索：地址 / 别名 / 描述" xml:space="preserve">
+    <value>Search: Address / Alias / Description</value>
+  </data>
+  <data name="操作日志" xml:space="preserve">
+    <value>Operation Logs</value>
+  </data>
+  <data name="数据" xml:space="preserve">
+    <value>Data</value>
+  </data>
+  <data name="数据传输主题" xml:space="preserve">
+    <value>Data transfer topic</value>
+  </data>
+  <data name="数据传输精简值" xml:space="preserve">
+    <value>Simplify transfer value</value>
+  </data>
+  <data name="数据字节序格式" xml:space="preserve">
+    <value>Data byte order format</value>
+  </data>
+  <data name="数据字节序格式不合法" xml:space="preserve">
+    <value>Invalid data byte order format</value>
+  </data>
+  <data name="文件内容为空" xml:space="preserve">
+    <value>File is empty</value>
+  </data>
+  <data name="文件过大或不合法" xml:space="preserve">
+    <value>File is too large or invalid</value>
+  </data>
+  <data name="新密码" xml:space="preserve">
+    <value>New Password</value>
+  </data>
+  <data name="新密码（至少 6 位）" xml:space="preserve">
+    <value>New password (at least 6 characters)</value>
+  </data>
+  <data name="新配置启动失败，原配置恢复后仍无法启动" xml:space="preserve">
+    <value>The new configuration failed to start, and the service still could not start after restoring the previous configuration</value>
+  </data>
+  <data name="新配置启动失败，已恢复原配置" xml:space="preserve">
+    <value>The new configuration failed to start; the previous configuration was restored</value>
+  </data>
+  <data name="无数据" xml:space="preserve">
+    <value>No data</value>
+  </data>
+  <data name="无日志用户" xml:space="preserve">
+    <value>No log users</value>
+  </data>
+  <data name="无消息" xml:space="preserve">
+    <value>No message</value>
+  </data>
+  <data name="旧密码" xml:space="preserve">
+    <value>Old password</value>
+  </data>
+  <data name="时间" xml:space="preserve">
+    <value>Time</value>
+  </data>
+  <data name="普通用户" xml:space="preserve">
+    <value>Regular User</value>
+  </data>
+  <data name="暂无 Daq 采集插件配置。请先在「插件设置 → 插件配置」添加 Daq 类型配置" xml:space="preserve">
+    <value>No Daq plugin configuration yet. Please add a Daq config under "Plugin Settings → Plugin Config"</value>
+  </data>
+  <data name="暂无 Mq 插件配置。请先在「插件设置 → 插件配置」添加 Mq 类型配置" xml:space="preserve">
+    <value>No Mq plugin configuration yet. Please add an Mq config under "Plugin Settings → Plugin Config"</value>
+  </data>
+  <data name="暂无地址数据" xml:space="preserve">
+    <value>No address data</value>
+  </data>
+  <data name="暂无已安装插件。可在插件浏览页下载（自动安装）或在此上传 .zip 包" xml:space="preserve">
+    <value>No installed plugins. Download from Plugin Browser (auto-install) or upload a .zip here</value>
+  </data>
+  <data name="暂无插件配置" xml:space="preserve">
+    <value>No plugin configuration</value>
+  </data>
+  <data name="暂无操作日志" xml:space="preserve">
+    <value>No operation logs</value>
+  </data>
+  <data name="暂无采集地址，点击「添加采集地址」从地址库选择" xml:space="preserve">
+    <value>No collection addresses. Click "Add Collection Address" to select from the library</value>
+  </data>
+  <data name="暂无采集设备，请在项目设置中添加设备" xml:space="preserve">
+    <value>No collection devices. Add a device in Project Settings</value>
+  </data>
+  <data name="暂无项目，点击右上角添加顶级项" xml:space="preserve">
+    <value>No projects. Click "Add Top Item" in the top-right</value>
+  </data>
+  <data name="服务" xml:space="preserve">
+    <value>Service</value>
+  </data>
+  <data name="服务停止失败，配置未应用" xml:space="preserve">
+    <value>Failed to stop the service; configuration was not applied</value>
+  </data>
+  <data name="服务器未安装 .NET SDK，无法下载插件" xml:space="preserve">
+    <value>.NET SDK not installed on server, cannot download plugins</value>
+  </data>
+  <data name="服务已启动" xml:space="preserve">
+    <value>Service already running</value>
+  </data>
+  <data name="服务未启动" xml:space="preserve">
+    <value>Service is not running</value>
+  </data>
+  <data name="服务端停止失败" xml:space="preserve">
+    <value>Failed to stop server</value>
+  </data>
+  <data name="服务配置" xml:space="preserve">
+    <value>Service config</value>
+  </data>
+  <data name="未注册运行时" xml:space="preserve">
+    <value>Runtime not registered</value>
+  </data>
+  <data name="未知服务" xml:space="preserve">
+    <value>Unknown service</value>
+  </data>
+  <data name="未获取到参数定义，可切换到 JSON 视图编辑" xml:space="preserve">
+    <value>No parameter definition available, switch to JSON view to edit</value>
+  </data>
+  <data name="未采集" xml:space="preserve">
+    <value>Not Collected</value>
+  </data>
+  <data name="核心插件" xml:space="preserve">
+    <value>Core plugins</value>
+  </data>
+  <data name="格式有误" xml:space="preserve">
+    <value>Invalid format</value>
+  </data>
+  <data name="欢迎" xml:space="preserve">
+    <value>Welcome</value>
+  </data>
+  <data name="正在上传 {0} ..." xml:space="preserve">
+    <value>Uploading {0} ...</value>
+  </data>
+  <data name="正在加载插件默认参数..." xml:space="preserve">
+    <value>Loading plugin default parameters...</value>
+  </data>
+  <data name="没有可添加的地址（已全部绑定或重复）" xml:space="preserve">
+    <value>No addresses to add (all bound or duplicated)</value>
+  </data>
+  <data name="测试" xml:space="preserve">
+    <value>Test</value>
+  </data>
+  <data name="测试中..." xml:space="preserve">
+    <value>Testing...</value>
+  </data>
+  <data name="测试失败" xml:space="preserve">
+    <value>Test failed</value>
+  </data>
+  <data name="测试结果" xml:space="preserve">
+    <value>Test Result</value>
+  </data>
+  <data name="消息" xml:space="preserve">
+    <value>Message</value>
+  </data>
+  <data name="添加 MQ 传输设备" xml:space="preserve">
+    <value>Add MQ Transfer Device</value>
+  </data>
+  <data name="添加传输" xml:space="preserve">
+    <value>Add Transfer</value>
+  </data>
+  <data name="添加失败，插件配置文件已经存在" xml:space="preserve">
+    <value>Add failed: the plugin config file already exists</value>
+  </data>
+  <data name="添加子项" xml:space="preserve">
+    <value>Add Child Item</value>
+  </data>
+  <data name="添加成功" xml:space="preserve">
+    <value>Added successfully</value>
+  </data>
+  <data name="添加用户" xml:space="preserve">
+    <value>Add User</value>
+  </data>
+  <data name="添加配置" xml:space="preserve">
+    <value>Add Configuration</value>
+  </data>
+  <data name="添加采集地址" xml:space="preserve">
+    <value>Add Collection Address</value>
+  </data>
+  <data name="添加项目" xml:space="preserve">
+    <value>Add Project</value>
+  </data>
+  <data name="清空当前用户" xml:space="preserve">
+    <value>Clear current user</value>
+  </data>
+  <data name="清空所有用户" xml:space="preserve">
+    <value>Clear all users</value>
+  </data>
+  <data name="源数据导入设置" xml:space="preserve">
+    <value>Source Import Settings</value>
+  </data>
+  <data name="热更新后服务端恢复失败" xml:space="preserve">
+    <value>Failed to restore the server after hot update</value>
+  </data>
+  <data name="状态验证失败" xml:space="preserve">
+    <value>Status verification failed</value>
+  </data>
+  <data name="状态验证通过" xml:space="preserve">
+    <value>Status verification passed</value>
+  </data>
+  <data name="生产失败" xml:space="preserve">
+    <value>Production failed</value>
+  </data>
+  <data name="生产成功" xml:space="preserve">
+    <value>Production succeeded</value>
+  </data>
+  <data name="生产测试" xml:space="preserve">
+    <value>Production Test</value>
+  </data>
+  <data name="用户不存在" xml:space="preserve">
+    <value>User not found</value>
+  </data>
+  <data name="用户名" xml:space="preserve">
+    <value>Username</value>
+  </data>
+  <data name="用户名不合法" xml:space="preserve">
+    <value>Invalid username</value>
+  </data>
+  <data name="用户名已存在" xml:space="preserve">
+    <value>Username already exists</value>
+  </data>
+  <data name="用户已停用" xml:space="preserve">
+    <value>User disabled</value>
+  </data>
+  <data name="用户已删除" xml:space="preserve">
+    <value>User deleted</value>
+  </data>
+  <data name="用户已启用" xml:space="preserve">
+    <value>User enabled</value>
+  </data>
+  <data name="用户已添加" xml:space="preserve">
+    <value>User added</value>
+  </data>
+  <data name="用户管理" xml:space="preserve">
+    <value>User Management</value>
+  </data>
+  <data name="登录" xml:space="preserve">
+    <value>Sign in</value>
+  </data>
+  <data name="确定" xml:space="preserve">
+    <value>OK</value>
+  </data>
+  <data name="确认删除 {0} 及其全部子项？" xml:space="preserve">
+    <value>Delete {0} and all its children?</value>
+  </data>
+  <data name="确认删除 {0}？" xml:space="preserve">
+    <value>Delete {0}?</value>
+  </data>
+  <data name="确认新密码" xml:space="preserve">
+    <value>Confirm password</value>
+  </data>
+  <data name="确认移除插件" xml:space="preserve">
+    <value>Remove plugin</value>
+  </data>
+  <data name="确认移除插件 {0}？" xml:space="preserve">
+    <value>Confirm removing plugin {0}?</value>
+  </data>
+  <data name="确认移除插件 {0}？该插件包内还有 {1} 个插件将一并移除" xml:space="preserve">
+    <value>Confirm removing plugin {0}? {1} more plugin(s) in the same package will be removed together</value>
+  </data>
+  <data name="确认移除该设备下所有地址与传输设备？" xml:space="preserve">
+    <value>Remove all addresses and transfer devices under this device?</value>
+  </data>
+  <data name="移除 WebApi" xml:space="preserve">
+    <value>Remove WebApi</value>
+  </data>
+  <data name="移除组包" xml:space="preserve">
+    <value>Remove Auto Pack</value>
+  </data>
+  <data name="端口" xml:space="preserve">
+    <value>Port</value>
+  </data>
+  <data name="第 {0} / {1} 页" xml:space="preserve">
+    <value>Page {0} / {1}</value>
+  </data>
+  <data name="等待导入" xml:space="preserve">
+    <value>Pending import</value>
+  </data>
+  <data name="简体中文" xml:space="preserve">
+    <value>Simplified Chinese</value>
+  </data>
+  <data name="管理员" xml:space="preserve">
+    <value>Administrator</value>
+  </data>
+  <data name="精简值" xml:space="preserve">
+    <value>Simplified Value</value>
+  </data>
+  <data name="组包" xml:space="preserve">
+    <value>Auto Pack</value>
+  </data>
+  <data name="组包已移除" xml:space="preserve">
+    <value>Auto pack removed</value>
+  </data>
+  <data name="组包设置" xml:space="preserve">
+    <value>Auto Pack Settings</value>
+  </data>
+  <data name="组包设置已保存" xml:space="preserve">
+    <value>Auto pack settings saved</value>
+  </data>
+  <data name="编码" xml:space="preserve">
+    <value>Encoding</value>
+  </data>
+  <data name="至少 6 位" xml:space="preserve">
+    <value>At least 6 characters</value>
+  </data>
+  <data name="至少保留一个管理员" xml:space="preserve">
+    <value>At least one administrator must remain</value>
+  </data>
+  <data name="表单" xml:space="preserve">
+    <value>Form</value>
+  </data>
+  <data name="角色" xml:space="preserve">
+    <value>Role</value>
+  </data>
+  <data name="角色已更新" xml:space="preserve">
+    <value>Role updated</value>
+  </data>
+  <data name="解包失败：{0}" xml:space="preserve">
+    <value>Unpack failed: {0}</value>
+  </data>
+  <data name="解压后体积超过限制" xml:space="preserve">
+    <value>Extracted size exceeds limit</value>
+  </data>
+  <data name="警告: {0} 个地址未配置传输设备，不参与采集: {1}" xml:space="preserve">
+    <value>Warning: {0} addresses have no transmission device configured and will not be collected: {1}</value>
+  </data>
+  <data name="设为普通用户" xml:space="preserve">
+    <value>Set as Regular User</value>
+  </data>
+  <data name="设为管理员" xml:space="preserve">
+    <value>Set as Administrator</value>
+  </data>
+  <data name="设备下没有可采集的地址" xml:space="preserve">
+    <value>No collectable addresses under the device</value>
+  </data>
+  <data name="设备添加成功" xml:space="preserve">
+    <value>Device added</value>
+  </data>
+  <data name="该传输设备已添加到此地址" xml:space="preserve">
+    <value>This transfer device already added to this address</value>
+  </data>
+  <data name="该插件配置在项目设置中有使用" xml:space="preserve">
+    <value>This plugin configuration is used in Project Settings</value>
+  </data>
+  <data name="该设备已添加到项目中" xml:space="preserve">
+    <value>This device is already added to the project</value>
+  </data>
+  <data name="请检查项目详情中传输设备是否正确设置给每个地址" xml:space="preserve">
+    <value>Please check whether the transmission device is correctly set for each address in the project details</value>
+  </data>
+  <data name="请选择插件" xml:space="preserve">
+    <value>Please select a plugin</value>
+  </data>
+  <data name="读取测试" xml:space="preserve">
+    <value>Read Test</value>
+  </data>
+  <data name="跨域" xml:space="preserve">
+    <value>Cross domain</value>
+  </data>
+  <data name="输入" xml:space="preserve">
+    <value>Input</value>
+  </data>
+  <data name="输出" xml:space="preserve">
+    <value>Output</value>
+  </data>
+  <data name="退出登录" xml:space="preserve">
+    <value>Sign out</value>
+  </data>
+  <data name="选择左侧设备节点，配置采集地址与 MQ 传输设备" xml:space="preserve">
+    <value>Select a device node on the left to configure collection addresses and MQ transfer devices</value>
+  </data>
+  <data name="选择采集地址" xml:space="preserve">
+    <value>Select Collection Address</value>
+  </data>
+  <data name="配置修改成功" xml:space="preserve">
+    <value>Configuration updated</value>
+  </data>
+  <data name="配置已移除" xml:space="preserve">
+    <value>Configuration removed</value>
+  </data>
+  <data name="配置添加成功" xml:space="preserve">
+    <value>Configuration added</value>
+  </data>
+  <data name="采集设备" xml:space="preserve">
+    <value>Collection Device</value>
+  </data>
+  <data name="重启服务器后可彻底清理" xml:space="preserve">
+    <value>Restart the server to fully clean up</value>
+  </data>
+  <data name="重命名" xml:space="preserve">
+    <value>Rename</value>
+  </data>
+  <data name="重命名成功" xml:space="preserve">
+    <value>Renamed</value>
+  </data>
+  <data name="重置密码" xml:space="preserve">
+    <value>Reset Password</value>
+  </data>
+  <data name="需修改密码" xml:space="preserve">
+    <value>Password change required</value>
+  </data>
+  <data name="项目" xml:space="preserve">
+    <value>Projects</value>
+  </data>
+  <data name="项目名称" xml:space="preserve">
+    <value>Project Name</value>
+  </data>
+  <data name="项目名称不能为空" xml:space="preserve">
+    <value>Project name cannot be empty</value>
+  </data>
+  <data name="项目配置写入失败" xml:space="preserve">
+    <value>Failed to write project configuration</value>
+  </data>
+  <data name="项目配置写入失败，请检查磁盘和文件占用情况" xml:space="preserve">
+    <value>Failed to write project configuration. Check the disk and file locks.</value>
+  </data>
+  <data name="验证中..." xml:space="preserve">
+    <value>Verifying...</value>
+  </data>
+  <data name="验证完成" xml:space="preserve">
+    <value>Verification complete</value>
+  </data>
+  <data name="（端口小于 1024 需管理员权限运行或 netsh URLACL 授权）" xml:space="preserve">
+    <value> (Port below 1024 requires admin privileges or netsh URLACL)</value>
+  </data>
+  <data name="操作失败" xml:space="preserve">
+    <value>Operation failed</value>
+  </data>
+  <data name="[{0}] UA 层级清理异常: {1}" xml:space="preserve">
+    <value>[{0}] UA folder cleanup error: {1}</value>
+  </data>
 </root>

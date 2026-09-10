@@ -23,6 +23,12 @@ public class DaqHostedService : BackgroundService
     private readonly ILogger<DaqHostedService> _logger;
 
     #region 字段与构造
+    /// <summary>创建负责加载配置并管理采集服务生命周期的后台服务。</summary>
+    /// <param name="appState">应用配置与运行状态。</param>
+    /// <param name="runtimeManager">设备运行时管理器。</param>
+    /// <param name="sampler">系统监控采样器。</param>
+    /// <param name="loggerBuffer">应用内日志缓冲区。</param>
+    /// <param name="logger">宿主日志记录器。</param>
     public DaqHostedService(
             AppStateService appState,
             DeviceRuntimeManager runtimeManager,
@@ -40,6 +46,7 @@ public class DaqHostedService : BackgroundService
     #endregion
 
     #region 生命周期
+    /// <inheritdoc />
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("DaqHostedService 启动");
@@ -67,10 +74,10 @@ public class DaqHostedService : BackgroundService
         }
     }
 
-    /// <summary>按 PluginList.json 逐个 InitPlugin 加载插件程序集（对齐 WPF Init 流程）</summary>
     #endregion
 
     #region 插件加载
+    /// <summary>按 PluginList.json 逐个 InitPlugin 加载插件程序集（对齐 WPF Init 流程）</summary>
     private void InitPlugins()
     {
         if (!File.Exists(WebPaths.PluginListConfigPath)) return;
@@ -100,23 +107,25 @@ public class DaqHostedService : BackgroundService
         }
     }
 
+    /// <inheritdoc />
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
         _logger.LogInformation("DaqHostedService 停止");
         // 进程停止时逆序释放：先停采集，再关服务端
         await _runtimeManager.StopAllAsync();
+        await _appState.FlushPendingChangesAsync();
         await StopServerServicesAsync();
-        _sampler.Dispose();
+        await _sampler.DisposeAsync();
         await base.StopAsync(cancellationToken);
     }
 
+    #endregion
+
+    #region 服务端启动
     /// <summary>
     /// 启动服务端（对齐 WPF ConsoleModel.MqttServerInitAsync / OpcUaServerInitAsync）：
     /// 配置存在才实例化并 OnAsync，失败退订事件 + Dispose + 置空。
     /// </summary>
-    #endregion
-
-    #region 服务端启动
     public async Task InitServerServicesAsync()
     {
         await _serverGate.WaitAsync();
@@ -149,7 +158,7 @@ public class DaqHostedService : BackgroundService
             if (!File.Exists(WebPaths.MqttServerConfigPath))
             {
                 Directory.CreateDirectory(WebPaths.ServerConfigPath);
-                File.WriteAllText(WebPaths.MqttServerConfigPath, new MqttServiceData.Basics().ToJson(true));
+                await File.WriteAllTextAsync(WebPaths.MqttServerConfigPath, new MqttServiceData.Basics().ToJson(true));
             }
             var ok = await InitMqttServerAsync();
             _appState.NotifyServerStateChanged();
@@ -161,7 +170,7 @@ public class DaqHostedService : BackgroundService
             if (!File.Exists(WebPaths.UaServerConfigPath))
             {
                 Directory.CreateDirectory(WebPaths.ServerConfigPath);
-                File.WriteAllText(WebPaths.UaServerConfigPath, new OpcUaServiceData.Basics().ToJson(true));
+                await File.WriteAllTextAsync(WebPaths.UaServerConfigPath, new OpcUaServiceData.Basics().ToJson(true));
             }
             var ok = await InitUaServerAsync();
             _appState.NotifyServerStateChanged();
@@ -170,10 +179,10 @@ public class DaqHostedService : BackgroundService
         return (false, T("未知服务"));
     }
 
-    /// <summary>停止单个服务端（对齐 WPF MqttServerStopAsync / OpcUaServerStopAsync）</summary>
     #endregion
 
     #region 服务端停止
+    /// <summary>停止单个服务端（对齐 WPF MqttServerStopAsync / OpcUaServerStopAsync）</summary>
     public async Task<(bool Ok, string Message)> StopServerAsync(string kind)
     {
         await _serverGate.WaitAsync();
@@ -223,7 +232,8 @@ public class DaqHostedService : BackgroundService
         if (!File.Exists(WebPaths.MqttServerConfigPath)) return false;
         try
         {
-            var basics = File.ReadAllText(WebPaths.MqttServerConfigPath).ToJsonEntity<MqttServiceData.Basics>() ?? new MqttServiceData.Basics();
+            var json = await File.ReadAllTextAsync(WebPaths.MqttServerConfigPath);
+            var basics = json.ToJsonEntity<MqttServiceData.Basics>() ?? new MqttServiceData.Basics();
             var service = MqttServiceOperate.Instance(basics);
             service.OnInfoEventAsync += MqttService_OnInfoEventAsync;
             var result = await service.OnAsync();
@@ -251,7 +261,8 @@ public class DaqHostedService : BackgroundService
         if (!File.Exists(WebPaths.UaServerConfigPath)) return false;
         try
         {
-            var basics = File.ReadAllText(WebPaths.UaServerConfigPath).ToJsonEntity<OpcUaServiceData.Basics>() ?? new OpcUaServiceData.Basics();
+            var json = await File.ReadAllTextAsync(WebPaths.UaServerConfigPath);
+            var basics = json.ToJsonEntity<OpcUaServiceData.Basics>() ?? new OpcUaServiceData.Basics();
             var service = OpcUaServiceOperate.Instance(basics);
             service.OnInfoEventAsync += UaService_OnInfoEventAsync;
             var result = await service.OnAsync();

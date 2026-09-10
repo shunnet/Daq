@@ -9,12 +9,15 @@ namespace Snet.Iot.Daq.Web.Services;
 /// SQLite 门面：单连接 + 单锁（维持 WPF 端 GlobalConfigModel.sqliteOperate + DbLock 的既定并发模式）。
 /// 使用与 WPF 同名的 AddressModel 表，保证 address.db 可互拷共用。
 /// </summary>
-public class DbGate
+public sealed class DbGate : IDisposable
 {
+    /// <summary>获取应用共享的 SQLite 连接；访问时必须持有 <see cref="DbLock"/>。</summary>
     public SQLiteConnection Db { get; }
+    /// <summary>获取串行化共享 SQLite 连接访问的同步对象。</summary>
     public object DbLock { get; } = new();
 
     #region 构造与迁移
+    /// <summary>创建地址数据库连接并确保地址表存在。</summary>
     public DbGate()
     {
         Directory.CreateDirectory(Path.GetDirectoryName(WebPaths.DbPath)!);
@@ -53,10 +56,10 @@ public class DbGate
         }
     }
 
-    /// <summary>分页查询地址（模糊匹配 别名/地址/描述），keyword 为空返回全部</summary>
     #endregion
 
     #region 查询
+    /// <summary>分页查询地址（模糊匹配 别名/地址/描述），keyword 为空返回全部</summary>
     public List<AddressModel> QueryAddresses(string? keyword, int pageIndex, int pageSize, out int total)
     {
         lock (DbLock)
@@ -76,5 +79,13 @@ public class DbGate
     /// <summary>批量插入（防重），返回统计</summary>
     public BatchInsertResult InsertUniqueAddresses(IEnumerable<AddressModel> items) =>
         ProjectHandlerCore.InsertUnique(Db, DbLock, items, null, x => x.AnotherName, x => x.Address);
+
+    /// <summary>释放应用共享的 SQLite 连接；由依赖注入容器在停止时调用。</summary>
+    public void Dispose()
+    {
+        lock (DbLock)
+            Db.Dispose();
+        GC.SuppressFinalize(this);
+    }
     #endregion
 }

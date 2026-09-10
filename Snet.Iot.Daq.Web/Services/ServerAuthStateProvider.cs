@@ -7,8 +7,10 @@ namespace Snet.Iot.Daq.Web.Services;
 public sealed class ServerAuthStateProvider(ILoggerFactory loggerFactory, AuthService auth)
     : RevalidatingServerAuthenticationStateProvider(loggerFactory)
 {
+    /// <inheritdoc />
     protected override TimeSpan RevalidationInterval => TimeSpan.FromSeconds(10);
 
+    /// <inheritdoc />
     protected override Task<bool> ValidateAuthenticationStateAsync(
         AuthenticationState authenticationState, CancellationToken cancellationToken) =>
         auth.IsSessionValidAsync(authenticationState.User);

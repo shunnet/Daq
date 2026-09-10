@@ -6,32 +6,46 @@
 public static class WebPaths
 {
     #region 路径
+    /// <summary>获取应用数据根目录的绝对路径。</summary>
     public static string DataDir { get; private set; } = ".";
 
+    /// <summary>获取插件二进制目录。</summary>
     public static string FilePath => Path.Combine(DataDir, "lib");
+    /// <summary>获取全部配置文件的根目录。</summary>
     public static string ConfigPath => Path.Combine(DataDir, "config");
+    /// <summary>获取界面配置目录。</summary>
     public static string UiConfigPath => Path.Combine(ConfigPath, "ui");
+    /// <summary>获取服务端配置目录。</summary>
     public static string ServerConfigPath => Path.Combine(ConfigPath, "server");
+    /// <summary>获取地址 SQLite 数据库文件路径。</summary>
     public static string DbPath => Path.Combine(DataDir, "db", "address.db");
 
     /// <summary>插件参数文件目录（对齐 WPF：config/daq、config/mq，每配置一个 {文件名}）</summary>
     public static string DaqPluginConfigPath => Path.Combine(ConfigPath, "daq");
+    /// <summary>获取消息转发插件参数文件目录。</summary>
     public static string MqPluginConfigPath => Path.Combine(ConfigPath, "mq");
 
+    /// <summary>获取 OPC UA 服务端配置文件路径。</summary>
     public static string UaServerConfigPath => Path.Combine(ServerConfigPath, "UaServerConfig.json");
+    /// <summary>获取 MQTT 服务端配置文件路径。</summary>
     public static string MqttServerConfigPath => Path.Combine(ServerConfigPath, "MqttServerConfig.json");
+    /// <summary>获取已发现插件清单文件路径。</summary>
     public static string PluginListConfigPath => Path.Combine(UiConfigPath, "PluginList.json");
+    /// <summary>获取已安装插件配置文件路径。</summary>
     public static string PluginConfigPath => Path.Combine(UiConfigPath, "PluginConfig.json");
+    /// <summary>获取项目树配置文件路径。</summary>
     public static string ProjectConfigPath => Path.Combine(UiConfigPath, "ProjectConfig.json");
+    /// <summary>获取插件仓库缓存文件路径。</summary>
     public static string PluginBrowseCachePath => Path.Combine(UiConfigPath, "PluginBrowseCache.json");
+    /// <summary>获取 Web 用户凭据文件路径。</summary>
     public static string UserConfigPath => Path.Combine(UiConfigPath, "User.json");
 
-    /// <summary>
-    /// 初始化数据目录：环境变量 SNET_IOT_DAQ_DATA > appsettings 配置 > 程序目录（与 WPF DAQ 一致，配置直接放程序根目录）
-    /// </summary>
     #endregion
 
     #region 初始化与迁移
+    /// <summary>
+    /// 初始化数据目录：环境变量 SNET_IOT_DAQ_DATA > appsettings 配置 > 程序目录（与 WPF DAQ 一致，配置直接放程序根目录）
+    /// </summary>
     public static void Init(IConfiguration config)
     {
         var dataDir = Environment.GetEnvironmentVariable("SNET_IOT_DAQ_DATA")

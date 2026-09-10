@@ -23,15 +23,15 @@
             <input type="hidden" name="username" value="@_changeUsername" />
             <div class="login-input">
                 <i class="bi bi-lock"></i>
-                <input type="password" name="password" required aria-label="@T("密码")" placeholder="@T("旧密码")" autocomplete="current-password" />
+                <input type="password" name="password" maxlength="1024" required aria-label="@T("密码")" placeholder="@T("旧密码")" autocomplete="current-password" />
             </div>
             <div class="login-input">
                 <i class="bi bi-key"></i>
-                <input type="password" name="newPassword" autocomplete="new-password" minlength="6" required aria-label="@T("新密码")" placeholder="@T("新密码（至少 6 位）")" />
+                <input type="password" name="newPassword" autocomplete="new-password" minlength="6" maxlength="1024" required aria-label="@T("新密码")" placeholder="@T("新密码（至少 6 位）")" />
             </div>
             <div class="login-input">
                 <i class="bi bi-shield-check"></i>
-                <input type="password" name="confirmPassword" autocomplete="new-password" minlength="6" required aria-label="@T("确认新密码")" placeholder="@T("确认新密码")" />
+                <input type="password" name="confirmPassword" autocomplete="new-password" minlength="6" maxlength="1024" required aria-label="@T("确认新密码")" placeholder="@T("确认新密码")" />
             </div>
             @if (_error is not null)
             {
@@ -48,11 +48,11 @@
             <AntiforgeryToken />
             <div class="login-input">
                 <i class="bi bi-person"></i>
-                <input type="text" name="username" required aria-label="@T("用户名")" value="snet" placeholder="@T("用户名")" autocomplete="username" />
+                <input type="text" name="username" minlength="2" maxlength="64" required aria-label="@T("用户名")" value="snet" placeholder="@T("用户名")" autocomplete="username" />
             </div>
             <div class="login-input">
                 <i class="bi bi-lock"></i>
-                <input type="password" name="password" required aria-label="@T("密码")" placeholder="@T("密码")" autocomplete="current-password" />
+                <input type="password" name="password" maxlength="1024" required aria-label="@T("密码")" placeholder="@T("密码")" autocomplete="current-password" />
             </div>
             @if (_error is not null)
             {
@@ -96,7 +96,7 @@
 
     private async Task SetLangAsync(string lang)
     {
-        await Localization.SetLanguageAsync(lang);
+        Localization.SetLanguage(lang);
         await JS.InvokeVoidAsync("snet.setLang", lang);
     }
 }

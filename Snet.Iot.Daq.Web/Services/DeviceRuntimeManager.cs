@@ -16,10 +16,16 @@ public class DeviceRuntimeManager
     private readonly LoggerBuffer _logger;
     private readonly LocalizationService _localization = new();
     private readonly object _syncLock = new();
+    private Task _pendingSync = Task.CompletedTask;
 
+    /// <summary>设备集合发生新增或移除时触发。</summary>
     public event Action? RuntimesChanged;
+    /// <summary>单个设备运行状态变化时触发。</summary>
     public event Action<DeviceRuntime>? RuntimeStateChanged;
 
+    /// <summary>创建设备运行时管理器并订阅全局配置变化。</summary>
+    /// <param name="logger">应用内日志缓冲区。</param>
+    /// <param name="appState">项目配置和服务端状态。</param>
     public DeviceRuntimeManager(LoggerBuffer logger, AppStateService appState)
     {
         _logger = logger;
@@ -27,36 +33,60 @@ public class DeviceRuntimeManager
         appState.EntityChanged += () => SyncFromProjects(appState);
     }
 
+    /// <summary>获取当前设备运行时的线程安全快照视图。</summary>
     public IEnumerable<DeviceRuntime> Runtimes => _runtimes.Values;
+    /// <summary>获取当前设备运行时数量。</summary>
     public int Count => _runtimes.Count;
 
-    /// <summary>按项目树同步设备集合（新增/移除），不自动启停。加锁串行：多电路并发修改时快照一致</summary>
     #endregion
 
     #region 同步与生命周期
+    /// <summary>按项目树同步设备集合（新增/移除），不自动启停。加锁串行：多电路并发修改时快照一致</summary>
     public void SyncFromProjects(AppStateService appState)
     {
+        var devices = new List<IProjectTreeViewModel>();
+        CollectDevices(appState.ProjectDict, devices);
         lock (_syncLock)
-        {
-            var devices = new List<IProjectTreeViewModel>();
-            CollectDevices(appState.ProjectDict, devices);
+            _pendingSync = SynchronizeAfterAsync(_pendingSync, appState, devices);
+    }
 
-            var valid = new HashSet<string>();
-            foreach (var device in devices)
-            {
-                if (device.DaqDetails is null) continue;
-                valid.Add(device.DaqDetails.Guid);
-                var runtime = _runtimes.GetOrAdd(device.DaqDetails.Guid, guid =>
-                    new DeviceRuntime(device, () => appState.UaService, _logger.Push, rt => RuntimeStateChanged?.Invoke(rt), _localization));
-                _ = ApplySettingsAsync(runtime, device);
-            }
-            foreach (var guid in _runtimes.Keys.Where(g => !valid.Contains(g)).ToList())
-            {
-                if (_runtimes.TryRemove(guid, out var rt))
-                    _ = rt.DisposeAsync();
-            }
-            RuntimesChanged?.Invoke();
+    /// <summary>等待前一次同步完成后应用最新项目快照，确保配置重载和释放按顺序执行。</summary>
+    private async Task SynchronizeAfterAsync(
+        Task previous,
+        AppStateService appState,
+        IReadOnlyCollection<IProjectTreeViewModel> devices)
+    {
+        try
+        {
+            await previous.ConfigureAwait(false);
         }
+        catch (Exception ex)
+        {
+            _logger.Push($"[Error] 上一次设备同步失败: {ex.Message}");
+        }
+
+        var valid = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var device in devices)
+        {
+            if (device.DaqDetails is null)
+                continue;
+
+            valid.Add(device.DaqDetails.Guid);
+            if (!_runtimes.TryGetValue(device.DaqDetails.Guid, out var runtime))
+            {
+                runtime = new DeviceRuntime(device, () => appState.UaService, _logger.Push,
+                    rt => RuntimeStateChanged?.Invoke(rt), _localization);
+                _runtimes[device.DaqDetails.Guid] = runtime;
+            }
+            await ApplySettingsAsync(runtime, device).ConfigureAwait(false);
+        }
+
+        foreach (var guid in _runtimes.Keys.Where(guid => !valid.Contains(guid)))
+        {
+            if (_runtimes.TryRemove(guid, out var runtime))
+                await runtime.DisposeAsync().ConfigureAwait(false);
+        }
+        RuntimesChanged?.Invoke();
     }
 
     private async Task ApplySettingsAsync(DeviceRuntime runtime, IProjectTreeViewModel device)
@@ -65,6 +95,9 @@ public class DeviceRuntimeManager
         catch (Exception ex) { _logger.Push($"[Error] 设备配置更新失败 {runtime.DeviceName}: {ex.Message}"); }
     }
 
+    /// <summary>按唯一标识查找设备运行时。</summary>
+    /// <param name="guid">设备采集插件配置的唯一标识。</param>
+    /// <returns>找到的运行时；不存在时返回 <see langword="null"/>。</returns>
     public DeviceRuntime? Get(string guid) => _runtimes.TryGetValue(guid, out var rt) ? rt : null;
 
     /// <summary>
@@ -118,10 +151,16 @@ public class DeviceRuntimeManager
         }
     }
 
+    /// <summary>等待配置同步完成并依次停止全部设备。</summary>
     public async Task StopAllAsync()
     {
+        Task pendingSync;
+        lock (_syncLock)
+            pendingSync = _pendingSync;
+        await pendingSync.ConfigureAwait(false);
+
         foreach (var rt in _runtimes.Values)
-            await rt.StopAsync();
+            await rt.StopAsync().ConfigureAwait(false);
     }
 
     private static void CollectDevices(IEnumerable<IProjectTreeViewModel> nodes, List<IProjectTreeViewModel> result)

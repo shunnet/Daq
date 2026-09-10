@@ -9,7 +9,9 @@ namespace Snet.Iot.Daq.Web.Services;
 public class AuthService
 {
     #region 常量与字段
+    /// <summary>管理员角色名称。</summary>
     public const string RoleAdmin = "Admin";
+    /// <summary>普通用户角色名称。</summary>
     public const string RoleUser = "User";
     /// <summary>管理员授权策略名（[Authorize(Policy = ...)] 使用）</summary>
     public const string AdminPolicy = "AdminOnly";
@@ -17,11 +19,14 @@ public class AuthService
     private const int Iterations = 100_000;
     private const int SaltSize = 16;
     private const int MaxFailedAttempts = 5;
+    private const int MaxUsernameLength = 64;
+    private const int MaxPasswordLength = 1024;
     private static readonly TimeSpan LockoutDuration = TimeSpan.FromMinutes(15);
 
     private readonly SemaphoreSlim _fileLock = new(1, 1);
     private readonly string _path = WebPaths.UserConfigPath;
 
+    /// <summary>创建认证服务并确保默认管理员账号存在。</summary>
     public AuthService()
     {
         EnsureDefaultUser();
@@ -123,6 +128,36 @@ public class AuthService
     private static string HashPassword(string password, byte[] salt) =>
             Convert.ToBase64String(Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, 32));
 
+    /// <summary>
+    /// 使用固定时间比较校验 PBKDF2 密码；损坏的 Base64 凭据按校验失败处理。
+    /// </summary>
+    private static bool VerifyPassword(string password, UserRecord user)
+    {
+        if (!TryParseSalt(user.Salt, out var salt))
+            return false;
+
+        try
+        {
+            var expected = Convert.FromBase64String(user.PasswordHash);
+            var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, expected.Length);
+            return CryptographicOperations.FixedTimeEquals(actual, expected);
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
+    }
+
+    /// <summary>检查用户名是否可用于账号标识和操作日志目录名。</summary>
+    private static bool IsValidUsername(string username) =>
+        !string.IsNullOrWhiteSpace(username)
+        && username.Length is >= 2 and <= MaxUsernameLength
+        && username is not ("." or "..")
+        && !username.Contains('/')
+        && !username.Contains('\\')
+        && username.IndexOfAny(Path.GetInvalidFileNameChars()) < 0
+        && !username.Any(char.IsControl);
+
     private static bool TryParseSalt(string? salt, out byte[] bytes)
     {
         bytes = [];
@@ -138,10 +173,10 @@ public class AuthService
         }
     }
 
-    /// <summary>按用户名查用户（供登录后取角色用）</summary>
     #endregion
 
     #region 登录校验与失败锁定
+    /// <summary>按用户名查用户（供登录后取角色用）</summary>
     internal UserRecord? FindUser(string username) =>
             Load().FirstOrDefault(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));
 
@@ -150,6 +185,9 @@ public class AuthService
     /// </summary>
     public async Task<(bool Ok, string? Error)> ValidateAsync(string username, string password)
     {
+        if (!IsValidUsername(username) || password.Length > MaxPasswordLength)
+            return (false, "InvalidUsernameOrPassword");
+
         await _fileLock.WaitAsync();
         try
         {
@@ -166,9 +204,7 @@ public class AuthService
             }
             if (user.LockoutUntil is { } lockUntil && lockUntil > DateTime.UtcNow)
                 return (false, "AccountLocked");
-            if (!TryParseSalt(user.Salt, out var salt))
-                return (false, "InvalidUsernameOrPassword");
-            if (user.PasswordHash != HashPassword(password, salt))
+            if (!VerifyPassword(password, user))
             {
                 RegisterFailure(user, users, index);
                 return (false, "InvalidUsernameOrPassword");
@@ -199,6 +235,9 @@ public class AuthService
         Save(users);
     }
 
+    /// <summary>确定指定用户下次登录后是否必须修改密码。</summary>
+    /// <param name="username">用户名。</param>
+    /// <returns>需要修改密码时为 <see langword="true"/>。</returns>
     public bool MustChangePassword(string username) => FindUser(username)?.MustChangePassword ?? false;
 
     internal async Task<bool> IsSessionValidAsync(System.Security.Claims.ClaimsPrincipal principal)
@@ -218,17 +257,25 @@ public class AuthService
     #endregion
 
     #region 修改密码
+    /// <summary>验证旧密码并更新指定用户的密码。</summary>
+    /// <param name="username">用户名。</param>
+    /// <param name="oldPassword">当前密码。</param>
+    /// <param name="newPassword">符合密码策略的新密码。</param>
+    /// <returns>操作结果及可供界面显示的错误消息。</returns>
     public async Task<(bool Ok, string? Error)> ChangePasswordAsync(string username, string oldPassword, string newPassword)
     {
+        if (!IsValidUsername(username) || oldPassword.Length > MaxPasswordLength)
+            return (false, "InvalidOldPassword");
+        if (newPassword.Length is < 6 or > MaxPasswordLength)
+            return (false, "PasswordTooShort");
+
         await _fileLock.WaitAsync();
         try
         {
             var user = FindUser(username);
             if (user?.IsDisabled == true) return (false, "UserDisabled");
             if (user?.LockoutUntil > DateTime.UtcNow) return (false, "AccountLocked");
-            if (user is null
-                || !TryParseSalt(user.Salt, out var oldSalt)
-                || user.PasswordHash != HashPassword(oldPassword, oldSalt))
+            if (user is null || !VerifyPassword(oldPassword, user))
             {
                 if (user is not null)
                 {
@@ -240,8 +287,6 @@ public class AuthService
                 }
                 return (false, "InvalidOldPassword");
             }
-            if (newPassword.Length < 6)
-                return (false, "PasswordTooShort");
             var salt = RandomNumberGenerator.GetBytes(SaltSize);
             var users = Load();
             // BUG 修复：原用 u.Username == user.Username（区分大小写），大小写混合登录改密时
@@ -270,6 +315,8 @@ public class AuthService
     #endregion
 
     #region 用户管理
+    /// <summary>获取不含密码哈希、盐和安全戳的用户列表快照。</summary>
+    /// <returns>用户概览列表。</returns>
     public List<UserInfo> ListUsers() =>
             Load().Select(u => new UserInfo(u.Username, u.Role, u.MustChangePassword, u.IsDisabled)).ToList();
 
@@ -279,15 +326,9 @@ public class AuthService
         await _fileLock.WaitAsync();
         try
         {
-            if (string.IsNullOrWhiteSpace(username) || username.Length < 2)
+            if (!IsValidUsername(username))
                 return (false, "InvalidUsername");
-            // 安全校验：用户名会拼接进操作日志目录（Path.Combine("operate", username)），
-            // 禁止路径分隔符/相对路径/非法文件名字符，防目录穿越与日志目录混乱
-            if (username is "." or ".."
-                || username.Contains('/') || username.Contains('\\')
-                || username.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
-                return (false, "InvalidUsername");
-            if (password.Length < 6)
+            if (password.Length is < 6 or > MaxPasswordLength)
                 return (false, "PasswordTooShort");
             var users = Load();
             if (users.Any(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase)))
@@ -339,7 +380,7 @@ public class AuthService
         await _fileLock.WaitAsync();
         try
         {
-            if (newPassword.Length < 6)
+            if (newPassword.Length is < 6 or > MaxPasswordLength)
                 return (false, "PasswordTooShort");
             var users = Load();
             var index = users.FindIndex(u => string.Equals(u.Username, username, StringComparison.OrdinalIgnoreCase));

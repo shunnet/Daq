@@ -11,6 +11,8 @@ public sealed class MenuCoordinator
     private readonly object _lock = new();
 
     #region 注册与互斥
+    /// <summary>注册一个菜单关闭回调。</summary>
+    /// <param name="close">关闭所属组件菜单的回调。</param>
     public void Register(Action close)
     {
         lock (_lock)
@@ -19,6 +21,8 @@ public sealed class MenuCoordinator
         }
     }
 
+    /// <summary>注销组件不再使用的菜单关闭回调。</summary>
+    /// <param name="close">注册时使用的同一个回调实例。</param>
     public void Unregister(Action close)
     {
         lock (_lock) _callbacks.Remove(close);

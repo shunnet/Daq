@@ -441,19 +441,21 @@
         AppState.NotifyEntityChanged();
     }
 
-    /// <summary>使用检查：ProjectConfig.json 内容包含地址 Guid 则视为被项目引用。读失败视为未使用，不阻断操作也不击穿电路</summary>
-    private static bool UseCheck(IAddressModel model)
+    /// <summary>检查当前项目树是否按 Guid 引用了指定地址。</summary>
+    private bool UseCheck(IAddressModel model)
     {
-        if (!File.Exists(WebPaths.ProjectConfigPath)) return false;
-        try
-        {
-            return File.ReadAllText(WebPaths.ProjectConfigPath).Contains(model.Guid);
-        }
-        catch
-        {
-            return false;
-        }
+        return AppState.ProjectDict.Any(node => ContainsAddress(node, model.Guid));
     }
+
+    /// <summary>按结构检查项目节点及其子节点是否引用指定地址，避免全文子串匹配产生误判。</summary>
+    private static bool ContainsAddress(IProjectTreeViewModel node, string guid) =>
+        (node.Details?.Any(detail => ContainsAddress(detail, guid)) ?? false)
+        || node.Children.Any(child => ContainsAddress(child, guid));
+
+    /// <summary>递归检查项目详情树中的地址引用。</summary>
+    private static bool ContainsAddress(IProjectDetailsTreeViewModel node, string guid) =>
+        string.Equals(node.AddressDetails?.Guid, guid, StringComparison.Ordinal)
+        || node.Children.Any(child => ContainsAddress(child, guid));
 
     /// <summary>导入/导出 JSON 行字段（含 Guid/Time 对齐 WPF 导出格式，保证跨端导入不换身份）</summary>
     private sealed class AddressFileModel

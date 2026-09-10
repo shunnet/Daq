@@ -8,7 +8,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// 插件下载作业管理器：包装 Core PluginDownloadHandler 为异步作业（任务状态机 + 进度推送）。
 /// Core 零改动 → 无行级进度，按 排队→下载→完成/失败 状态推进。
 /// </summary>
-public class DownloadTaskManager
+public sealed class DownloadTaskManager : IAsyncDisposable
 {
     #region 字段与作业模型
     private readonly LoggerBuffer _logger;
@@ -18,12 +18,13 @@ public class DownloadTaskManager
     private readonly object _gate = new();
     private readonly SemaphoreSlim _runGate = new(1, 1);
     private readonly List<DownloadJob> _jobs = new();
+    private readonly List<Task> _runningTasks = new();
     private CancellationTokenSource? _stopCts;
 
-    /// <summary>取消所有进行中的下载（「停止下载」按钮）</summary>
     #endregion
 
     #region 队列控制
+    /// <summary>取消所有进行中的下载（「停止下载」按钮）</summary>
     public void StopAll()
     {
         lock (_gate)
@@ -34,10 +35,44 @@ public class DownloadTaskManager
         }
     }
 
-    public record DownloadJob(string Id, string PackName, string Status, int Progress, string? Error);
+    /// <summary>描述一个插件下载作业的不可变状态快照。</summary>
+    public sealed record DownloadJob
+    {
+        /// <summary>创建插件下载作业快照。</summary>
+        /// <param name="id">作业唯一标识。</param>
+        /// <param name="packName">待下载的插件包显示名称。</param>
+        /// <param name="status">当前状态文本。</param>
+        /// <param name="progress">0 到 100 的完成百分比。</param>
+        /// <param name="error">失败原因；作业未失败时为空。</param>
+        public DownloadJob(string id, string packName, string status, int progress, string? error)
+        {
+            Id = id;
+            PackName = packName;
+            Status = status;
+            Progress = progress;
+            Error = error;
+        }
 
+        /// <summary>获取作业唯一标识。</summary>
+        public string Id { get; init; }
+        /// <summary>获取待下载的插件包显示名称。</summary>
+        public string PackName { get; init; }
+        /// <summary>获取当前状态文本。</summary>
+        public string Status { get; init; }
+        /// <summary>获取 0 到 100 的完成百分比。</summary>
+        public int Progress { get; init; }
+        /// <summary>获取失败原因；作业未失败时为空。</summary>
+        public string? Error { get; init; }
+    }
+
+    /// <summary>下载作业状态变化时触发。</summary>
     public event Action<DownloadJob>? JobChanged;
 
+    /// <summary>创建插件下载作业管理器。</summary>
+    /// <param name="logger">应用内日志缓冲区。</param>
+    /// <param name="runtimeManager">设备运行时管理器。</param>
+    /// <param name="appState">应用配置与运行状态。</param>
+    /// <param name="hosted">采集宿主服务。</param>
     public DownloadTaskManager(LoggerBuffer logger, DeviceRuntimeManager runtimeManager, AppStateService appState, DaqHostedService hosted)
     {
         _logger = logger;
@@ -46,10 +81,10 @@ public class DownloadTaskManager
         _hosted = hosted;
     }
 
-    /// <summary>dotnet CLI 可用性探测（Core PluginDownloadHandler 依赖 dotnet publish）。异步版：不阻塞电路线程</summary>
     #endregion
 
     #region SDK 探测
+    /// <summary>dotnet CLI 可用性探测（Core PluginDownloadHandler 依赖 dotnet publish）。异步版：不阻塞电路线程</summary>
     public static async Task<bool> IsSdkAvailableAsync()
     {
         try
@@ -79,6 +114,7 @@ public class DownloadTaskManager
         }
     }
 
+    /// <summary>获取下载作业列表快照。</summary>
     public IReadOnlyList<DownloadJob> Jobs
     {
         get
@@ -88,6 +124,9 @@ public class DownloadTaskManager
         }
     }
 
+    /// <summary>验证下载参数并将选中的插件包加入串行下载队列。</summary>
+    /// <param name="models">插件仓库中的选中项。</param>
+    /// <returns>新建或已存在的作业标识。</returns>
     public Task<string> EnqueueAsync(IEnumerable<PluginBrowseDataGridModel> models)
     {
         var id = Guid.NewGuid().ToString("N")[..8];
@@ -112,7 +151,8 @@ public class DownloadTaskManager
             var job = new DownloadJob(id, string.Join(", ", names.Take(3)), "排队", 0, null);
             _jobs.Add(job);
             JobChanged?.Invoke(job);
-            _ = RunAsync(job, packages, _stopCts.Token);
+            _runningTasks.RemoveAll(static task => task.IsCompleted);
+            _runningTasks.Add(RunAsync(job, packages, _stopCts.Token));
         }
         return Task.FromResult(id);
     }
@@ -122,6 +162,7 @@ public class DownloadTaskManager
     #region 下载作业执行
     private async Task RunAsync(DownloadJob job, List<PluginBrowseDataGridModel> packages, CancellationToken token)
     {
+        await Task.Yield();
         var names = packages.Select(m => m.PackName).ToList();
         var entered = false;
         try
@@ -177,14 +218,14 @@ public class DownloadTaskManager
         }
     }
 
+    #endregion
+
+    #region 自动安装
     /// <summary>
     /// 下载即安装：把 lib/{name}/ 探测类型后归位到 lib/{type}/{name}/ 并 InitPlugin 注册。
     /// 同名插件执行热更新（对齐上传路径）：停使用该插件的设备 → 卸载旧程序集 → 替换目录 → 恢复设备采集。
     /// 返回成功安装的接口数。
     /// </summary>
-    #endregion
-
-    #region 自动安装
     private async Task<int> TryAutoInstallAsync(List<string> names)
     {
         var installed = 0;
@@ -373,6 +414,27 @@ public class DownloadTaskManager
             if (index >= 0) _jobs[index] = job;
         }
         JobChanged?.Invoke(job);
+    }
+
+    /// <summary>取消并等待管理器拥有的全部下载作业，然后释放同步资源。</summary>
+    public async ValueTask DisposeAsync()
+    {
+        Task[] tasks;
+        lock (_gate)
+        {
+            _stopCts?.Cancel();
+            tasks = _runningTasks.ToArray();
+        }
+
+        await Task.WhenAll(tasks).ConfigureAwait(false);
+        lock (_gate)
+        {
+            _stopCts?.Dispose();
+            _stopCts = null;
+            _runningTasks.Clear();
+        }
+        _runGate.Dispose();
+        GC.SuppressFinalize(this);
     }
     #endregion
 }

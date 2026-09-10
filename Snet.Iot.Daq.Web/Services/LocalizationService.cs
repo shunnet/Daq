@@ -1,390 +1,53 @@
-﻿using System.Collections;
 using System.Globalization;
-using System.Resources;
+using Snet.Iot.Daq.Core;
 
 namespace Snet.Iot.Daq.Web.Services;
 
 /// <summary>
-/// 本地化服务：启动时把 Core 的 Language.resx / Language.en.resx 载入内存字典，T(key) O(1) 查表。
-/// key 即中文字面量（Core 资源约定），en 缺失时回退中文。
+/// 为当前 Blazor 用户会话提供本地化资源查询和语言状态通知。
 /// </summary>
-public class LocalizationService
+/// <remarks>
+/// 每个作用域实例只保存当前会话的语言，查询时显式传入区域性，避免修改进程级区域性而影响其他用户。
+/// </remarks>
+public sealed class LocalizationService
 {
-    private readonly Dictionary<string, string> _en = new(StringComparer.Ordinal);
-    private readonly CultureInfo _zhCulture = CultureInfo.GetCultureInfo("zh-Hans");
+    private static readonly CultureInfo ChineseCulture = CultureInfo.GetCultureInfo("zh-Hans");
+    private static readonly CultureInfo EnglishCulture = CultureInfo.GetCultureInfo("en");
 
-    /// <summary>Core 资源未覆盖的 Web 端补充词表（key 即中文字面量）</summary>
-    #region 词表
-    private static readonly Dictionary<string, string> WebTranslations = new(StringComparer.Ordinal)
-    {
-        ["插件"] = "Plugins",
-        ["项目"] = "Projects",
-        ["主题"] = "Theme",
-        ["退出登录"] = "Sign out",
-        ["登录"] = "Sign in",
-        ["用户名"] = "Username",
-        ["密码"] = "Password",
-        ["旧密码"] = "Old password",
-        ["新密码"] = "New password",
-        ["确认新密码"] = "Confirm password",
-        ["修改密码"] = "Change password",
-        ["至少 6 位"] = "At least 6 characters",
-        ["新密码（至少 6 位）"] = "New password (at least 6 characters)",
-        ["简体中文"] = "Simplified Chinese",
-        ["InvalidUsernameOrPassword"] = "Invalid username or password",
-        ["AccountLocked"] = "Account locked, try again later",
-        ["PasswordTooShort"] = "Password must be at least 6 characters",
-        ["InvalidOldPassword"] = "Invalid old password",
-        ["PasswordMismatch"] = "Passwords do not match",
-        // ---- 以下为页面/组件中使用的补充词表（按首字拼音排序）----
-        ["图标"] = "Icon",
-        ["保存"] = "Save",
-        ["折叠导航"] = "Toggle Navigation",
-        ["必填"] = "Required",
-        ["编码"] = "Encoding",
-        ["批量添加 MQ 传输设备"] = "Batch Add MQ Transfer Devices",
-        ["批量添加传输"] = "Batch Add Transfer",
-        ["采集设备"] = "Collection Device",
-        ["从地址库选择"] = "Select from Address Library",
-        ["参数"] = "Parameters",
-        ["参数 JSON 错误"] = "Invalid parameter JSON",
-        ["参数中缺少 SN，请在参数 JSON 中填写 SN"] = "Missing SN in parameters, please fill SN in the JSON",
-        ["参数校验失败"] = "Parameter validation failed",
-        ["操作"] = "Actions",
-        ["插件配置写入失败"] = "Failed to write the plugin config file",
-        ["测试"] = "Test",
-        ["测试结果"] = "Test Result",
-        ["测试中..."] = "Testing...",
-        ["测试失败"] = "Test failed",
-        ["添加失败，插件配置文件已经存在"] = "Add failed: the plugin config file already exists",
-        ["组包"] = "Auto Pack",
-        ["组包设置"] = "Auto Pack Settings",
-        ["单次批量读取的最大字节数"] = "Max bytes per batch read",
-        ["数据字节序格式"] = "Data byte order format",
-        ["数据字节序格式不合法"] = "Invalid data byte order format",
-        ["组包设置已保存"] = "Auto pack settings saved",
-        ["String解包是否按字反转字节"] = "Does String unpacking reverse bytes by word",
-        ["组包已移除"] = "Auto pack removed",
-        ["移除组包"] = "Remove Auto Pack",
-        ["WebApi 设置"] = "WebApi Settings",
-        ["Ip 地址"] = "IP address",
-        ["Ip 地址不能为空"] = "IP address cannot be empty",
-        ["端口"] = "Port",
-        ["跨域"] = "Cross domain",
-        ["WebApi 设置已保存"] = "WebApi settings saved",
-        ["WebApi 已移除"] = "WebApi removed",
-        ["移除 WebApi"] = "Remove WebApi",
-        ["用户管理"] = "User Management",
-        ["添加用户"] = "Add User",
-        ["用户名"] = "Username",
-        ["密码"] = "Password",
-        ["角色"] = "Role",
-        ["管理员"] = "Administrator",
-        ["普通用户"] = "Regular User",
-        ["状态"] = "Status",
-        ["操作"] = "Actions",
-        ["需修改密码"] = "Password change required",
-        ["正常"] = "Normal",
-        ["设为普通用户"] = "Set as Regular User",
-        ["设为管理员"] = "Set as Administrator",
-        ["重置密码"] = "Reset Password",
-        ["删除"] = "Delete",
-        ["当前登录"] = "Current User",
-        ["新密码"] = "New Password",
-        ["用户已添加"] = "User added",
-        ["用户已删除"] = "User deleted",
-        ["角色已更新"] = "Role updated",
-        ["密码已重置"] = "Password reset",
-        ["用户名不合法"] = "Invalid username",
-        ["用户名已存在"] = "Username already exists",
-        ["用户不存在"] = "User not found",
-        ["至少保留一个管理员"] = "At least one administrator must remain",
-        ["不能删除当前登录用户"] = "Cannot delete the current user",
-        ["已停用"] = "Disabled",
-        ["停用"] = "Disable",
-        ["启用"] = "Enable",
-        ["用户已停用"] = "User disabled",
-        ["用户已启用"] = "User enabled",
-        ["不能停用当前登录用户"] = "Cannot disable the current user",
-        ["UserDisabled"] = "Account disabled, please contact the administrator",
-        ["你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置"] = "You are importing raw source data. Plugin required parameters must be configured first. Continue?",
-        ["导入取消"] = "Import canceled",
-        ["源数据导入设置"] = "Source Import Settings",
-        ["数据传输主题"] = "Data transfer topic",
-        ["数据传输精简值"] = "Simplify transfer value",
-        ["导出成功：{0} 个项目"] = "Exported {0} projects",
-        ["导入成功：{0} 个项目"] = "Imported {0} projects",
-        ["导入失败：未识别到项目数据"] = "Import failed: no project data recognized",
-        ["文件过大或不合法"] = "File is too large or invalid",
-        ["修改失败，插件配置文件名称已经存在，请修改SN"] = "Update failed: the config file name already exists, please change the SN",
-        ["修改失败，地址已不存在"] = "Update failed: the address no longer exists",
-        ["重命名"] = "Rename",
-        ["重命名成功"] = "Renamed",
-        ["重启服务器后可彻底清理"] = "Restart the server to fully clean up",
-        ["处理间隔"] = "Processing interval",
-        ["传输设备添加成功"] = "Transfer device added",
-        ["打开方式"] = "Open method",
-        ["第 {0} / {1} 页"] = "Page {0} / {1}",
-        ["读取测试"] = "Read Test",
-        ["地址编辑"] = "Edit Address",
-        ["地址和别名不能为空"] = "Address and alias cannot be empty",
-        ["导出成功：{0} 个地址"] = "Exported {0} addresses",
-        ["等待导入"] = "Pending import",
-        ["导入失败：未识别到地址数据"] = "Import failed: no address data recognized",
-        ["导入完成：新增 {0} 个，重复跳过 {1} 个"] = "Import done: {0} added, {1} duplicates skipped",
-        ["导入成功：{0} 个地址"] = "Imported {0} addresses",
-        ["到地址库选择"] = "Select from Address Library",
-        ["该传输设备已添加到此地址"] = "This transfer device already added to this address",
-        ["该设备已添加到项目中"] = "This device is already added to the project",
-        ["格式有误"] = "Invalid format",
-        ["共 {0} 条"] = "Total {0} items",
-        ["关于"] = "About",
-        ["关键字"] = "Keyword",
-        ["核心插件"] = "Core plugins",
-        ["欢迎"] = "Welcome",
-        ["加载"] = "Load",
-        ["解压后体积超过限制"] = "Extracted size exceeds limit",
-        ["仅支持 .zip 插件包"] = "Only .zip plugin packages supported",
-        ["精简值"] = "Simplified Value",
-        ["消息"] = "Message",
-        ["MQ 传输设备"] = "MQ Transfer Device",
-        ["名称不能为空"] = "Name cannot be empty",
-        ["内容"] = "Content",
-        ["确定"] = "OK",
-        ["确认删除 {0} 及其全部子项？"] = "Delete {0} and all its children?",
-        ["确认删除 {0}？"] = "Delete {0}?",
-        ["确认移除插件"] = "Remove plugin",
-        ["请选择插件"] = "Please select a plugin",
-        ["前往插件设置"] = "Go to Plugin Settings",
-        ["全部"] = "All",
-        ["全选"] = "Select all",
-        ["正在上传 {0} ..."] = "Uploading {0} ...",
-        ["正在加载插件默认参数..."] = "Loading plugin default parameters...",
-        ["刷新失败"] = "Refresh failed",
-        ["设备添加成功"] = "Device added",
-        ["上传中..."] = "Uploading...",
-        ["上传成功：{0}，已安装 {1}，点击刷新按钮查看"] = "Uploaded {0}, installed {1}. Click Refresh to view",
-        ["插件已安装，但运行时加载失败：{0}"] = "Plugin installed, but failed to load at runtime: {0}",
-        ["服务端停止失败"] = "Failed to stop server",
-        ["生产测试"] = "Production Test",
-        ["生产成功"] = "Production succeeded",
-        ["生产失败"] = "Production failed",
-        ["时间"] = "Time",
-        ["使用"] = "Use",
-        ["数据"] = "Data",
-        ["搜索插件包名"] = "Search plugin package name",
-        ["搜索：地址 / 别名 / 描述"] = "Search: Address / Alias / Description",
-        ["输入"] = "Input",
-        ["输出"] = "Output",
-        ["停止下载"] = "Stop download",
-        ["同源"] = "Same origin",
-        ["确认移除插件 {0}？"] = "Confirm removing plugin {0}?",
-        ["确认移除插件 {0}？该插件包内还有 {1} 个插件将一并移除"] = "Confirm removing plugin {0}? {1} more plugin(s) in the same package will be removed together",
-        ["同名插件已存在，执行热更新"] = "Plugin with same name exists, performing hot update",
-        ["同名插件已存在，是否执行热更新？运行中的设备将暂停后恢复"] = "A plugin with the same name already exists. Perform a hot update? Running devices will be paused and resumed.",
-        ["SN 已存在"] = "SN already exists",
-        ["Topic 不能为空"] = "Topic cannot be empty",
-        ["未获取到参数定义，可切换到 JSON 视图编辑"] = "No parameter definition available, switch to JSON view to edit",
-        ["未注册运行时"] = "Runtime not registered",
-        ["无消息"] = "No message",
-        ["文件内容为空"] = "File is empty",
-        ["下载中"] = "Downloading",
-        ["未采集"] = "Not Collected",
-        ["{0} 台设备已加载"] = "{0} device(s) loaded",
-        ["该插件配置在项目设置中有使用"] = "This plugin configuration is used in Project Settings",
-        ["下载完成"] = "Download complete",
-        ["下载失败"] = "Download failed",
-        ["下载选中"] = "Download selected",
-        ["项目名称"] = "Project Name",
-        ["项目名称不能为空"] = "Project name cannot be empty",
-        ["写入测试"] = "Write Test",
-        ["压缩包条目过多"] = "Archive has too many entries",
-        ["验证完成"] = "Verification complete",
-        ["验证中..."] = "Verifying...",
-        ["已加入下载队列"] = "Added to download queue",
-        ["已停止下载"] = "Download stopped",
-        ["服务"] = "Service",
-        ["服务配置"] = "Service config",
-        ["服务已启动"] = "Service already running",
-        ["服务未启动"] = "Service is not running",
-        ["MQTT 服务启动成功"] = "MQTT service started",
-        ["MQTT 服务启动失败"] = "MQTT service failed to start",
-        ["OPC UA 服务启动成功"] = "OPC UA service started",
-        ["OPC UA 服务启动失败"] = "OPC UA service failed to start",
-        ["MQTT 服务已停止"] = "MQTT service stopped",
-        ["OPC UA 服务已停止"] = "OPC UA service stopped",
-        ["未知服务"] = "Unknown service",
-        ["启动"] = "Start",
-        ["停止"] = "Stop",
-        ["修改服务配置"] = "Edit server config",
-        ["已添加 {0} 个采集地址"] = "{0} collection addresses added",
-        ["已为 {0} 个地址添加传输设备"] = "Transfer device added to {0} addresses",
-        ["已选"] = "Selected",
-        ["已装插件"] = "Installed Plugins",
-        ["值"] = "Value",
-        ["值不能为空"] = "Value cannot be empty",
-        ["状态验证失败"] = "Status verification failed",
-        ["状态验证通过"] = "Status verification passed",
-        ["字体"] = "Font",
-        ["暂无地址数据"] = "No address data",
-        ["暂无采集地址，点击「添加采集地址」从地址库选择"] = "No collection addresses. Click \"Add Collection Address\" to select from the library",
-        ["暂无采集设备，请在项目设置中添加设备"] = "No collection devices. Add a device in Project Settings",
-        ["暂无插件配置"] = "No plugin configuration",
-        ["暂无项目，点击右上角添加顶级项"] = "No projects. Click \"Add Top Item\" in the top-right",
-        ["暂无已安装插件。可在插件浏览页下载（自动安装）或在此上传 .zip 包"] = "No installed plugins. Download from Plugin Browser (auto-install) or upload a .zip here",
-        ["插件包名不合法"] = "Invalid plugin package name",
-        ["插件包超过 100MB 限制"] = "Plugin package exceeds 100MB limit",
-        ["插件化工业物联网数据采集工具"] = "Plugin-based Industrial IoT Data Acquisition Tool",
-        ["插件列表为空，点击刷新从 NuGet 市场拉取"] = "Plugin list is empty, click Refresh to fetch from NuGet",
-        ["插件列表刷新成功"] = "Plugin list refreshed",
-        ["插件目录清理失败"] = "Plugin directory cleanup failed",
-        ["插件目录移除失败（列表已清理）：{0}"] = "Plugin directory removal failed (list already cleaned): {0}",
-        ["插件上传失败"] = "Plugin upload failed",
-        ["插件上传成功：{0}"] = "Plugin uploaded: {0}",
-        ["插件下载位置"] = "Plugin Download Location",
-        ["插件移除失败"] = "Plugin removal failed",
-        ["插件路径不合法"] = "Invalid plugin path",
-        ["插件已从列表移除，目录清理失败"] = "Plugin removed from list but directory cleanup failed",
-        ["插件已移除：{0}"] = "Plugin removed: {0}",
-        ["扩展参数"] = "Extended Parameters",
-        ["服务器未安装 .NET SDK，无法下载插件"] = ".NET SDK not installed on server, cannot download plugins",
-        ["将应用到该设备下的全部采集地址（已有相同 SN 的跳过）"] = "Applies to all collection addresses of this device (same SN skipped)",
-        ["所有地址已添加该传输设备"] = "All addresses already have this transfer device",
-        ["添加采集地址"] = "Add Collection Address",
-        ["添加传输"] = "Add Transfer",
-        ["添加配置"] = "Add Configuration",
-        ["添加成功"] = "Added successfully",
-        ["添加 MQ 传输设备"] = "Add MQ Transfer Device",
-        ["添加项目"] = "Add Project",
-        ["添加子项"] = "Add Child Item",
-        ["选择采集地址"] = "Select Collection Address",
-        ["选择左侧设备节点，配置采集地址与 MQ 传输设备"] = "Select a device node on the left to configure collection addresses and MQ transfer devices",
-        ["取消"] = "Cancel",
-        ["表单"] = "Form",
-        ["配置修改成功"] = "Configuration updated",
-        ["配置已移除"] = "Configuration removed",
-        ["配置添加成功"] = "Configuration added",
-        ["没有可添加的地址（已全部绑定或重复）"] = "No addresses to add (all bound or duplicated)",
-        ["暂无 Daq 采集插件配置。请先在「插件设置 → 插件配置」添加 Daq 类型配置"] = "No Daq plugin configuration yet. Please add a Daq config under \"Plugin Settings → Plugin Config\"",
-        ["暂无 Mq 插件配置。请先在「插件设置 → 插件配置」添加 Mq 类型配置"] = "No Mq plugin configuration yet. Please add an Mq config under \"Plugin Settings → Plugin Config\"",
-        ["WebApi 启动"] = "WebApi Start",
-        ["WebApi 停止"] = "WebApi Stop",
-        ["WebApi 请求示例"] = "WebApi Example",
-        ["添加软启采集"] = "Enable Soft Collect",
-        ["取消软启采集"] = "Disable Soft Collect",
-        ["添加软启采集成功"] = "Soft collect enabled",
-        ["取消软启采集成功"] = "Soft collect disabled",
-        ["无数据"] = "No data",
-        ["写入"] = "Write",
-        ["写入成功"] = "Write succeeded",
-        ["写入失败"] = "Write failed",
-        ["移除所有"] = "Remove All",
-        ["已移除全部地址与传输设备"] = "All addresses and transfer devices removed",
-        ["确认移除该设备下所有地址与传输设备？"] = "Remove all addresses and transfer devices under this device?",
-        ["JSON"] = "JSON",
-        ["Topic"] = "Topic",
-        ["保存成功"] = "Saved successfully",
-        ["分页"] = "Pagination",
-        ["成功"] = "succeeded",
-        ["失败"] = "failed",
-        ["异常"] = "error",
-        ["启动失败"] = "Failed to start",
-        ["[{0}] 启动采集失败: {1}"] = "[{0}] Failed to start collection: {1}",
-        ["[{0}] 启动采集成功，地址数 {1}"] = "[{0}] Collection started, {1} addresses",
-        ["[{0}] WebApi 启动{1}: {2}"] = "[{0}] WebApi {1}: {2}",
-        ["[{0}] WebApi 停止{1}: {2}"] = "[{0}] WebApi {1}: {2}",
-        ["[{0}] WebApi 启动异常: {1}"] = "[{0}] WebApi start error: {1}",
-        ["[{0}] WebApi 关闭异常: {1}"] = "[{0}] WebApi close error: {1}",
-        ["[{0}] 启动采集异常: {1}"] = "[{0}] Collection start error: {1}",
-        ["[{0}] 退订异常: {1}"] = "[{0}] Unsubscribe error: {1}",
-        ["[{0}] 停止采集"] = "[{0}] Collection stopped",
-        ["[{0}] {1}"] = "[{0}] {1}",
-        ["[{0}] 采集未启动，无法操作 WebApi"] = "[{0}] Collection not running, cannot operate WebApi",
-        ["[{0}] 未设置 WebApi 参数"] = "[{0}] WebApi parameters not set",
-        ["[{0}] 数据入队异常: {1}"] = "[{0}] Data enqueue error: {1}",
-        ["[{0}] 数据通道异常: {1}"] = "[{0}] Data channel error: {1}",
-        ["MQ 转发失败 {0}: {1}"] = "MQ forward failed {0}: {1}",
-        ["地址 {0} 处理异常: {1}"] = "Address {0} error: {1}",
-        ["UA 地址创建失败 {0}: {1}"] = "UA address creation failed {0}: {1}",
-        ["UA 写入失败 {0}: {1}"] = "UA write failed {0}: {1}",
-        ["UA 转发异常 {0}: {1}"] = "UA forward error {0}: {1}",
-        ["UA 层级创建失败 {0}: {1}"] = "UA folder creation failed {0}: {1}",
-        ["UA 层级创建异常: {0}"] = "UA folder creation error: {0}",
-        ["[Info] Daq 宿主启动完成，设备 {0} 台"] = "[Info] Daq host started, {0} devices",
-        ["[Error] Daq 宿主初始化失败: {0}"] = "[Error] Daq host init failed: {0}",
-        ["[Error] 服务停止异常: {0}"] = "[Error] Service stop error: {0}",
-        ["[Error] MQTT 服务端启动失败: {0}"] = "[Error] MQTT server start failed: {0}",
-        ["[Info] MQTT 服务端已启动"] = "[Info] MQTT server started",
-        ["[Error] MQTT 服务端启动异常: {0}"] = "[Error] MQTT server start error: {0}",
-        ["[Error] MQTT 服务端停止异常: {0}"] = "[Error] MQTT server stop error: {0}",
-        ["[Error] OPC UA 服务端启动失败: {0}"] = "[Error] OPC UA server start failed: {0}",
-        ["[Info] OPC UA 服务端已启动"] = "[Info] OPC UA server started",
-        ["[Error] OPC UA 服务端启动异常: {0}"] = "[Error] OPC UA server start error: {0}",
-        ["[Error] OPC UA 服务端停止异常: {0}"] = "[Error] OPC UA server stop error: {0}",
-        ["设备类型"] = "DeviceType",
-        ["插件版本"] = "PluginVersion",
-        ["版本"] = "Version",
-        ["（端口小于 1024 需管理员权限运行或 netsh URLACL 授权）"] = " (Port below 1024 requires admin privileges or netsh URLACL)",
-        ["[{0}] WebApi 状态查询异常: {1}"] = "[{0}] WebApi status query error: {1}",
-        ["操作日志"] = "Operation Logs",
-        ["无日志用户"] = "No log users",
-        ["暂无操作日志"] = "No operation logs",
-        ["清空当前用户"] = "Clear current user",
-        ["清空所有用户"] = "Clear all users",
-        ["已清空"] = "Cleared",
-        ["UA 服务端未启动，跳过转发"] = "UA server not started, skip forwarding",
-        ["UA 服务端未运行，跳过转发：{0}"] = "UA server not running, skip forwarding: {0}",
-        ["UA 层级创建失败，跳过转发"] = "UA folder creation failed, skip forwarding",
-        ["UA 地址映射失败 {0}（AddressSpaceName={1}）"] = "UA address mapping failed {0} (AddressSpaceName={1})",
-        ["扩展参数不正确"] = "Invalid extension parameters",
-        ["解包失败：{0}"] = "Unpack failed: {0}",
-        ["请检查项目详情中传输设备是否正确设置给每个地址"] = "Please check whether the transmission device is correctly set for each address in the project details",
-        ["以下地址未配置传输设备，无法采集：{0}"] = "The following addresses have no transmission device configured and cannot be collected: {0}",
-        ["设备下没有可采集的地址"] = "No collectable addresses under the device",
-        ["警告: {0} 个地址未配置传输设备，不参与采集: {1}"] = "Warning: {0} addresses have no transmission device configured and will not be collected: {1}",
-    };
-
-    #endregion
-
-    #region 语言状态与查表
+    /// <summary>
+    /// 获取当前会话使用的语言代码，值为 <c>zh</c> 或 <c>en</c>。
+    /// </summary>
     public string CurrentLanguage { get; private set; } = "zh";
 
+    /// <summary>
+    /// 在当前会话语言发生变化后触发，订阅方应在释放时取消订阅。
+    /// </summary>
     public event Action? LanguageChanged;
 
-    #endregion
-
-    #region 初始化
-    public LocalizationService()
-    {
-        var rm = new ResourceManager("Snet.Iot.Daq.Core.Language", typeof(Snet.Iot.Daq.Core.Core).Assembly);
-        if (rm.GetResourceSet(CultureInfo.GetCultureInfo("en"), true, false) is { } enSet)
-        {
-            foreach (DictionaryEntry entry in enSet)
-            {
-                if (entry.Value is string value)
-                    _en[(string)entry.Key] = value;
-            }
-        }
-    }
-
+    /// <summary>
+    /// 从 <see cref="Language"/> 的统一资源文件读取当前语言的文本。
+    /// </summary>
+    /// <param name="key">资源键；项目约定中文显示文本可直接作为资源键。</param>
+    /// <returns>当前语言的资源值；资源缺失时返回原始键，确保界面仍可读。</returns>
+    /// <exception cref="ArgumentNullException"><paramref name="key"/> 为 <see langword="null"/>。</exception>
     public string T(string key)
     {
-        if (CurrentLanguage != "en") return key;
-        return _en.TryGetValue(key, out var en) ? en
-            : WebTranslations.TryGetValue(key, out var web) ? web
-            : key;
+        ArgumentNullException.ThrowIfNull(key);
+        var culture = CurrentLanguage == "en" ? EnglishCulture : ChineseCulture;
+        return Language.ResourceManager.GetString(key, culture) ?? key;
     }
 
-    #endregion
-
-    #region 语言切换
-    public Task SetLanguageAsync(string lang)
+    /// <summary>
+    /// 切换当前用户会话的界面语言，并在值实际变化时通知订阅方。
+    /// </summary>
+    /// <param name="language">语言代码；仅 <c>en</c> 选择英文，其余值统一为中文。</param>
+    public void SetLanguage(string language)
     {
-        if (lang == CurrentLanguage) return Task.CompletedTask;
-        CurrentLanguage = lang == "en" ? "en" : "zh";
-        // 浏览器语言仅属于当前电路，不能修改进程级 Core 语言和数值格式。
+        var normalized = string.Equals(language, "en", StringComparison.OrdinalIgnoreCase) ? "en" : "zh";
+        if (normalized == CurrentLanguage)
+            return;
+
+        CurrentLanguage = normalized;
         LanguageChanged?.Invoke();
-        return Task.CompletedTask;
     }
-    #endregion
 }

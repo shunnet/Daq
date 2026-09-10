@@ -329,7 +329,7 @@
         try
         {
             var r = await rt.WebApiStartAsync();
-            Toast.Show(r.Message, r.Status ? "success" : "error");
+            Toast.Show(r.Message ?? T("操作失败"), r.Status ? "success" : "error");
         }
         catch (Exception ex)
         {
@@ -342,7 +342,7 @@
         _moreOpen = null;
         await OperateInfoAsync($"WebApi 停止：{rt.DeviceName}");
         var r = await rt.WebApiStopAsync();
-        Toast.Show(r.Message, r.Status ? "success" : "error");
+        Toast.Show(r.Message ?? T("操作失败"), r.Status ? "success" : "error");
     }
 
     private async Task WebApiExampleAsync(DeviceRuntime rt)

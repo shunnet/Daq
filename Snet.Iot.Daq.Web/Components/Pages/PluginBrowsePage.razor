@@ -241,7 +241,8 @@
         if (!File.Exists(WebPaths.PluginBrowseCachePath)) return;
         try
         {
-            var cached = File.ReadAllText(WebPaths.PluginBrowseCachePath).ToJsonEntity<List<PluginBrowseDataGridModel>>();
+            var json = await File.ReadAllTextAsync(WebPaths.PluginBrowseCachePath);
+            var cached = json.ToJsonEntity<List<PluginBrowseDataGridModel>>();
             if (cached is { Count: > 0 })
                 _all = cached;
         }

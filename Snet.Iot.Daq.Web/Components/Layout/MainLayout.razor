@@ -9,7 +9,6 @@
 @inject LocalizationService Localization
 @inject ThemeService Theme
 @inject IJSRuntime JS
-@inject NavigationManager Nav
 
 <div class="app-shell">
     <header class="app-bar">
@@ -47,12 +46,15 @@
                 }
             </svg>
         </button>
-        <button class="btn btn-icon" title="@T("退出登录")" @onclick="LogoutAsync">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                <path d="M16 17l5-5-5-5M21 12H9" />
-            </svg>
-        </button>
+        <form method="post" action="/logout" class="logout-form">
+            <AntiforgeryToken />
+            <button type="submit" class="btn btn-icon" title="@T("退出登录")">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                    <path d="M16 17l5-5-5-5M21 12H9" />
+                </svg>
+            </button>
+        </form>
     </header>
 
     <div class="app-body">
@@ -117,7 +119,7 @@
         {
             var saved = await JS.InvokeAsync<string>("snet.getLang");
             if (saved is "en" or "zh" && Localization.CurrentLanguage != saved)
-                await Localization.SetLanguageAsync(saved);
+                Localization.SetLanguage(saved);
         }
         catch { }
 
@@ -138,7 +140,7 @@
 
     private async Task SetLangAsync(string lang)
     {
-        await Localization.SetLanguageAsync(lang);
+        Localization.SetLanguage(lang);
         await JS.InvokeVoidAsync("snet.setLang", lang);
         StateHasChanged();
     }
@@ -151,8 +153,6 @@
     }
 
     private void ToggleNavAsync() => _navCollapsed = !_navCollapsed;
-
-    private void LogoutAsync() => Nav.NavigateTo("/logout", forceLoad: true);
 
     protected override void OnInitialized()
     {

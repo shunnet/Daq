@@ -9,6 +9,7 @@ namespace Snet.Iot.Daq.Web.Components;
 /// </summary>
 public abstract class LocalizedComponentBase : ComponentBase, IDisposable
 {
+    /// <summary>获取当前用户电路使用的本地化服务。</summary>
     [Inject]
     protected LocalizationService Localization { get; set; } = null!;
 
@@ -16,6 +17,9 @@ public abstract class LocalizedComponentBase : ComponentBase, IDisposable
     [CascadingParameter]
     private Task<AuthenticationState>? _authState { get; set; }
 
+    /// <summary>获取指定资源键在当前语言下的文本。</summary>
+    /// <param name="key">Core 语言资源中的资源键。</param>
+    /// <returns>本地化文本；资源不存在时返回资源键。</returns>
     protected string T(string key) => Localization.T(key);
 
     /// <summary>记录当前用户操作日志（logs/operate/{用户名}/，用户名 - [角色] 操作内容）</summary>
@@ -46,20 +50,41 @@ public abstract class LocalizedComponentBase : ComponentBase, IDisposable
         catch { /* 日志失败不影响操作 */ }
     }
 
+    /// <inheritdoc />
     protected override void OnInitialized()
     {
         Localization.LanguageChanged += OnLanguageChanged;
     }
 
-    private void OnLanguageChanged()
+    private async void OnLanguageChanged()
     {
-        OnLanguageChangedCore();
-        InvokeAsync(StateHasChanged);
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                await OnLanguageChangedCoreAsync();
+                StateHasChanged();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // 语言切换与页面销毁同时发生时，组件已经不再需要刷新。
+        }
+        catch (InvalidOperationException)
+        {
+            // 电路断开后调度器不可用，忽略这次界面刷新。
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"[Localization] 语言切换后的组件刷新失败: {ex.Message}");
+        }
     }
 
-    /// <summary>语言切换钩子：子类可在此重建语言相关的数据（在 StateHasChanged 之前调用）</summary>
-    protected virtual void OnLanguageChangedCore() { }
+    /// <summary>语言切换钩子：子类可在界面刷新前异步重建语言相关数据。</summary>
+    /// <returns>重建操作。</returns>
+    protected virtual Task OnLanguageChangedCoreAsync() => Task.CompletedTask;
 
+    /// <summary>取消语言事件订阅，释放组件持有的托管资源。</summary>
     public virtual void Dispose()
     {
         Localization.LanguageChanged -= OnLanguageChanged;

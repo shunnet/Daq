@@ -126,7 +126,7 @@ window.snet = {
         return document.documentElement.getAttribute('data-theme') || 'dark';
     },
     setLang: function (lang) {
-        document.documentElement.setAttribute('lang', lang);
+        document.documentElement.setAttribute('lang', lang === 'en' ? 'en' : 'zh-Hans');
         try { localStorage.setItem('snet-lang', lang); } catch (e) { }
     },
     getLang: function () {

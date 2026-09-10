@@ -1,4 +1,4 @@
-@inject MenuCoordinator MenuCoordinator
+﻿@inject MenuCoordinator MenuCoordinator
 @page "/plugins/settings"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
@@ -546,11 +546,8 @@
     }
 
     /// <summary>语言切换：参数表单标签（中文用描述/英文用属性名）随语言重建</summary>
-    protected override void OnLanguageChangedCore()
-    {
-        if (_paramDef is null) return;
-        _ = RebuildParamLabelsAsync();
-    }
+    protected override Task OnLanguageChangedCoreAsync() =>
+        _paramDef is null ? Task.CompletedTask : RebuildParamLabelsAsync();
 
     private async Task RebuildParamLabelsAsync()
     {
@@ -648,7 +645,7 @@
                 {
                     var dirName = Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
                     var fallback = Path.Combine(WebPaths.FilePath, p.Type.ToString().ToLower(), dirName);
-                    if (Directory.Exists(fallback)) p.PluginDetails.Path = fallback;
+                    if (Directory.Exists(fallback) && p.PluginDetails is not null) p.PluginDetails.Path = fallback;
                 }
             }
             // 加载去重（历史热更新可能遗留同名条目）
@@ -1228,7 +1225,7 @@
         _autoSubset = subset;
         // 协议选择器：字段名取插件声明的自动分配属性名，选项取全量定义的 subset 名
         var desc = _paramDef.Subset.SelectMany(s => s.Propertie)
-            .FirstOrDefault(p => p.PropertyName.Equals(propName, StringComparison.OrdinalIgnoreCase))?.Description;
+            .FirstOrDefault(p => string.Equals(p.PropertyName, propName, StringComparison.OrdinalIgnoreCase))?.Description;
         _protocolField = new ParamField
         {
             PropertyName = propName!,
@@ -1312,9 +1309,9 @@
             {
                 var byNum = def.Subset
                     .Where(s => !string.IsNullOrEmpty(s.Name))
-                    .ToDictionary(s => s.Propertie.FirstOrDefault(p => p.PropertyName.Equals(_protocolField.PropertyName, StringComparison.OrdinalIgnoreCase))?.Default?.ToString() ?? "", s => s.Name!);
+                    .ToDictionary(s => s.Propertie.FirstOrDefault(p => string.Equals(p.PropertyName, _protocolField.PropertyName, StringComparison.OrdinalIgnoreCase))?.Default?.ToString() ?? "", s => s.Name!);
                 _protocolType = !string.IsNullOrEmpty(jsonProto) && byNum.TryGetValue(jsonProto, out var name)
-                    ? name
+                    ? name ?? string.Empty
                     : def.Subset.FirstOrDefault(s => !string.IsNullOrEmpty(s.Name))?.Name ?? "";
             }
             // 当前协议 subset：优先插件自动分配结果（GetAutoAllocatingArgsAsync 按 ProtocolType 值返回，
@@ -1335,7 +1332,7 @@
                     .Where(p => !string.IsNullOrEmpty(p.PropertyName)
                                 && (p.Show || p.PropertyName.Equals("SN", StringComparison.OrdinalIgnoreCase))
                                 && (p.Use || p.PropertyName.Equals("SN", StringComparison.OrdinalIgnoreCase))
-                                && !p.PropertyName.Equals(_protocolField.PropertyName, StringComparison.OrdinalIgnoreCase)
+                                && !string.Equals(p.PropertyName, _protocolField.PropertyName, StringComparison.OrdinalIgnoreCase)
                                 && !IsMqExcludedField(p.PropertyName))
                     .Select(p => ToParamField(p, s)))
                 .GroupBy(f => f.PropertyName)
@@ -1368,11 +1365,11 @@
     {
         var f = new ParamField
         {
-            PropertyName = p.PropertyName,
+            PropertyName = p.PropertyName ?? string.Empty,
             // 标签语言自适应：中文界面用插件描述，英文界面用属性名
             Description = Localization.CurrentLanguage == "en" || string.IsNullOrWhiteSpace(p.Description)
-                ? p.PropertyName
-                : p.Description,
+                ? p.PropertyName ?? string.Empty
+                : p.Description ?? string.Empty,
             Cate = p.DataCate?.ToString() ?? "text",
             Value = p.Default?.ToString() ?? "",
             MustFillIn = p.MustFillIn,
@@ -1737,19 +1734,22 @@
         }
     }
 
-    /// <summary>使用检查（对齐 DAQ UseCheck）：ProjectConfig.json 全文包含 Guid 即视为被项目引用。读失败视为未使用，不阻断操作也不击穿电路</summary>
-    private static bool IsConfigUsedByProject(string guid)
+    /// <summary>检查当前项目树是否按 Guid 引用了指定采集或传输插件配置。</summary>
+    private bool IsConfigUsedByProject(string guid)
     {
-        if (!File.Exists(WebPaths.ProjectConfigPath)) return false;
-        try
-        {
-            return File.ReadAllText(WebPaths.ProjectConfigPath).Contains(guid);
-        }
-        catch
-        {
-            return false;
-        }
+        return AppState.ProjectDict.Any(node => ContainsPluginReference(node, guid));
     }
+
+    /// <summary>递归检查项目节点及其详情树中的插件配置引用。</summary>
+    private static bool ContainsPluginReference(IProjectTreeViewModel node, string guid) =>
+        string.Equals(node.DaqDetails?.Guid, guid, StringComparison.Ordinal)
+        || node.Details?.Any(detail => ContainsMqReference(detail, guid)) == true
+        || node.Children.Any(child => ContainsPluginReference(child, guid));
+
+    /// <summary>递归检查详情树中的传输插件配置引用。</summary>
+    private static bool ContainsMqReference(IProjectDetailsTreeViewModel node, string guid) =>
+        string.Equals(node.MqDetails?.Guid, guid, StringComparison.Ordinal)
+        || node.Children.Any(child => ContainsMqReference(child, guid));
 
     /// <summary>插件配置文件名 = ConfigFormat 模板格式化 SN（对齐 WPF AddPluginConfigAsync），无模板时回退原始 SN</summary>
     private static string BuildConfigFileName(PluginListModel? plugin, string sn)

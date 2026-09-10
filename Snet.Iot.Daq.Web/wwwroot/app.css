@@ -367,6 +367,11 @@ a:hover { color: var(--primary-hover); }
 
 .app-bar .spacer { flex: 1; }
 
+.logout-form {
+    display: flex;
+    margin: 0;
+}
+
 .app-bar .brand img {
     width: 40px;
     height: 40px;

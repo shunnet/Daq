@@ -541,13 +541,14 @@
         try
         {
             var file = e.File;
-            if (file is null || file.Size > 100 * 1024 * 1024)
+            const long maxProjectFileSize = 10 * 1024 * 1024;
+            if (file is null || file.Size > maxProjectFileSize)
             {
                 ToastSvc.Error(T("文件过大或不合法"));
                 return;
             }
             string json;
-            using (var reader = new StreamReader(file.OpenReadStream()))
+            using (var reader = new StreamReader(file.OpenReadStream(maxProjectFileSize)))
                 json = await reader.ReadToEndAsync();
 
             var projects = json.ToJsonEntity<ObservableCollection<IProjectTreeViewModel>>();

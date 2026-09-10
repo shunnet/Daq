@@ -18,12 +18,17 @@ public class AppStateService
     #region 全局字典与服务实例
     private readonly DbGate _dbGate;
     private readonly LoggerBuffer _logger;
+    private readonly object _persistenceLock = new();
+    private Task _pendingPersistence = Task.CompletedTask;
 
     /// <summary>配置写门：串行化 PluginConfig.json / ProjectConfig.json 的检查→写文件→改字典→落盘流程（Blazor 多电路并发保护）</summary>
     public readonly SemaphoreSlim ConfigSaveGate = new(1, 1);
 
+    /// <summary>获取按插件唯一标识索引的全局插件配置。</summary>
     public ConcurrentDictionary<string, PluginConfigModel> PluginDict { get; } = new();
+    /// <summary>获取按地址唯一标识索引的全局地址配置。</summary>
     public ConcurrentDictionary<string, IAddressModel> AddressDict { get; } = new();
+    /// <summary>获取当前项目树根节点集合；集合变更必须在配置写门内持久化。</summary>
     public ObservableCollection<IProjectTreeViewModel> ProjectDict { get; } = new();
 
     /// <summary>OPC UA 服务端实例（对应 WPF GlobalConfigModel.uaService）</summary>
@@ -35,21 +40,25 @@ public class AppStateService
     /// <summary>服务端状态变更通知（UA/MQTT 启动/停止后触发，供控制台刷新）</summary>
     public event Action? ServerStateChanged;
 
+    /// <summary>通知订阅组件刷新 OPC UA 与 MQTT 服务端状态。</summary>
     public void NotifyServerStateChanged() => ServerStateChanged?.Invoke();
 
     /// <summary>实体变更通知（地址/插件信息修改后触发，对齐原版 RefreshAsync 感知更新）</summary>
     public event Action? EntityChanged;
 
+    /// <summary>创建全局状态服务。</summary>
+    /// <param name="dbGate">共享 SQLite 连接及同步入口。</param>
+    /// <param name="logger">应用内日志缓冲区。</param>
     public AppStateService(DbGate dbGate, LoggerBuffer logger)
     {
         _dbGate = dbGate;
         _logger = logger;
     }
 
-    /// <summary>从 JSON 配置 + SQLite 加载插件/地址/项目树并回灌全局引用（对齐 WPF App.xaml.cs Init）</summary>
     #endregion
 
     #region 加载
+    /// <summary>从 JSON 配置 + SQLite 加载插件/地址/项目树并回灌全局引用（对齐 WPF App.xaml.cs Init）</summary>
     public async Task LoadAllAsync()
     {
         PluginDict.Clear();
@@ -114,27 +123,39 @@ public class AppStateService
         }
     }
 
-    /// <summary>
-    /// 实体变更：地址/插件信息修改后调用 → 刷新项目树全部引用与名称（感知更新）→ 持久化项目树。
-    /// 对齐原版 GlobalConfigModel.RefreshAsync + 节点 OnInfoEvent 后的 SetAsync：一处改变，所有用到的地方跟着变，且名称变更落盘。
-    /// 落盘走 Task.Run + WaitAsync（调用方可能正持有 ConfigSaveGate，同线程再等待会死锁，后台线程安全等待即可）。
-    /// </summary>
     #endregion
 
     #region 实体变更与持久化
+    /// <summary>
+    /// 实体变更：地址/插件信息修改后调用 → 刷新项目树全部引用与名称（感知更新）→ 持久化项目树。
+    /// 对齐原版 GlobalConfigModel.RefreshAsync + 节点 OnInfoEvent 后的 SetAsync：一处改变，所有用到的地方跟着变，且名称变更落盘。
+    /// 先生成不可变 JSON 快照，再把异步写入加入本服务拥有的串行任务链，避免未托管后台任务和并发序列化集合。
+    /// </summary>
     public void NotifyEntityChanged()
     {
         RefreshProjectBindings();
-        _ = Task.Run(PersistProjectsAfterEntityChangeAsync);
+        var snapshot = ProjectDict.ToJson(true);
+        lock (_persistenceLock)
+            _pendingPersistence = PersistProjectsAfterEntityChangeAsync(_pendingPersistence, snapshot);
         EntityChanged?.Invoke();
     }
 
-    /// <summary>实体变更后的项目树持久化（跨门等待，与 SaveProjectsAsync 串行共用写门）</summary>
-    private async Task PersistProjectsAfterEntityChangeAsync()
+    /// <summary>等待上一次实体写入结束后持久化本次不可变快照。</summary>
+    private async Task PersistProjectsAfterEntityChangeAsync(Task previous, string snapshot)
     {
         try
         {
-            await SaveProjectsAsync();
+            await previous.ConfigureAwait(false);
+            await ConfigSaveGate.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.ProjectConfigPath, snapshot).ConfigureAwait(false))
+                    _logger.Push("[Error] 项目配置感知更新落盘失败: ProjectConfig.json 可能被占用");
+            }
+            finally
+            {
+                ConfigSaveGate.Release();
+            }
         }
         catch (Exception ex)
         {
@@ -142,10 +163,17 @@ public class AppStateService
         }
     }
 
-    /// <summary>刷新项目树引用与名称：替换为全局字典最新对象 + 更新节点名（不塞回已删除实体）</summary>
+    /// <summary>等待已排队的实体配置写入完成，供应用停止流程防止丢失最后一次更新。</summary>
+    public Task FlushPendingChangesAsync()
+    {
+        lock (_persistenceLock)
+            return _pendingPersistence;
+    }
+
     #endregion
 
     #region 项目树回灌
+    /// <summary>刷新项目树引用与名称：替换为全局字典最新对象 + 更新节点名（不塞回已删除实体）</summary>
     private void RefreshProjectBindings()
     {
         foreach (var node in ProjectDict)
@@ -195,6 +223,8 @@ public class AppStateService
             ExpandAll(child);
     }
 
+    /// <summary>将当前项目树序列化并持久化到项目配置文件。</summary>
+    /// <returns>写入成功时为 <see langword="true"/>。</returns>
     public async Task<bool> SaveProjectsAsync()
     {
         await ConfigSaveGate.WaitAsync();
@@ -215,13 +245,13 @@ public class AppStateService
         }
     }
 
+    #endregion
+
+    #region 路径工具
     /// <summary>
     /// 绝对化插件配置的 ConfigPath：WPF 存的是相对路径（config/daq），
     /// 统一解析到数据目录，保证 per-SN 参数文件在 WPF/Web 间读写同一位置。
     /// </summary>
-    #endregion
-
-    #region 路径工具
     public static void NormalizeConfigPath(PluginConfigModel model)
     {
         if (!string.IsNullOrWhiteSpace(model.ConfigPath) && !Path.IsPathRooted(model.ConfigPath))

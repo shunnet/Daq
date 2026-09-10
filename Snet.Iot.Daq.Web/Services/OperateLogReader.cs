@@ -5,7 +5,28 @@
 /// </summary>
 public static class OperateLogReader
 {
+    private const int MaxLogLines = 20_000;
+    private const int MaxLogLineLength = 16_384;
     private static string LogsRoot => Path.Combine(WebPaths.DataDir, "logs");
+
+    /// <summary>解析日志子目录并保证结果仍位于日志根目录内。</summary>
+    private static bool TryResolveDirectory(out string directory, params string[] segments)
+    {
+        directory = string.Empty;
+        if (segments.Any(segment => string.IsNullOrWhiteSpace(segment)
+            || segment is "." or ".."
+            || segment != Path.GetFileName(segment)
+            || segment.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
+            return false;
+
+        var root = Path.GetFullPath(LogsRoot).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
+        var candidate = Path.GetFullPath(Path.Combine([LogsRoot, .. segments]));
+        if (!candidate.StartsWith(root, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        directory = candidate;
+        return true;
+    }
 
     /// <summary>所有日志日期目录（倒序，最新在前）</summary>
     #region 日期与用户
@@ -28,22 +49,22 @@ public static class OperateLogReader
     {
         try
         {
-            var operateDir = Path.Combine(LogsRoot, date, "operate");
+            if (!TryResolveDirectory(out var operateDir, date, "operate")) return new();
             if (!Directory.Exists(operateDir)) return new();
             return Directory.GetDirectories(operateDir).Select(Path.GetFileName).OrderByDescending(u => u).ToList()!;
         }
         catch { return new(); }
     }
 
-    /// <summary>指定日期+用户的操作日志行（合并当天全部 .log 文件，按时间序），行格式 "HH:mm:ss | 级别 | 内容"</summary>
     #endregion
 
     #region 日志行读取
+    /// <summary>指定日期+用户的操作日志行（合并当天全部 .log 文件，按时间序），行格式 "HH:mm:ss | 级别 | 内容"</summary>
     public static List<string> GetLines(string date, string user)
     {
         try
         {
-            var dir = Path.Combine(LogsRoot, date, "operate", user);
+            if (!TryResolveDirectory(out var dir, date, "operate", user)) return new();
             if (!Directory.Exists(dir)) return new();
             var lines = new List<(DateTime Time, string Line)>();
             foreach (var file in Directory.GetFiles(dir, "*.log").OrderBy(f => f))
@@ -55,10 +76,13 @@ public static class OperateLogReader
                 while ((raw = reader.ReadLine()) is not null)
                 {
                     if (string.IsNullOrWhiteSpace(raw)) continue;
+                    if (raw.Length > MaxLogLineLength) raw = raw[..MaxLogLineLength];
                     // LogHelper 行格式：yyyy-MM-dd HH:mm:ss.fff | LVL | 内容
                     var time = raw.Length >= 23 && DateTime.TryParse(raw[..19], out var t) ? t : DateTime.MinValue;
                     lines.Add((time, raw));
+                    if (lines.Count >= MaxLogLines) break;
                 }
+                if (lines.Count >= MaxLogLines) break;
             }
             return lines.OrderBy(l => l.Time)
                 .Select(l => FormatLine(l.Line))
@@ -72,19 +96,19 @@ public static class OperateLogReader
         }
     }
 
-    /// <summary>清空指定用户的操作日志目录（先 Reset 释放 LogHelper 文件句柄，否则删除被锁文件失败）</summary>
     #endregion
 
     #region 清理
+    /// <summary>清空指定用户的操作日志目录（先 Reset 释放 LogHelper 文件句柄，否则删除被锁文件失败）</summary>
     public static async Task ClearUserAsync(string date, string user)
     {
         await Snet.Log.LogHelper.ResetAsync();
         try
         {
-            var dir = Path.Combine(LogsRoot, date, "operate", user);
+            if (!TryResolveDirectory(out var dir, date, "operate", user)) return;
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
         }
-        catch { /* 清理失败不阻断 */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[OperateLogReader] 清理用户日志失败: {ex.Message}"); }
     }
 
     /// <summary>清空指定日期全部用户的操作日志目录</summary>
@@ -93,10 +117,10 @@ public static class OperateLogReader
         await Snet.Log.LogHelper.ResetAsync();
         try
         {
-            var dir = Path.Combine(LogsRoot, date, "operate");
+            if (!TryResolveDirectory(out var dir, date, "operate")) return;
             if (Directory.Exists(dir)) Directory.Delete(dir, true);
         }
-        catch { /* 清理失败不阻断 */ }
+        catch (Exception ex) { Console.Error.WriteLine($"[OperateLogReader] 清理日期日志失败: {ex.Message}"); }
     }
 
     #endregion

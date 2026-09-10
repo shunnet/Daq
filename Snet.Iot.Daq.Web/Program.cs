@@ -18,7 +18,11 @@ builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationSc
     {
         options.Cookie.Name = "Snet.Daq.Web.Auth";
         options.Cookie.HttpOnly = true;
+        options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
         options.Cookie.SameSite = SameSiteMode.Lax;
+        options.Cookie.IsEssential = true;
+        options.ExpireTimeSpan = TimeSpan.FromHours(12);
+        options.SlidingExpiration = true;
         options.LoginPath = "/login";
         options.AccessDeniedPath = "/login";
         options.Events.OnValidatePrincipal = async context =>
@@ -79,6 +83,14 @@ builder.Services.AddRateLimiter(options =>
 });
 
 var app = builder.Build();
+
+app.Use(async (context, next) =>
+{
+    context.Response.Headers.XContentTypeOptions = "nosniff";
+    context.Response.Headers.XFrameOptions = "DENY";
+    context.Response.Headers["Referrer-Policy"] = "no-referrer";
+    await next();
+});
 
 if (!app.Environment.IsDevelopment())
 {
@@ -162,8 +174,6 @@ app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService 
         return Results.Redirect("/console");
     }
 
-    // 登录分支兜底：无用户名时按 admin 处理（登录表单始终带用户名，兜底仅防异常提交）
-    if (string.IsNullOrEmpty(username)) username = "admin";
     var (valid, err2) = await auth.ValidateAsync(username, password);
     if (!valid)
     {
@@ -184,13 +194,13 @@ app.MapPost("/login", async (HttpContext ctx, IFormCollection form, AuthService 
     return Results.Redirect("/console");
 }).RequireRateLimiting("login");
 
-app.MapGet("/logout", async (HttpContext ctx) =>
+app.MapPost("/logout", async (HttpContext ctx, IFormCollection _) =>
 {
     var name = ctx.User.Identity?.Name ?? "anonymous";
     await ctx.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
     await Snet.Log.LogHelper.InfoAsync($"{name} - 退出登录", foldername: OperateLog.UserFolder(name));
     return Results.Redirect("/login");
-}).DisableAntiforgery();
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

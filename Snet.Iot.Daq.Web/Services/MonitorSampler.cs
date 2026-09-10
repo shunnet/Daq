@@ -8,7 +8,7 @@ namespace Snet.Iot.Daq.Web.Services;
 /// 跨平台：Windows 用 PerformanceCounter + GlobalMemoryStatusEx；Linux 读 /proc/stat（CPU 差值）+ /proc/meminfo；
 /// 其他平台（macOS 等）无 API 可读，CPU/内存均降级为 0（采样循环不受影响）。
 /// </summary>
-public class MonitorSampler : IDisposable
+public sealed class MonitorSampler : IAsyncDisposable
 {
     #region 字段与事件
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(1));
@@ -20,9 +20,30 @@ public class MonitorSampler : IDisposable
     private bool _firstCpu = true;
     private int _disposed;
 
+    /// <summary>每次成功采集系统指标后触发。</summary>
     public event Action<MonitorSample>? Sample;
 
-    public record MonitorSample(double Cpu, double RamPercent, double TotalRamMb);
+    /// <summary>系统资源使用情况的不可变采样快照。</summary>
+    public sealed record MonitorSample
+    {
+        /// <summary>创建系统资源采样快照。</summary>
+        /// <param name="cpu">CPU 总使用率百分比。</param>
+        /// <param name="ramPercent">物理内存使用率百分比。</param>
+        /// <param name="totalRamMb">物理内存总量，单位 MB。</param>
+        public MonitorSample(double cpu, double ramPercent, double totalRamMb)
+        {
+            Cpu = cpu;
+            RamPercent = ramPercent;
+            TotalRamMb = totalRamMb;
+        }
+
+        /// <summary>获取 CPU 总使用率百分比。</summary>
+        public double Cpu { get; }
+        /// <summary>获取物理内存使用率百分比。</summary>
+        public double RamPercent { get; }
+        /// <summary>获取物理内存总量，单位 MB。</summary>
+        public double TotalRamMb { get; }
+    }
     #endregion
 
     #region 互操作结构体与 P/Invoke
@@ -46,8 +67,10 @@ public class MonitorSampler : IDisposable
 
     #region 启动
 
+    /// <summary>启动每秒一次的系统指标采样循环；重复调用不会创建额外循环。</summary>
     public void Start()
     {
+        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
         if (_loop is not null) return;
         if (OperatingSystem.IsWindows())
         {
@@ -188,12 +211,16 @@ public class MonitorSampler : IDisposable
     #endregion
 
     #region 释放
-    public void Dispose()
+    /// <summary>取消采样循环，等待其退出后释放计时器和系统性能计数器。</summary>
+    public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
         _cts.Cancel();
+        if (_loop is not null)
+            await _loop.ConfigureAwait(false);
         _timer.Dispose();
         _cpuCounter?.Dispose();
+        _cts.Dispose();
         GC.SuppressFinalize(this);
     }
     #endregion

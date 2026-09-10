@@ -6,6 +6,7 @@ using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Model.data;
 using Snet.Utility;
 using System.Collections.Concurrent;
+using System.Collections.Frozen;
 using System.Threading.Channels;
 
 namespace Snet.Iot.Daq.Web.Services;
@@ -23,7 +24,7 @@ public class DeviceRuntime : IAsyncDisposable
     private static readonly TimeSpan StatePushThrottle = TimeSpan.FromMilliseconds(500);
 
     /// <summary>DataType → OPC UA BuiltInType 映射（对齐 WPF ConsoleDeviceModel._typeMap）</summary>
-    private static readonly Dictionary<DataType, BuiltInType> UaTypeMap = new()
+    private static readonly FrozenDictionary<DataType, BuiltInType> UaTypeMap = new Dictionary<DataType, BuiltInType>
     {
         { DataType.Byte, BuiltInType.Byte },
         { DataType.Bool, BuiltInType.Boolean },
@@ -44,7 +45,7 @@ public class DeviceRuntime : IAsyncDisposable
         { DataType.UInt64, BuiltInType.UInt64 },
         { DataType.String, BuiltInType.String },
         { DataType.Char, BuiltInType.String },
-    };
+    }.ToFrozenDictionary();
 
     #endregion
 
@@ -78,8 +79,8 @@ public class DeviceRuntime : IAsyncDisposable
     private OpcUaServiceOperate? _uaFolderService;
     private readonly List<FolderState> _uaFolderStates = new();
     private string _uaAddressSpaceName = "";
-    private readonly Dictionary<string, string> _uaAddressMap = new();
-    private readonly HashSet<string> _uaFailedAddresses = new();
+    private readonly ConcurrentDictionary<string, string> _uaAddressMap = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, byte> _uaFailedAddresses = new(StringComparer.Ordinal);
     private readonly ConcurrentDictionary<string, WriteModel> _singleWriteDict = new();
     // 字节解包链（对齐 WPF ConsoleDeviceModel：GetBytesModels 缓存 + TransformAndForwardAsync）
     private readonly ConcurrentDictionary<string, (object Source, List<BytesModel> Models)> _bytesModels = new();
@@ -89,25 +90,41 @@ public class DeviceRuntime : IAsyncDisposable
     #endregion
 
     #region 属性
+    /// <summary>获取设备采集插件配置的唯一标识。</summary>
     public string Guid => _daqConfig.Guid;
+    /// <summary>获取设备当前是否处于采集状态。</summary>
     public bool IsRun { get; private set; }
+    /// <summary>获取项目树中显示的设备名称。</summary>
     public string DeviceName { get; private set; }
+    /// <summary>获取设备采集插件的类型名称。</summary>
     public string DeviceType => _daqConfig.Name;
     /// <summary>底层插件包版本（热更新后由配置同步刷新，控制台设备卡展示）</summary>
     public string DeviceVersion { get; private set; } = "-";
+    /// <summary>获取设备在项目树中的完整层级路径。</summary>
     public string DeviceHierarchy => _hierarchyPath;
     /// <summary>设备下全部点位（Address 节点）数量：添加/删除点位经 SyncFromProjects → RefreshSettings 感知更新。
     /// 注意：采集订阅集是 _addressDatas（仅配了 MQ 的地址），地址数量显示全量点位更符合直觉。</summary>
     public int AddressCount { get; private set; }
+    /// <summary>获取面向界面显示的采集状态文本。</summary>
     public string CollectStatus { get; private set; } = "未采集";
+    /// <summary>获取采集成功指示灯状态。</summary>
     public bool LedGreen { get; private set; }
+    /// <summary>获取采集失败指示灯状态。</summary>
     public bool LedRed { get; private set; }
+    /// <summary>获取最近一次接收数据的本地时间文本。</summary>
     public string UpdateTime { get; private set; } = "-";
+    /// <summary>获取本次运行累计的采集秒数。</summary>
     public int CollectTimeSeconds => (int)_runtime.TotalSeconds;
 
     #endregion
 
     #region 构造与配置快照
+    /// <summary>创建与一个项目设备节点对应的采集运行时。</summary>
+    /// <param name="deviceNode">包含采集与转发配置的设备节点。</param>
+    /// <param name="uaService">获取当前 OPC UA 服务实例的函数。</param>
+    /// <param name="pushLog">向应用控制台推送日志的回调。</param>
+    /// <param name="pushState">运行状态变化回调。</param>
+    /// <param name="localization">状态文本本地化服务。</param>
     public DeviceRuntime(IProjectTreeViewModel deviceNode, Func<OpcUaServiceOperate?> uaService, Action<string> pushLog, Action<DeviceRuntime> pushState, LocalizationService localization)
     {
         _daqConfig = deviceNode.DaqDetails!;
@@ -250,11 +267,11 @@ public class DeviceRuntime : IAsyncDisposable
         }
     }
 
-    /// <summary>启动采集（对齐 WPF CollectAsync：订阅地址 → 起通道 → 计时）。
-    /// 通道与事件订阅仅在首次启动时创建一次，避免重复订阅叠加；SemaphoreSlim 防双击并发重复订阅。</summary>
     #endregion
 
     #region 采集控制
+    /// <summary>启动采集（对齐 WPF CollectAsync：订阅地址 → 起通道 → 计时）。
+    /// 通道与事件订阅仅在首次启动时创建一次，避免重复订阅叠加；SemaphoreSlim 防双击并发重复订阅。</summary>
     public async Task CollectAsync()
     {
         if (IsRun) return;
@@ -301,7 +318,11 @@ public class DeviceRuntime : IAsyncDisposable
                 var srv = _uaService();
                 if (srv is not null)
                 {
-                    try { srv.RemoveFolder([_uaFolderStates[^1].NodeId]); } catch { }
+                    try { srv.RemoveFolder([_uaFolderStates[^1].NodeId]); }
+                    catch (Exception ex)
+                    {
+                        _pushLog(string.Format(T("[{0}] UA 层级清理异常: {1}"), DeviceName, ex.Message));
+                    }
                 }
                 _uaFolderStates.Clear();
                 _uaFolder = null;
@@ -393,11 +414,11 @@ public class DeviceRuntime : IAsyncDisposable
 
     }
 
-    /// <summary>释放采集 handler 及相关资源（无锁版，须在 _collectGate 持有内调用）。
-    /// 插件实例缓存创建时的参数快照（IP/端口等），配置变更或采集失败后必须置空，下次采集用最新配置重建</summary>
     #endregion
 
     #region 停止与资源释放
+    /// <summary>释放采集 handler 及相关资源（无锁版，须在 _collectGate 持有内调用）。
+    /// 插件实例缓存创建时的参数快照（IP/端口等），配置变更或采集失败后必须置空，下次采集用最新配置重建</summary>
     private async Task ReleaseHandlerInternalAsync()
     {
         await StopConsumersAsync();
@@ -405,7 +426,11 @@ public class DeviceRuntime : IAsyncDisposable
         {
             _daqHandler.OnDataEventAsync -= OnDataEvent;
             _daqHandler.OnInfoEventAsync -= OnInfoEvent;
-            try { await _daqHandler.DisposeAsync(); } catch { }
+            try { await _daqHandler.DisposeAsync(); }
+            catch (Exception ex)
+            {
+                _pushLog(string.Format(T("[{0}] 退订异常: {1}"), DeviceName, ex.Message));
+            }
             _daqHandler = null;
         }
         if (_dataChannel is not null)
@@ -533,10 +558,10 @@ public class DeviceRuntime : IAsyncDisposable
         finally { _collectGate.Release(); }
     }
 
-    /// <summary>随软启状态（对齐 WPF ConsoleDeviceModel.IsSoftStart：持久化于项目树，宿主启动/配置同步时自动恢复采集）</summary>
     #endregion
 
     #region 软启采集
+    /// <summary>随软启状态（对齐 WPF ConsoleDeviceModel.IsSoftStart：持久化于项目树，宿主启动/配置同步时自动恢复采集）</summary>
     public bool IsSoftStart => _deviceNode.IsSoftStart;
 
     /// <summary>添加/取消软启采集（对齐 WPF OnSoftCollectAsync/OffSoftCollectAsync：改项目节点标志 + 成功提示，落盘由页面调 SaveProjectsAsync 等价 Project.SetAsync）</summary>
@@ -546,10 +571,10 @@ public class DeviceRuntime : IAsyncDisposable
         _pushLog(string.Format(T("[{0}] {1}"), DeviceName, on ? T("添加软启采集成功") : T("取消软启采集成功")));
     }
 
-    /// <summary>WebApi 启动（对齐 WPF WASatrtAsync：状态预检 → 未设置参数/未运行提示失败 → WAOnAsync）</summary>
     #endregion
 
     #region WebApi 操作
+    /// <summary>WebApi 启动（对齐 WPF WASatrtAsync：状态预检 → 未设置参数/未运行提示失败 → WAOnAsync）</summary>
     public async Task<OperateResult> WebApiStartAsync()
     {
         var handler = _daqHandler;
@@ -620,10 +645,10 @@ public class DeviceRuntime : IAsyncDisposable
         return await handler.WARequestExampleAsync(_daqConfig.Guid);
     }
 
-    /// <summary>数据事件入队（一次订阅，避免重复叠加；带取消令牌防停止时挂起）</summary>
     #endregion
 
     #region 数据事件与消费
+    /// <summary>数据事件入队（一次订阅，避免重复叠加；带取消令牌防停止时挂起）</summary>
     private async Task OnDataEvent(object? sender, EventDataResult e)
     {
         var channel = _dataChannel;
@@ -709,11 +734,11 @@ public class DeviceRuntime : IAsyncDisposable
         }
     }
 
-    /// <summary>处理一组地址值（原样移植 WPF ConsoleDeviceModel.ProcessKeysAsync）：
-    /// 质量校验 → 字节解包（GetBytesModels）→ UA 通道 + MQ 转发，单地址异常不影响整组消费。</summary>
     #endregion
 
     #region 数据处理与转发
+    /// <summary>处理一组地址值（原样移植 WPF ConsoleDeviceModel.ProcessKeysAsync）：
+    /// 质量校验 → 字节解包（GetBytesModels）→ UA 通道 + MQ 转发，单地址异常不影响整组消费。</summary>
     private async Task ProcessKeysAsync(ConcurrentDictionary<string, AddressValue> keys, CancellationToken token)
     {
         if (keys.Count == 0)
@@ -830,8 +855,14 @@ public class DeviceRuntime : IAsyncDisposable
     {
         _bytesHandler ??= await BytesHandler.InstanceAsync(DeviceName);
 
+        if (addressValue.ResultValue is null)
+        {
+            ThrottledLog($"{DeviceHierarchy}, {addressValue.AddressName} - {T("扩展参数不正确")}", "t:" + addressValue.AddressName);
+            return;
+        }
+
         OperateResult result = await _bytesHandler.TransformAsync(addressValue.ResultValue.GetSource<byte[]>(), addressValue.Time, bm, isStringReverseByteWord: _daqConfig.AutoPack?.IsStringReverseByteWord ?? false);
-        if (!result.GetDetails(out ConcurrentDictionary<string, AddressValue>? res))
+        if (!result.GetDetails(out ConcurrentDictionary<string, AddressValue>? res) || res is null)
         {
             ThrottledLog($"{DeviceHierarchy}, {addressValue.AddressName} - {string.Format(T("解包失败：{0}"), result.Message)}", "t:" + addressValue.AddressName);
             return;
@@ -846,7 +877,7 @@ public class DeviceRuntime : IAsyncDisposable
             AddressModelCore newModel = new()
             {
                 Address = item.Key,
-                Describe = item.Value.AddressDescribe,
+                Describe = item.Value.AddressDescribe ?? string.Empty,
                 EncodingType = item.Value.EncodingType,
                 Guid = sourceModel?.Guid ?? addressModel.Guid,
                 SimplifyValue = sourceModel?.SimplifyValue ?? addressModel.SimplifyValue,
@@ -873,11 +904,11 @@ public class DeviceRuntime : IAsyncDisposable
         }
     }
 
-    /// <summary>UA 通道数据事件消费（原样移植 WPF ConsoleDeviceModel.UaSyncChannelDataEventAsync）：
-    /// 质量校验 → 层级文件夹 → 首次地址创建 + NodeId 映射 → 写入 UA 地址空间。</summary>
     #endregion
 
     #region UA 转发
+    /// <summary>UA 通道数据事件消费（原样移植 WPF ConsoleDeviceModel.UaSyncChannelDataEventAsync）：
+    /// 质量校验 → 层级文件夹 → 首次地址创建 + NodeId 映射 → 写入 UA 地址空间。</summary>
     private async Task UaSyncChannelDataEventAsync(CancellationToken token)
     {
         try
@@ -921,13 +952,15 @@ public class DeviceRuntime : IAsyncDisposable
                         continue;
                     }
 
-                    if (!_uaAddressMap.ContainsKey(addressName) && !_uaFailedAddresses.Contains(addressName))
+                    if (!_uaAddressMap.ContainsKey(addressName) && !_uaFailedAddresses.ContainsKey(addressName))
                     {
                         if (!UaTypeMap.TryGetValue(dataType, out var builtInType))
                             continue;
 
                         if (builtInType == BuiltInType.String)
                             value ??= string.Empty;
+                        else if (value is null)
+                            continue;
 
                         //创建地址
                         var createResult = service.CreateAddress(new()
@@ -945,7 +978,7 @@ public class DeviceRuntime : IAsyncDisposable
                         if (!createResult.Status)
                         {
                             // 标记失败，避免每个数据事件重复创建并刷屏消息
-                            _uaFailedAddresses.Add(addressName);
+                            _uaFailedAddresses.TryAdd(addressName, 0);
                             ThrottledLog(string.Format(T("UA 地址创建失败 {0}: {1}"), addressName, createResult.Message), "ua:" + addressName);
                             continue;
                         }
@@ -970,14 +1003,16 @@ public class DeviceRuntime : IAsyncDisposable
                     if (!_uaAddressMap.TryGetValue(addressName, out var realAddress))
                     {
                         // 创建成功但未能映射到真实地址，标记避免重复创建
-                        if (!_uaFailedAddresses.Contains(addressName))
+                        if (!_uaFailedAddresses.ContainsKey(addressName))
                         {
-                            _uaFailedAddresses.Add(addressName);
+                            _uaFailedAddresses.TryAdd(addressName, 0);
                             ThrottledLog(string.Format(T("UA 地址映射失败 {0}（AddressSpaceName={1}）"), addressName, _uaAddressSpaceName), "uamap:" + addressName);
                         }
                         continue;
                     }
 
+                    if (value is null)
+                        continue;
                     _singleWriteDict[realAddress] = new WriteModel(value, dataType);
 
                     var writeResult = await service.WriteAsync(_singleWriteDict);
@@ -1033,7 +1068,7 @@ public class DeviceRuntime : IAsyncDisposable
             {
                 var basics = service.GetBasicsArgs();
                 if (basics.Status && basics.ResultData is OpcUaServiceData.Basics b)
-                    _uaAddressSpaceName = b.AddressSpaceName;
+                    _uaAddressSpaceName = b.AddressSpaceName ?? string.Empty;
             }
 
             if (service.GetStatus().Status)
@@ -1067,10 +1102,10 @@ public class DeviceRuntime : IAsyncDisposable
         }
     }
 
-    /// <summary>失败日志节流：同一键 5 秒内只记一次，避免高频失败刷爆日志缓冲</summary>
     #endregion
 
     #region 日志节流
+    /// <summary>失败日志节流：同一键 5 秒内只记一次，避免高频失败刷爆日志缓冲</summary>
     private void ThrottledLog(string message, string key)
     {
         var now = DateTime.UtcNow;
@@ -1079,6 +1114,7 @@ public class DeviceRuntime : IAsyncDisposable
         _pushLog($"[{DeviceName}] {message}");
     }
 
+    /// <summary>停止采集并释放运行时拥有的通道、处理器和同步资源。</summary>
     public async ValueTask DisposeAsync()
     {
         await _collectGate.WaitAsync();
