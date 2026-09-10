@@ -1,4 +1,15 @@
 window.snet = {
+    pluginSettingsTab: {
+        get: function () {
+            try {
+                var value = sessionStorage.getItem('snet-plugin-settings-tab');
+                return value === null ? null : Number(value);
+            } catch (e) { return null; }
+        },
+        set: function (tab) {
+            try { sessionStorage.setItem('snet-plugin-settings-tab', String(tab)); } catch (e) { }
+        }
+    },
     modalFocus: {
         entries: new Map(),
         nextId: 0,

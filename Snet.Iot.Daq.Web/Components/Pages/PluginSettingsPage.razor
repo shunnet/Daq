@@ -26,8 +26,8 @@
     <div class="card-header">
         <h1 class="card-title"><i class="bi bi-sliders me-2"></i>@T("插件设置")</h1>
         <div class="segmented plugin-tabs">
-            <button class="@(_tab == 0 ? "active" : "")" @onclick="() => { _tab = 0; StateHasChanged(); }"><i class="bi bi-box-seam"></i>@T("已装插件")</button>
-            <button class="@(_tab == 1 ? "active" : "")" @onclick="() => { _tab = 1; StateHasChanged(); }"><i class="bi bi-gear"></i>@T("插件配置")</button>
+            <button class="@(_tab == 0 ? "active" : "")" @onclick="() => SelectTabAsync(0)"><i class="bi bi-box-seam"></i>@T("已装插件")</button>
+            <button class="@(_tab == 1 ? "active" : "")" @onclick="() => SelectTabAsync(1)"><i class="bi bi-gear"></i>@T("插件配置")</button>
         </div>
     </div>
 
@@ -515,6 +515,23 @@
         _newConfigPluginName = _plugins.FirstOrDefault(p => p.Type.ToString() == _newConfigType)?.Name ?? "";
         MenuCoordinator.Register(CloseMenu);
         await Task.CompletedTask;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        var savedTab = await JS.InvokeAsync<int?>("snet.pluginSettingsTab.get");
+        if (savedTab is 0 or 1 && savedTab != _tab)
+        {
+            _tab = savedTab.Value;
+            StateHasChanged();
+        }
+    }
+
+    private async Task SelectTabAsync(int tab)
+    {
+        _tab = tab;
+        await JS.InvokeVoidAsync("snet.pluginSettingsTab.set", tab);
     }
 
     /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
@@ -1950,7 +1967,7 @@
             _configEditing = false;
             _editingConfig = null;
             // 从已装插件入口添加的配置：保存成功才切到「插件配置」展示新配置列表
-            _tab = 1;
+            await SelectTabAsync(1);
         }
         finally
         {
