@@ -1,5 +1,5 @@
+﻿using Snet.Iot.Daq.Core;
 using System.Globalization;
-using Snet.Iot.Daq.Core;
 
 namespace Snet.Iot.Daq.Web.Services;
 
