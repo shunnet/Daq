@@ -176,6 +176,28 @@ namespace Snet.Iot.Daq.Core.opc.core
         }
 
         /// <summary>
+        /// 创建仪表实例以创建和记录指标。调用者负责处理返回的仪表实例
+        /// </summary>
+        /// <param name="assembly">生成度量的组件组件</param>
+        /// <returns></returns>
+        public Meter CreateMeter(Assembly assembly)
+        {
+            assembly.ThrowIfNull(nameof(assembly));
+            return CreateMeter();
+        }
+
+        /// <summary>
+        /// 获取指定程序集的活动源。不要处置返回的活动源，因为它是遥测上下文的一部分。
+        /// </summary>
+        /// <param name="assembly">产生活动的组件组件</param>
+        /// <returns></returns>
+        public ActivitySource GetActivitySource(Assembly assembly)
+        {
+            assembly.ThrowIfNull(nameof(assembly));
+            return ActivitySource;
+        }
+
+        /// <summary>
         /// 释放遥测相关资源
         /// 
         /// 注意：

@@ -14,7 +14,7 @@
 
 	<ItemGroup>
 		<PackageReference Include="Snet.Mqtt" Version="26.256.1" />
-		<PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="2.0.0-preview.4" />
+		<PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="2.0.0-preview.5" />
 		<PackageReference Include="Serilog.Expressions" Version="5.0.0" />
 		<PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
