@@ -1168,6 +1168,9 @@
   <data name="已停止下载" xml:space="preserve">
     <value>Download stopped</value>
   </data>
+  <data name="已停止下载，已有 {0} 个插件接口安装完成" xml:space="preserve">
+    <value>Download stopped; {0} plugin interfaces were installed</value>
+  </data>
   <data name="已停用" xml:space="preserve">
     <value>Disabled</value>
   </data>

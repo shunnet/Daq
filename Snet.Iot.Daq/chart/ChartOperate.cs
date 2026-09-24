@@ -70,8 +70,17 @@ namespace Snet.Iot.Daq.chart
         /// <inheritdoc/>
         public override async ValueTask DisposeAsync()
         {
+            var refreshTask = AutoRefreshTask;
             Off();
-            await base.DisposeAsync();
+            try
+            {
+                if (refreshTask is not null)
+                    await refreshTask.ConfigureAwait(false);
+            }
+            finally
+            {
+                await base.DisposeAsync();
+            }
         }
         #endregion
 
@@ -123,6 +132,8 @@ namespace Snet.Iot.Daq.chart
         /// 自动刷新的 CancellationTokenSource（在 Off/Dispose 时释放）
         /// </summary>
         private CancellationTokenSource? AutoRefreshTokenSource;
+        /// <summary>图表持有的刷新任务；异步释放时等待其退出。</summary>
+        private Task? AutoRefreshTask;
         /// <summary>
         /// 自动刷新状态标识<br/>
         /// 仅用于避免重复启动刷新循环。
@@ -143,7 +154,7 @@ namespace Snet.Iot.Daq.chart
         /// 4. 在 Cancel 时 Dispose TokenSource，避免资源泄漏。<br/>
         /// 注意：此方法会在内部启动一个后台任务；如果外部已经在 UI 线程周期性刷新，则可不启用。<br/>
         /// </summary>
-        private async Task AutoRefreshAsync(CancellationTokenSource source, int millisecond)
+        private async Task AutoRefreshAsync(WpfPlot plot, CancellationTokenSource source, int millisecond)
         {
             var token = source.Token;
             if (millisecond <= 0)
@@ -159,18 +170,19 @@ namespace Snet.Iot.Daq.chart
             {
                 while (!token.IsCancellationRequested)
                 {
-                    // 避免每次都枚举完整集合，Any() 在 IEnumerable 上能尽早返回
-                    if (wpfPlot?.Plot?.GetPlottables()?.Any() == true)
+                    // 查询和刷新都在 UI 线程；已排队的回调在关闭后由 token 阻止。
+                    await plot.Dispatcher.InvokeAsync(() =>
                     {
-                        // Refresh 必须在 UI 线程
-                        wpfPlot.Dispatcher.Invoke(() => wpfPlot.Refresh());
-                    }
+                        if (!token.IsCancellationRequested && plot.Plot.GetPlottables().Any())
+                            plot.Refresh();
+                    }).Task.WaitAsync(token).ConfigureAwait(false);
 
                     await Task.Delay(millisecond, token).ConfigureAwait(false);
                 }
             }
             catch (TaskCanceledException) { }
             catch (OperationCanceledException) { }
+            catch (InvalidOperationException) when (token.IsCancellationRequested || plot.Dispatcher.HasShutdownStarted) { }
             finally
             {
                 // 旧循环退出时不能清理新循环的取消源或运行状态。
@@ -253,11 +265,10 @@ namespace Snet.Iot.Daq.chart
             DefaultMenu(wpfPlot);
 
             // 如果没有启动自动刷新，则启动一个新 CTS 并运行 AutoRefreshAsync
-            if (AutoRefreshTokenSource == null)
+            if (AutoRefreshTokenSource == null && basics.RefreshTime > 0)
             {
                 AutoRefreshTokenSource = new CancellationTokenSource();
-                // 不在 UI 线程等待 AutoRefreshAsync 完成；让其后台运行
-                _ = AutoRefreshAsync(AutoRefreshTokenSource, basics.RefreshTime);
+                AutoRefreshTask = AutoRefreshAsync(wpfPlot, AutoRefreshTokenSource, basics.RefreshTime);
             }
         }
         /// <summary>

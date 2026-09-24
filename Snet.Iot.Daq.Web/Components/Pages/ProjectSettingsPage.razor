@@ -71,7 +71,9 @@
                     else
                     {
                         // 地址超过 50 条分页（树区域内部滚动，不挤出 app-main）
-                        var details = _selectedDevice.Details;
+                        List<IProjectDetailsTreeViewModel> details;
+                        lock (AppState.ProjectTreeLock)
+                            details = _selectedDevice.Details.ToList();
                         var detailTotalPages = Math.Max(1, (int)Math.Ceiling(details.Count / 50.0));
                         var detailPageItems = details.Skip((_detailPage - 1) * 50).Take(50).ToList();
                         <div class="detail-tree-scroll">
@@ -404,7 +406,9 @@
         base.OnInitialized();
 
         // 项目树的选中状态会随配置恢复；页面首次进入时同步右侧详情，无需再次点击设备。
-        var selectedNode = ProjectHandlerCore.GetFirstSelectItem(AppState.ProjectDict);
+        IProjectTreeViewModel? selectedNode;
+        lock (AppState.ProjectTreeLock)
+            selectedNode = ProjectHandlerCore.GetFirstSelectItem(AppState.ProjectDict);
         if (selectedNode?.NodeType == ProjectNodeType.Device)
             ShowDeviceDetails(selectedNode);
     }
@@ -475,7 +479,8 @@
 
     private void OnNodeClick(IProjectTreeViewModel node)
     {
-        AppState.ProjectDict.EnsureSingleSelection(node);
+        lock (AppState.ProjectTreeLock)
+            AppState.ProjectDict.EnsureSingleSelection(node);
         if (node.NodeType == ProjectNodeType.Device)
         {
             ShowDeviceDetails(node);
@@ -523,9 +528,15 @@
     {
         try
         {
-            var json = AppState.ProjectDict.ToJson(true);
+            string json;
+            int projectCount;
+            lock (AppState.ProjectTreeLock)
+            {
+                json = AppState.ProjectDict.ToJson(true);
+                projectCount = AppState.ProjectDict.Count;
+            }
             await JS.InvokeVoidAsync("snet.download", $"Project[{DateTime.Now:yyyyMMddHHmmss}].json", json);
-            ToastSvc.Success(string.Format(T("导出成功：{0} 个项目"), AppState.ProjectDict.Count));
+            ToastSvc.Success(string.Format(T("导出成功：{0} 个项目"), projectCount));
         }
         catch (Exception ex)
         {
@@ -559,9 +570,12 @@
             }
             AppState.PrepareImportedProjects(projects);
             // 替换整棵树并立即保存（对齐 WPF 清空重填语义）
-            AppState.ProjectDict.Clear();
-            foreach (var node in projects)
-                AppState.ProjectDict.Add(node);
+            lock (AppState.ProjectTreeLock)
+            {
+                AppState.ProjectDict.Clear();
+                foreach (var node in projects)
+                    AppState.ProjectDict.Add(node);
+            }
             if (!await SaveProjectsCheckedAsync()) return;
             RuntimeManager.SyncFromProjects(AppState);
             ToastSvc.Success(string.Format(T("导入成功：{0} 个项目"), projects.Count));
@@ -587,14 +601,17 @@
             return;
         }
         var node = new ProjectTreeViewModelCore { Name = _newProjectName.Trim(), NodeType = ProjectNodeType.Describe };
-        if (_targetParent is not null)
+        lock (AppState.ProjectTreeLock)
         {
-            node.Parent = _targetParent;
-            _targetParent.Children.Add(node);
-        }
-        else
-        {
-            AppState.ProjectDict.Add(node);
+            if (_targetParent is not null)
+            {
+                node.Parent = _targetParent;
+                _targetParent.Children.Add(node);
+            }
+            else
+            {
+                AppState.ProjectDict.Add(node);
+            }
         }
         if (!await SaveProjectsCheckedAsync()) return;
         ToastSvc.Success(T("添加成功"));
@@ -638,11 +655,6 @@
     {
         var config = _deviceCandidates.FirstOrDefault(c => c.Guid == _selectedDeviceConfig);
         if (config is null || _targetParent is null) return;
-        if (!AppState.ProjectDict.QueryDeviceUnique(new ProjectTreeViewModelCore { DaqDetails = config }))
-        {
-            ToastSvc.Error(T("该设备已添加到项目中"));
-            return;
-        }
         var node = new ProjectTreeViewModelCore
         {
             Name = config.GetObjSn(),
@@ -652,7 +664,18 @@
             IsExpanded = true,
             Parent = _targetParent
         };
-        _targetParent.Children.Add(node);
+        bool added;
+        lock (AppState.ProjectTreeLock)
+        {
+            added = AppState.ProjectDict.QueryDeviceUnique(node);
+            if (added)
+                _targetParent.Children.Add(node);
+        }
+        if (!added)
+        {
+            ToastSvc.Error(T("该设备已添加到项目中"));
+            return;
+        }
         if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         _showDeviceDialog = false;
@@ -665,13 +688,15 @@
     private void CollapseAllDetails()
     {
         if (_selectedDevice?.Details is null) return;
-        foreach (var n in _selectedDevice.Details) SetExpandedRecursive(n, false);
+        lock (AppState.ProjectTreeLock)
+            foreach (var n in _selectedDevice.Details) SetExpandedRecursive(n, false);
     }
 
     private void ExpandAllDetails()
     {
         if (_selectedDevice?.Details is null) return;
-        foreach (var n in _selectedDevice.Details) SetExpandedRecursive(n, true);
+        lock (AppState.ProjectTreeLock)
+            foreach (var n in _selectedDevice.Details) SetExpandedRecursive(n, true);
     }
 
     private static void SetExpandedRecursive(IProjectDetailsTreeViewModel node, bool expanded)
@@ -684,11 +709,14 @@
     {
         if (_selectedDevice is null) return;
         var bound = new HashSet<string>();
-        if (_selectedDevice.Details is not null)
+        lock (AppState.ProjectTreeLock)
         {
-            foreach (var d in _selectedDevice.Details)
-                if (d.AddressDetails is not null)
-                    bound.Add(d.AddressDetails.Guid);
+            if (_selectedDevice.Details is not null)
+            {
+                foreach (var d in _selectedDevice.Details)
+                    if (d.AddressDetails is not null)
+                        bound.Add(d.AddressDetails.Guid);
+            }
         }
         _addressCandidates = AppState.AddressDict.Values.OrderBy(a => a.AnotherName).ToList();
         _pickedAddresses = new HashSet<string>(bound);
@@ -715,21 +743,26 @@
     private async Task ConfirmAddAddressesAsync()
     {
         if (_selectedDevice is null) return;
-        if (_selectedDevice.Details is null)
-            _selectedDevice.Details = new ObservableCollection<IProjectDetailsTreeViewModel>();
-        var existingAddresses = new HashSet<string>(_selectedDevice.Details
-            .Where(d => d.AddressDetails is not null).Select(d => d.AddressDetails!.Address));
-        var existingNames = new HashSet<string>(_selectedDevice.Details
-            .Where(d => d.AddressDetails is not null).Select(d => d.AddressDetails!.AnotherName));
-        var added = 0;
-        foreach (var a in _addressCandidates.Where(a => _pickedAddresses.Contains(a.Guid)))
+        int added;
+        lock (AppState.ProjectTreeLock)
         {
-            if (existingAddresses.Contains(a.Address) || existingNames.Contains(a.AnotherName))
-                continue;
-            _selectedDevice.Details.Add(new ProjectDetailsTreeViewModelCore(a));
-            existingAddresses.Add(a.Address);
-            existingNames.Add(a.AnotherName);
-            added++;
+            _selectedDevice.Details ??= new ObservableCollection<IProjectDetailsTreeViewModel>();
+            var existingAddresses = new HashSet<string>(_selectedDevice.Details
+                .Where(d => d.AddressDetails is not null).Select(d => d.AddressDetails!.Address));
+            var existingNames = new HashSet<string>(_selectedDevice.Details
+                .Where(d => d.AddressDetails is not null).Select(d => d.AddressDetails!.AnotherName));
+            added = 0;
+            foreach (var a in _addressCandidates.Where(a => _pickedAddresses.Contains(a.Guid)))
+            {
+                if (existingAddresses.Contains(a.Address) || existingNames.Contains(a.AnotherName))
+                    continue;
+                _selectedDevice.Details.Add(new ProjectDetailsTreeViewModelCore(a));
+                existingAddresses.Add(a.Address);
+                existingNames.Add(a.AnotherName);
+                added++;
+            }
+            if (added > 0)
+                _selectedDevice.UpdateSpecialData();
         }
         if (added == 0)
         {
@@ -737,7 +770,6 @@
             return;
         }
         // 更新设备树节点 SpecialData（[ 插件 ] ( 地址数 )）：添加地址路径此前漏调用，左侧树数量不刷新
-        _selectedDevice.UpdateSpecialData();
         if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(string.Format(T("已添加 {0} 个采集地址"), added));
@@ -772,14 +804,18 @@
     {
         var config = _mqCandidates.FirstOrDefault(c => c.Guid == _selectedMq);
         if (config is null || _selectedDevice?.Details is null) return;
-        var added = 0;
-        foreach (var addr in _selectedDevice.Details)
+        int added;
+        lock (AppState.ProjectTreeLock)
         {
-            if (addr.Children.Any(c => c.MqDetails is not null && c.MqDetails.SN == config.SN))
-                continue;
-            addr.Children.Add(new ProjectDetailsTreeViewModelCore(config));
-            addr.UpdateSpecialData();
-            added++;
+            added = 0;
+            foreach (var addr in _selectedDevice.Details)
+            {
+                if (addr.Children.Any(c => c.MqDetails is not null && c.MqDetails.SN == config.SN))
+                    continue;
+                addr.Children.Add(new ProjectDetailsTreeViewModelCore(config));
+                addr.UpdateSpecialData();
+                added++;
+            }
         }
         if (added == 0)
         {
@@ -797,13 +833,21 @@
     {
         var config = _mqCandidates.FirstOrDefault(c => c.Guid == _selectedMq);
         if (config is null || _mqTarget is null) return;
-        if (_mqTarget.Children.Any(c => c.MqDetails is not null && c.MqDetails.SN == config.SN))
+        bool alreadyAdded;
+        lock (AppState.ProjectTreeLock)
+        {
+            alreadyAdded = _mqTarget.Children.Any(c => c.MqDetails is not null && c.MqDetails.SN == config.SN);
+            if (!alreadyAdded)
+            {
+                _mqTarget.Children.Add(new ProjectDetailsTreeViewModelCore(config));
+                _mqTarget.UpdateSpecialData();
+            }
+        }
+        if (alreadyAdded)
         {
             ToastSvc.Error(T("该传输设备已添加到此地址"));
             return;
         }
-        _mqTarget.Children.Add(new ProjectDetailsTreeViewModelCore(config));
-        _mqTarget.UpdateSpecialData();
         if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("传输设备添加成功"));
@@ -1008,7 +1052,8 @@
     {
         _confirmRemoveAll = false;
         if (_selectedDevice?.Details is null) return;
-        _selectedDevice.Details.Clear();
+        lock (AppState.ProjectTreeLock)
+            _selectedDevice.Details.Clear();
         if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("已移除全部地址与传输设备"));
@@ -1091,8 +1136,11 @@
         _removeTarget = null;
         if (target is null) return;
         // 用 Core RemoveNode（内部处理 Parent 链）；Parent 引用丢失时递归兜底查找
-        if (!AppState.ProjectDict.RemoveNode(target))
-            RemoveNodeRecursive(AppState.ProjectDict, target);
+        lock (AppState.ProjectTreeLock)
+        {
+            if (!AppState.ProjectDict.RemoveNode(target))
+                RemoveNodeRecursive(AppState.ProjectDict, target);
+        }
         if (_selectedDevice == target)
             _selectedDevice = null;
         if (!await SaveProjectsCheckedAsync()) return;
@@ -1113,15 +1161,17 @@
         _detailRemoveTarget = null;
         if (target is null) return;
         if (_selectedDevice?.Details is null) return;
-        var removed = target.Parent is not null
-            ? target.Parent.Children.Remove(target)
-            : _selectedDevice.Details.Remove(target);
-        if (removed && target.Parent is not null)
-            target.Parent.UpdateSpecialData();
-        // 设备节点 SpecialData（[ 插件 ] ( 地址数 )）：删除顶层地址节点时 Parent 为 null，
-        // 只更新 Parent 会漏掉设备节点，必须显式刷新
-        if (removed)
-            _selectedDevice.UpdateSpecialData();
+        // 删除顶层地址时 Parent 为 null，仍需刷新设备节点的地址数量。
+        lock (AppState.ProjectTreeLock)
+        {
+            var removed = target.Parent is not null
+                ? target.Parent.Children.Remove(target)
+                : _selectedDevice.Details.Remove(target);
+            if (removed && target.Parent is not null)
+                target.Parent.UpdateSpecialData();
+            if (removed)
+                _selectedDevice.UpdateSpecialData();
+        }
         if (!await SaveProjectsCheckedAsync()) return;
         RuntimeManager.SyncFromProjects(AppState);
         ToastSvc.Success(T("删除成功"));

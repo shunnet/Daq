@@ -61,6 +61,7 @@ public class DeviceRuntime : IAsyncDisposable
     private readonly Action<DeviceRuntime> _pushState;
     private readonly Func<OpcUaServiceOperate?> _uaService;
     private readonly LocalizationService _localization;
+    private readonly object _projectTreeLock;
 
     private DqaHandler? _daqHandler;
     private Channel<EventDataResult>? _dataChannel;
@@ -125,20 +126,25 @@ public class DeviceRuntime : IAsyncDisposable
     /// <param name="pushLog">向应用控制台推送日志的回调。</param>
     /// <param name="pushState">运行状态变化回调。</param>
     /// <param name="localization">状态文本本地化服务。</param>
-    public DeviceRuntime(IProjectTreeViewModel deviceNode, Func<OpcUaServiceOperate?> uaService, Action<string> pushLog, Action<DeviceRuntime> pushState, LocalizationService localization)
+    /// <param name="projectTreeLock">与项目树结构修改共用的同步对象。</param>
+    public DeviceRuntime(IProjectTreeViewModel deviceNode, Func<OpcUaServiceOperate?> uaService, Action<string> pushLog, Action<DeviceRuntime> pushState, LocalizationService localization, object projectTreeLock)
     {
-        _daqConfig = deviceNode.DaqDetails!;
-        _deviceNode = deviceNode;
-        _addressDatas = ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new());
-        foreach (var address in _addressDatas.Keys)
-            _addressIndex[address.Address] = address;
-        _hierarchyPath = deviceNode.GetHierarchyPath();
+        _projectTreeLock = projectTreeLock;
+        lock (_projectTreeLock)
+        {
+            _daqConfig = deviceNode.DaqDetails!;
+            _deviceNode = deviceNode;
+            _addressDatas = ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new());
+            foreach (var address in _addressDatas.Keys)
+                _addressIndex[address.Address] = address;
+            _hierarchyPath = deviceNode.GetHierarchyPath();
+            DeviceName = deviceNode.Name;
+            AddressCount = CountAddressNodes(deviceNode.Details);
+        }
         _uaService = uaService;
         _pushLog = pushLog;
         _pushState = pushState;
         _localization = localization;
-        DeviceName = deviceNode.Name;
-        AddressCount = CountAddressNodes(deviceNode.Details);
     }
 
     /// <summary>统计设备下全部 Address 节点（含层级嵌套），供控制台地址数量展示</summary>
@@ -158,7 +164,8 @@ public class DeviceRuntime : IAsyncDisposable
     private List<string> GetAddressesWithoutMq()
     {
         var all = new List<string>();
-        CollectAddressNames(_deviceNode.Details, all);
+        lock (_projectTreeLock)
+            CollectAddressNames(_deviceNode.Details, all);
         var bound = new HashSet<string>(_addressDatas.Keys.Select(a => a.Address));
         return all.Where(name => !bound.Contains(name)).ToList();
     }
@@ -182,21 +189,24 @@ public class DeviceRuntime : IAsyncDisposable
     /// </summary>
     public bool RefreshSettings(IProjectTreeViewModel deviceNode)
     {
-        _daqConfig = deviceNode.DaqDetails!;
-        _deviceNode = deviceNode;
-        var newDict = ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new());
-        var signature = SettingsSignature(deviceNode, newDict);
-        var changed = signature != _settingsSignature;
-        _settingsSignature = signature;
-        _addressDatas = newDict;
-        _addressIndex.Clear();
-        foreach (var address in newDict.Keys)
-            _addressIndex[address.Address] = address;
-        _hierarchyPath = deviceNode.GetHierarchyPath();
-        DeviceName = deviceNode.Name;
-        DeviceVersion = ResolvePluginVersion(DeviceType);
-        AddressCount = CountAddressNodes(deviceNode.Details);
-        return changed;
+        lock (_projectTreeLock)
+        {
+            _daqConfig = deviceNode.DaqDetails!;
+            _deviceNode = deviceNode;
+            var newDict = ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new());
+            var signature = SettingsSignature(deviceNode, newDict);
+            var changed = signature != _settingsSignature;
+            _settingsSignature = signature;
+            _addressDatas = newDict;
+            _addressIndex.Clear();
+            foreach (var address in newDict.Keys)
+                _addressIndex[address.Address] = address;
+            _hierarchyPath = deviceNode.GetHierarchyPath();
+            DeviceName = deviceNode.Name;
+            DeviceVersion = ResolvePluginVersion(DeviceType);
+            AddressCount = CountAddressNodes(deviceNode.Details);
+            return changed;
+        }
     }
 
     private static string SettingsSignature(IProjectTreeViewModel deviceNode,
@@ -241,12 +251,26 @@ public class DeviceRuntime : IAsyncDisposable
         {
             if (_disposed) return;
             var first = string.IsNullOrEmpty(_settingsSignature);
-            var changed = SettingsSignature(deviceNode,
-                ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new())) != _settingsSignature;
-            var restart = changed && IsRun;
-            if (changed) await StopInternalAsync();
-            RefreshSettings(deviceNode);
-            if (restart || (first && deviceNode.IsSoftStart)) await CollectInternalAsync();
+            var restart = false;
+            bool softStart;
+            while (true)
+            {
+                bool stopBeforeRefresh;
+                lock (_projectTreeLock)
+                {
+                    stopBeforeRefresh = IsRun && SettingsSignature(deviceNode,
+                        ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new())) != _settingsSignature;
+                    if (!stopBeforeRefresh)
+                    {
+                        RefreshSettings(deviceNode);
+                        softStart = deviceNode.IsSoftStart;
+                        break;
+                    }
+                }
+                await StopInternalAsync();
+                restart = true;
+            }
+            if (restart || (first && softStart)) await CollectInternalAsync();
             _pushState(this);
         }
         finally { _collectGate.Release(); }
@@ -562,12 +586,16 @@ public class DeviceRuntime : IAsyncDisposable
 
     #region 软启采集
     /// <summary>随软启状态（对齐 WPF ConsoleDeviceModel.IsSoftStart：持久化于项目树，宿主启动/配置同步时自动恢复采集）</summary>
-    public bool IsSoftStart => _deviceNode.IsSoftStart;
+    public bool IsSoftStart
+    {
+        get { lock (_projectTreeLock) return _deviceNode.IsSoftStart; }
+    }
 
     /// <summary>添加/取消软启采集（对齐 WPF OnSoftCollectAsync/OffSoftCollectAsync：改项目节点标志 + 成功提示，落盘由页面调 SaveProjectsAsync 等价 Project.SetAsync）</summary>
     public void SetSoftCollect(bool on)
     {
-        _deviceNode.IsSoftStart = on;
+        lock (_projectTreeLock)
+            _deviceNode.IsSoftStart = on;
         _pushLog(string.Format(T("[{0}] {1}"), DeviceName, on ? T("添加软启采集成功") : T("取消软启采集成功")));
     }
 
@@ -985,7 +1013,10 @@ public class DeviceRuntime : IAsyncDisposable
 
                         // 只在创建成功后刷新一次地址列表
                         var res = service.GetAddressArray();
-                        string format = $"s={_uaAddressSpaceName}.{_deviceNode.GetHierarchyPath(".")}.{addressName}";
+                        string hierarchy;
+                        lock (_projectTreeLock)
+                            hierarchy = _deviceNode.GetHierarchyPath(".");
+                        string format = $"s={_uaAddressSpaceName}.{hierarchy}.{addressName}";
                         if (res.Status && res.ResultData is List<string> list)
                         {
                             foreach (var nodeId in list)

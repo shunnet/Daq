@@ -19,6 +19,8 @@ public class AppStateService
     private readonly DbGate _dbGate;
     private readonly LoggerBuffer _logger;
     private readonly object _persistenceLock = new();
+    /// <summary>跨电路保护共享项目树的结构修改与快照读取。</summary>
+    internal object ProjectTreeLock { get; } = new();
     private Task _pendingPersistence = Task.CompletedTask;
 
     /// <summary>配置写门：串行化 PluginConfig.json / ProjectConfig.json 的检查→写文件→改字典→落盘流程（Blazor 多电路并发保护）</summary>
@@ -28,7 +30,7 @@ public class AppStateService
     public ConcurrentDictionary<string, PluginConfigModel> PluginDict { get; } = new();
     /// <summary>获取按地址唯一标识索引的全局地址配置。</summary>
     public ConcurrentDictionary<string, IAddressModel> AddressDict { get; } = new();
-    /// <summary>获取当前项目树根节点集合；集合变更必须在配置写门内持久化。</summary>
+    /// <summary>获取当前项目树根节点集合；遍历和结构修改须持有 <see cref="ProjectTreeLock"/>，持久化由配置写门串行。</summary>
     public ObservableCollection<IProjectTreeViewModel> ProjectDict { get; } = new();
 
     /// <summary>OPC UA 服务端实例（对应 WPF GlobalConfigModel.uaService）</summary>
@@ -106,19 +108,22 @@ public class AppStateService
                 AddressDict[row.Guid] = row;
         }
 
-        ProjectDict.Clear();
-        if (File.Exists(WebPaths.ProjectConfigPath))
+        lock (ProjectTreeLock)
         {
-            var projects = ProjectHandlerCore.GetConfig<ObservableCollection<IProjectTreeViewModel>>(WebPaths.ProjectConfigPath)?
-                .GetSource<ObservableCollection<IProjectTreeViewModel>>() ?? new();
-            ProjectHandlerCore.InitChildrenParent(projects);
-            foreach (var node in projects)
+            ProjectDict.Clear();
+            if (File.Exists(WebPaths.ProjectConfigPath))
             {
-                node.IsExpanded = true;
-                foreach (var child in node.Children)
-                    ExpandAll(child);
-                RebindProjectNode(node);
-                ProjectDict.Add(node);
+                var projects = ProjectHandlerCore.GetConfig<ObservableCollection<IProjectTreeViewModel>>(WebPaths.ProjectConfigPath)?
+                    .GetSource<ObservableCollection<IProjectTreeViewModel>>() ?? new();
+                ProjectHandlerCore.InitChildrenParent(projects);
+                foreach (var node in projects)
+                {
+                    node.IsExpanded = true;
+                    foreach (var child in node.Children)
+                        ExpandAll(child);
+                    RebindProjectNode(node);
+                    ProjectDict.Add(node);
+                }
             }
         }
     }
@@ -133,8 +138,12 @@ public class AppStateService
     /// </summary>
     public void NotifyEntityChanged()
     {
-        RefreshProjectBindings();
-        var snapshot = ProjectDict.ToJson(true);
+        string snapshot;
+        lock (ProjectTreeLock)
+        {
+            RefreshProjectBindings();
+            snapshot = ProjectDict.ToJson(true);
+        }
         lock (_persistenceLock)
             _pendingPersistence = PersistProjectsAfterEntityChangeAsync(_pendingPersistence, snapshot);
         EntityChanged?.Invoke();
@@ -231,7 +240,10 @@ public class AppStateService
         try
         {
             // 注意：Core 该方法失败返回 false 而不抛异常，必须检查返回值
-            if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.ProjectConfigPath, ProjectDict.ToJson(true)))
+            string snapshot;
+            lock (ProjectTreeLock)
+                snapshot = ProjectDict.ToJson(true);
+            if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.ProjectConfigPath, snapshot))
             {
                 // 重试已耗尽：写入失败不中断电路，但必须让用户可见（控制台信息区），否则静默丢更新
                 _logger.Push("[Error] 项目配置写入失败（已重试 5 次）：ProjectConfig.json 可能被占用");

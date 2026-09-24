@@ -1737,7 +1737,8 @@
     /// <summary>检查当前项目树是否按 Guid 引用了指定采集或传输插件配置。</summary>
     private bool IsConfigUsedByProject(string guid)
     {
-        return AppState.ProjectDict.Any(node => ContainsPluginReference(node, guid));
+        lock (AppState.ProjectTreeLock)
+            return AppState.ProjectDict.Any(node => ContainsPluginReference(node, guid));
     }
 
     /// <summary>递归检查项目节点及其详情树中的插件配置引用。</summary>

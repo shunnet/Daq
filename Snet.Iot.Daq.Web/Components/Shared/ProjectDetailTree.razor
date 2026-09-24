@@ -3,9 +3,10 @@
 @namespace Snet.Iot.Daq.Web.Components.Shared
 @using Snet.Iot.Daq.Web.Services
 @inject LocalizationService Localization
+@inject AppStateService AppState
 
 <div class="project-tree detail-tree">
-    @foreach (var node in Nodes)
+    @foreach (var node in SnapshotNodes())
     {
         <div class="tree-node">
             <div class="tree-node-row @(node.IsSelected ? "selected" : "")" @onclick="() => OnNodeClick.InvokeAsync(node)"
@@ -69,6 +70,12 @@
 
 @code {
     private string T(string key) => Localization.T(key);
+
+    private IProjectDetailsTreeViewModel[] SnapshotNodes()
+    {
+        lock (AppState.ProjectTreeLock)
+            return Nodes.ToArray();
+    }
 
     protected override void OnInitialized()
     {

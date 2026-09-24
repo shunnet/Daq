@@ -24,7 +24,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
     #endregion
 
     #region 队列控制
-    /// <summary>取消所有进行中的下载（「停止下载」按钮）</summary>
+    /// <summary>取消排队和下载；已进入目录替换的安装会完成当前包，避免留下半安装状态。</summary>
     public void StopAll()
     {
         lock (_gate)
@@ -63,6 +63,8 @@ public sealed class DownloadTaskManager : IAsyncDisposable
         public int Progress { get; init; }
         /// <summary>获取失败原因；作业未失败时为空。</summary>
         public string? Error { get; init; }
+        /// <summary>取消请求到达安装阶段前后，已成功安装的插件接口数。</summary>
+        public int InstalledCount { get; init; }
     }
 
     /// <summary>下载作业状态变化时触发。</summary>
@@ -191,7 +193,13 @@ public sealed class DownloadTaskManager : IAsyncDisposable
             _logger.Push($"[Info] 插件下载完成，开始安装: {job.PackName}");
             // 下载即安装：探测类型 → 归位 lib/{type}/{name}/ → InitPlugin → 注册 PluginList.json
             // 同名插件走热更新（停设备 → 卸载 → 替换 → 恢复），对齐上传路径语义
-            var installResults = await TryAutoInstallAsync(names);
+            var installResults = await TryAutoInstallAsync(names, token);
+            if (token.IsCancellationRequested)
+            {
+                Update(job with { Status = "已取消", Progress = installResults > 0 ? 100 : 0, InstalledCount = installResults });
+                _logger.Push($"[Warn] 插件安装已停止: {job.PackName}，已安装 {installResults} 个接口");
+                return;
+            }
             Update(job with
             {
                 Status = installResults > 0 ? "完成" : "失败",
@@ -226,7 +234,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
     /// 同名插件执行热更新（对齐上传路径）：停使用该插件的设备 → 卸载旧程序集 → 替换目录 → 恢复设备采集。
     /// 返回成功安装的接口数。
     /// </summary>
-    private async Task<int> TryAutoInstallAsync(List<string> names)
+    private async Task<int> TryAutoInstallAsync(List<string> names, CancellationToken token)
     {
         var installed = 0;
         var stopped = new List<DeviceRuntime>();
@@ -235,6 +243,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
         {
             foreach (var name in names)
             {
+                if (token.IsCancellationRequested) break;
                 try
                 {
                     var srcPath = Path.Combine(WebPaths.FilePath, name);
@@ -242,6 +251,8 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                     // 探测 Daq / Mq 接口
                     foreach (var type in new[] { Snet.Model.@enum.PluginType.Daq, Snet.Model.@enum.PluginType.Mq })
                     {
+                        // 探测可能加载程序集；从这里到配置落盘必须作为一个提交单元完成。
+                        if (token.IsCancellationRequested) break;
                         var iName = $"Snet.Model.interface.I{type}";
                         var result = PluginHandlerCore.PluginOperate.InitPlugin(srcPath, iName);
                         if (result.Count == 0) continue;

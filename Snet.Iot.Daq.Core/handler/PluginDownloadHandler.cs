@@ -194,7 +194,7 @@ namespace Snet.Iot.Daq.Core.handler
 
             try
             {
-                SafeDelete(outDir);
+                SafeDelete(outDir, throwOnFailure: true);
                 Directory.CreateDirectory(workDir);
 
                 string projectName = $"{packageName}.Runtime";
@@ -350,7 +350,7 @@ namespace Snet.Iot.Daq.Core.handler
             return "dotnet";
         }
 
-        private void SafeDelete(string path)
+        private void SafeDelete(string path, bool throwOnFailure = false)
         {
             if (Directory.Exists(path))
             {
@@ -359,6 +359,8 @@ namespace Snet.Iot.Daq.Core.handler
                 {
                     OnInfoEventHandlerAsync(this,
                         EventInfoResult.CreateFailureResult($"删除目录失败 {path}: {ex.Message}"));
+                    if (throwOnFailure)
+                        throw new IOException($"无法清理旧插件目录: {path}", ex);
                 }
             }
         }

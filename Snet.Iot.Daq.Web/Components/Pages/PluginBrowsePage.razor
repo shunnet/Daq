@@ -227,7 +227,9 @@
         else if (job.Status == "失败")
             Toast.Error($"{T("下载失败")}: {job.PackName}");
         else if (job.Status == "已取消")
-            Toast.Warning($"{T("已停止下载")}: {job.PackName}");
+            Toast.Warning(job.InstalledCount > 0
+                ? string.Format(T("已停止下载，已有 {0} 个插件接口安装完成"), job.InstalledCount)
+                : $"{T("已停止下载")}: {job.PackName}");
         else if (job.Status == "下载中")
             Toast.Info($"{T("下载中")}: {job.PackName}");
         // 无活动任务时复位下载状态（停止下载按钮自动禁用）

@@ -41,11 +41,12 @@ public class DeviceRuntimeManager
     #endregion
 
     #region 同步与生命周期
-    /// <summary>按项目树同步设备集合（新增/移除），不自动启停。加锁串行：多电路并发修改时快照一致</summary>
+    /// <summary>按项目树同步设备集合（新增/移除），不自动启停。项目树快照与结构修改共用一把锁。</summary>
     public void SyncFromProjects(AppStateService appState)
     {
         var devices = new List<IProjectTreeViewModel>();
-        CollectDevices(appState.ProjectDict, devices);
+        lock (appState.ProjectTreeLock)
+            CollectDevices(appState.ProjectDict, devices);
         lock (_syncLock)
             _pendingSync = SynchronizeAfterAsync(_pendingSync, appState, devices);
     }
@@ -75,7 +76,7 @@ public class DeviceRuntimeManager
             if (!_runtimes.TryGetValue(device.DaqDetails.Guid, out var runtime))
             {
                 runtime = new DeviceRuntime(device, () => appState.UaService, _logger.Push,
-                    rt => RuntimeStateChanged?.Invoke(rt), _localization);
+                    rt => RuntimeStateChanged?.Invoke(rt), _localization, appState.ProjectTreeLock);
                 _runtimes[device.DaqDetails.Guid] = runtime;
             }
             await ApplySettingsAsync(runtime, device).ConfigureAwait(false);

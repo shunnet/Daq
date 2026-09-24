@@ -444,7 +444,9 @@
     /// <summary>检查当前项目树是否按 Guid 引用了指定地址。</summary>
     private bool UseCheck(IAddressModel model)
     {
-        return AppState.ProjectDict.Any(node => ContainsAddress(node, model.Guid));
+        lock (AppState.ProjectTreeLock)
+        lock (AppState.ProjectTreeLock)
+            return AppState.ProjectDict.Any(node => ContainsAddress(node, model.Guid));
     }
 
     /// <summary>按结构检查项目节点及其子节点是否引用指定地址，避免全文子串匹配产生误判。</summary>
