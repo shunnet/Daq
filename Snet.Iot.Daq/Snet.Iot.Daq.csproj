@@ -25,7 +25,7 @@
 		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4191.47" />
 		<PackageReference Include="ScottPlot.WPF" Version="5.1.59" />
 		<PackageReference Include="SkiaSharp.Views.WPF" Version="4.152.1" />
-		<PackageReference Include="Snet.Windows.Controls" Version="26.256.1" />
+		<PackageReference Include="Snet.Windows.Controls" Version="26.271.1" />
 	</ItemGroup>
 
 	<ItemGroup>
