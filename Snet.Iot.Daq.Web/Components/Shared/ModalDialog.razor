@@ -48,7 +48,9 @@
     [Parameter] public string Title { get; set; } = "";
     /// <summary>标题左侧图标（bootstrap icons 类名，如 bi-plus-circle），空则无图标</summary>
     [Parameter] public string? TitleIcon { get; set; }
+    /// <summary>可独立滚动的弹窗正文；操作按钮应通过 Footer 提供。</summary>
     [Parameter] public RenderFragment? ChildContent { get; set; }
+    /// <summary>固定在正文之外的操作区；为空时不显示底部容器。</summary>
     [Parameter] public RenderFragment? Footer { get; set; }
     [Parameter] public EventCallback OnClose { get; set; }
 

@@ -10,8 +10,7 @@ namespace Snet.Iot.Daq.Core.handler
     {
         /// <summary>
         /// 按 UTF-8 字节长度截断字符串，超出部分用 "..." 替换<br/>
-        /// 逐字符计算字节数，确保不会在多字节字符中间截断<br/>
-        /// 性能优化：使用 stackalloc 避免临时数组的堆分配，预分配 StringBuilder 容量
+        /// 按 Unicode 标量计算字节数，不拆分 Emoji 等 UTF-16 代理对；容量预分配且无逐字符临时数组。
         /// </summary>
         /// <param name="text">原始字符串</param>
         /// <param name="maxBytes">允许的最大 UTF-8 字节长度（包含省略号）</param>
@@ -42,18 +41,18 @@ namespace Snet.Iot.Daq.Core.handler
             // 预分配 StringBuilder 容量，减少扩容次数
             var sb = new StringBuilder(Math.Min(text.Length, allowedBytes) + ellipsis.Length);
             int currentBytes = 0;
-            Span<char> singleChar = stackalloc char[1];
+            Span<char> chars = stackalloc char[2];
 
-            // 逐字符累计字节数，确保在字符边界处截断
-            foreach (char c in text)
+            // UTF-16 的一个 char 不一定是完整字符，必须以 Unicode 标量为边界。
+            foreach (var rune in text.EnumerateRunes())
             {
-                singleChar[0] = c;
-                int charBytes = encoding.GetByteCount(singleChar);
+                int charBytes = rune.Utf8SequenceLength;
 
                 if (currentBytes + charBytes > allowedBytes)
                     break;
 
-                sb.Append(c);
+                int charCount = rune.EncodeToUtf16(chars);
+                sb.Append(chars[..charCount]);
                 currentBytes += charBytes;
             }
 

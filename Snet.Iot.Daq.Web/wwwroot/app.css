@@ -1002,13 +1002,14 @@ table.snet-table tr:hover td { background: var(--tint); }
     padding: 16px;
 }
 .modal {
-    display: block; /* 覆盖 Bootstrap .modal display:none（默认隐藏） */
+    display: flex; /* 覆盖 Bootstrap 的默认隐藏，标题、正文和操作区纵向布局 */
+    flex-direction: column;
     position: relative; /* 覆盖 Bootstrap position:fixed，保持 overlay flex 居中 */
     height: auto; /* 覆盖 Bootstrap .modal height:100%，弹窗高度随内容 */
     width: 100%;
     max-width: 460px;
     max-height: 88vh;
-    overflow-y: auto;
+    overflow: hidden; /* 正文独立滚动，长表单不能把标题和关闭按钮滚出视野 */
     background: var(--glass-pop);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
@@ -1026,6 +1027,7 @@ table.snet-table tr:hover td { background: var(--tint); }
     .modal { animation: none; }
 }
 .modal-header {
+    flex-shrink: 0;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -1065,7 +1067,8 @@ table.snet-table tr:hover td { background: var(--tint); }
     color: var(--text);
     word-break: break-word;
 }
-.modal-body { padding: 20px 24px; }
+/* 允许正文在有限高度内收缩，保留标题与保存/取消按钮的可见性。 */
+.modal-body { padding: 20px 24px; min-height: 0; overflow-y: auto; }
 
 /* 配置弹窗信息摘要行：类型 / 插件以只读 label 展示 */
 .config-summary {
@@ -1089,6 +1092,7 @@ table.snet-table tr:hover td { background: var(--tint); }
 html[lang^="zh"] .config-summary-label::after { content: "\FF1A"; }
 .config-summary-value { font-weight: 500; }
 .modal-footer {
+    flex-shrink: 0;
     display: flex;
     align-items: center; /* 按钮在 footer 内上下居中 */
     justify-content: flex-end; /* 靠右展示 */
@@ -1096,6 +1100,8 @@ html[lang^="zh"] .config-summary-label::after { content: "\FF1A"; }
     padding: 16px 24px; /* 上下对称留白 */
     border-top: 1px solid var(--border);
 }
+/* 条件插槽没有操作按钮时不占空间，例如尚未配置任何插件的选择弹窗。 */
+.modal-footer:empty { display: none; }
 /* 弹窗底部按钮：留白继承全局统一高度（34px） */
 @media (min-width: 768px) {
     .modal { max-width: 660px; }

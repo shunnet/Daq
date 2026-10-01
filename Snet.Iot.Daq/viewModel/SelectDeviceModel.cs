@@ -1,4 +1,4 @@
-using CommunityToolkit.Mvvm.Input;
+﻿using CommunityToolkit.Mvvm.Input;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.mvvm;
@@ -43,19 +43,14 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand StatusVerification => statusVerification ??= new AsyncRelayCommand(StatusVerificationAsync);
         private IAsyncRelayCommand? statusVerification;
+        /// <summary>逐项等待插件的异步状态验证；在 UI 线程取得集合快照，异步返回后更新绑定属性。</summary>
         public async Task StatusVerificationAsync()
         {
-            await Task.Run(async () =>
+            foreach (var item in PluginConfig.ToArray())
             {
-                foreach (var item in PluginConfig)
-                {
-                    //插件类型
-                    PluginType plugin = item.Type;
-                    //接口名称
-                    string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
-                    item.Status = (await PluginHandlerCore.PluginOperate.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
-                }
-            });
+                string interfaceName = string.Format(GlobalConfigModel.InterfaceFullName, item.Type);
+                item.Status = (await PluginHandlerCore.PluginOperate.StatusVerifyAsync(interfaceName, item.Name, item.Param)).Status;
+            }
         }
         #endregion
 

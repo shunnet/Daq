@@ -60,25 +60,12 @@ public sealed class DbGate : IDisposable
 
     #region 查询
     /// <summary>分页查询地址（模糊匹配 别名/地址/描述），keyword 为空返回全部</summary>
-    public List<AddressModel> QueryAddresses(string? keyword, int pageIndex, int pageSize, out int total)
-    {
-        lock (DbLock)
-        {
-            var query = Db.Table<AddressModel>();
-            if (!string.IsNullOrWhiteSpace(keyword))
-            {
-                var kw = keyword.Trim();
-                query = query.Where(a => a.AnotherName.Contains(kw) || a.Address.Contains(kw) || a.Describe.Contains(kw));
-            }
-            total = query.Count();
-            // 与 WPF 对齐：按更新时间倒序（最新编辑在前）
-            return query.OrderByDescending(a => a.Time).Skip((pageIndex - 1) * pageSize).Take(pageSize).ToList();
-        }
-    }
+    public List<AddressModel> QueryAddresses(string? keyword, int pageIndex, int pageSize, out int total) =>
+        AddressStore.Query<AddressModel>(Db, DbLock, keyword, pageIndex, pageSize, out total, out _);
 
     /// <summary>批量插入（防重），返回统计</summary>
-    public BatchInsertResult InsertUniqueAddresses(IEnumerable<AddressModel> items) =>
-        ProjectHandlerCore.InsertUnique(Db, DbLock, items, null, x => x.AnotherName, x => x.Address);
+    public BatchInsertResult InsertUniqueAddresses(IEnumerable<AddressModel> items, Action<AddressModel>? onInserted = null) =>
+        ProjectHandlerCore.InsertUnique(Db, DbLock, items, onInserted, x => x.AnotherName, x => x.Address, x => x.Guid);
 
     /// <summary>释放应用共享的 SQLite 连接；由依赖注入容器在停止时调用。</summary>
     public void Dispose()

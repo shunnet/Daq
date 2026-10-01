@@ -38,7 +38,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 字节处理
         /// </summary>
-        private BytesHandler bytesHandler;
+        private BytesHandler? bytesHandler;
 
         /// <summary>
         /// 外部回调需要显示的消息
@@ -53,7 +53,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 采集驱动
         /// </summary>
-        private DqaHandler daqHandler;
+        private DqaHandler? daqHandler;
 
         /// <summary>
         /// 消息处理
@@ -101,7 +101,11 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// opcua 父级层级
         /// </summary>
-        private FolderState folderState;
+        private FolderState? folderState;
+        /// <summary>文件夹所属的 UA 实例，服务重启后必须丢弃旧地址空间缓存。</summary>
+        private OpcUaServiceOperate? folderService;
+        /// <summary>运行配置快照签名，避免其他设备编辑或无关 UI 刷新导致重复停止和订阅。</summary>
+        private string settingsSignature = string.Empty;
 
         /// <summary>
         /// 层级集合
@@ -111,38 +115,14 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 地址索引缓存（单线程路径，每次重建）
         /// </summary>
-        private Dictionary<string, IAddressModel> _addressIndex = new();
+        private readonly ConcurrentDictionary<string, IAddressModel> _addressIndex = new();
 
         /// <summary>
         /// MQ 配置映射缓存（单线程路径，每次重建）
         /// </summary>
-        private Dictionary<string, List<PluginConfigModel>> _mqPluginMap = new();
+        private readonly ConcurrentDictionary<string, List<PluginConfigModel>> _mqPluginMap = new();
 
-        /// <summary>
-        /// DataType 与 BuiltInType 映射缓存
-        /// </summary>
-        private static readonly Dictionary<DataType, BuiltInType> _typeMap = new()
-        {
-            { Model.@enum.DataType.Byte, BuiltInType.Byte },
-            { Model.@enum.DataType.Bool, BuiltInType.Boolean },
-            { Model.@enum.DataType.Double, BuiltInType.Double },
-            { Model.@enum.DataType.Float, BuiltInType.Float },
-            { Model.@enum.DataType.Single, BuiltInType.Float },
-            { Model.@enum.DataType.Short, BuiltInType.Int16 },
-            { Model.@enum.DataType.Int16, BuiltInType.Int16 },
-            { Model.@enum.DataType.Ushort, BuiltInType.UInt16 },
-            { Model.@enum.DataType.UInt16, BuiltInType.UInt16 },
-            { Model.@enum.DataType.Int, BuiltInType.Int32 },
-            { Model.@enum.DataType.Int32, BuiltInType.Int32 },
-            { Model.@enum.DataType.Uint, BuiltInType.UInt32 },
-            { Model.@enum.DataType.UInt32, BuiltInType.UInt32 },
-            { Model.@enum.DataType.Long, BuiltInType.Int64 },
-            { Model.@enum.DataType.Int64, BuiltInType.Int64 },
-            { Model.@enum.DataType.Ulong, BuiltInType.UInt64 },
-            { Model.@enum.DataType.UInt64, BuiltInType.UInt64 },
-            { Model.@enum.DataType.String, BuiltInType.String },
-            { Model.@enum.DataType.Char, BuiltInType.String },
-        };
+
 
 
         /// <summary>
@@ -348,12 +328,14 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         private async Task DqaHandler_OnDataEventAsync(object? sender, EventDataResult e)
         {
-            if (DataSyncChannel is null)
-                return;
-            if (TokenSource is null)
-                return;
+            var channel = DataSyncChannel;
+            var source = TokenSource;
+            if (channel is null || source is null) return;
 
-            await DataSyncChannel.Writer.WriteAsync(e, TokenSource.Token);
+            try { await channel.Writer.WriteAsync(e, source.Token); }
+            catch (ObjectDisposedException) when (!ReferenceEquals(source, TokenSource)) { /* 停止已释放这次事件所属的取消源。 */ }
+            catch (OperationCanceledException) { /* 停止时取消入队，驱动事件正常结束。 */ }
+            catch (ChannelClosedException) { /* 停止时通道完成，不将其报告为驱动故障。 */ }
         }
 
         #endregion
@@ -365,7 +347,11 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand WASatrt => waStart ??= new AsyncRelayCommand(WASatrtAsync);
         private IAsyncRelayCommand? waStart;
-        private async Task WASatrtAsync()
+        /// <summary>与采集启停共用操作门，避免 WebApi 操作访问正在释放的驱动。</summary>
+        private Task WASatrtAsync() => RunDeviceOperationAsync(WASatrtCoreAsync);
+
+        /// <summary>操作门内执行 WebApi WASatrt，处理器不存在时不创建新连接。</summary>
+        private async Task WASatrtCoreAsync()
         {
             if (daqHandler == null)
             {
@@ -393,7 +379,11 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand WAStop => waStop ??= new AsyncRelayCommand(WAStopAsync);
         private IAsyncRelayCommand? waStop;
-        private async Task WAStopAsync()
+        /// <summary>与采集启停共用操作门，避免 WebApi 操作访问正在释放的驱动。</summary>
+        private Task WAStopAsync() => RunDeviceOperationAsync(WAStopCoreAsync);
+
+        /// <summary>操作门内执行 WebApi WAStop，处理器不存在时不创建新连接。</summary>
+        private async Task WAStopCoreAsync()
         {
             if (daqHandler == null)
             {
@@ -421,7 +411,11 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand WARequestExample => waRequestExample ??= new AsyncRelayCommand(WARequestExampleAsync);
         private IAsyncRelayCommand? waRequestExample;
-        private async Task WARequestExampleAsync()
+        /// <summary>与采集启停共用操作门，避免 WebApi 操作访问正在释放的驱动。</summary>
+        private Task WARequestExampleAsync() => RunDeviceOperationAsync(WARequestExampleCoreAsync);
+
+        /// <summary>操作门内执行 WebApi WARequestExample，处理器不存在时不创建新连接。</summary>
+        private async Task WARequestExampleCoreAsync()
         {
             if (daqHandler == null)
             {
@@ -434,7 +428,7 @@ namespace Snet.Iot.Daq.viewModel
             }
             OperateResult result = await daqHandler.WARequestExampleAsync(DaqData.Guid);
             //写入结果回调
-            if (ShowAsync != null) await ShowAsync($"{DeviceHierarchyToolTip}\r\n" + result.ResultData.ToString());
+            if (ShowAsync != null) await ShowAsync($"{DeviceHierarchyToolTip}\r\n" + (result.ResultData?.ToString() ?? result.Message ?? string.Empty));
         }
 
         /// <summary>
@@ -442,7 +436,11 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Collect => collect ??= new AsyncRelayCommand(CollectAsync);
         private IAsyncRelayCommand? collect;
-        private async Task CollectAsync()
+        /// <summary>启动与停止、配置替换共用操作门，避免不同命令并发创建处理器和消费者。</summary>
+        private Task CollectAsync() => RunDeviceOperationAsync(CollectCoreAsync);
+
+        /// <summary>操作门内启动采集；消费任务归本实例所有，停止时等待退出。</summary>
+        private async Task CollectCoreAsync()
         {
             if (!IsRun)
             {
@@ -456,13 +454,13 @@ namespace Snet.Iot.Daq.viewModel
                 }
 
                 //内部实现组包
-                OperateResult result = result = await daqHandler.SubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList(), DaqData.AutoPack);
+                OperateResult result = await daqHandler.SubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList(), DaqData.AutoPack);
 
                 if (result.Status)
                 {
                     if (folderStates.Count > 0)
                     {
-                        GlobalConfigModel.uaService.RemoveFolder([folderStates[^1].NodeId]);
+                        folderService?.RemoveFolder([folderStates[^1].NodeId]);
                         folderStates.Clear();
                         folderState = null;
                     }
@@ -480,7 +478,7 @@ namespace Snet.Iot.Daq.viewModel
 
                     if (DaqData.WebApi != null)
                     {
-                        await WASatrtAsync();
+                        await WASatrtCoreAsync();
                     }
 
                     if (TokenSource == null)
@@ -491,19 +489,22 @@ namespace Snet.Iot.Daq.viewModel
                     if (UaSyncChannel == null)
                     {
                         UaSyncChannel = Channel.CreateBounded<AddressValue>(channel);
-                        _uaConsumerTask = UaSyncChannelDataEventAsync(TokenSource.Token);
+                        var token = TokenSource.Token;
+                        _uaConsumerTask = Task.Run(() => UaSyncChannelDataEventAsync(token));
                     }
 
                     if (DataSyncChannel == null)
                     {
                         DataSyncChannel = Channel.CreateBounded<EventDataResult>(channel);
-                        _dataConsumerTask = DataSyncChannelDataEventAsync(TokenSource.Token);
+                        var token = TokenSource.Token;
+                        _dataConsumerTask = Task.Run(() => DataSyncChannelDataEventAsync(token));
                     }
 
                     IsRun = true;
                 }
                 else
                 {
+                    await StopCoreAsync();
                     DeviceStatusFlashing = false;
                     DeviceStatusChangLiang = false;
                 }
@@ -521,12 +522,21 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Stop => stop ??= new AsyncRelayCommand(StopAsync);
         private IAsyncRelayCommand? stop;
-        private async Task StopAsync()
+        /// <summary>等待其他设备操作完成后停止，不因处理器已为空而漏清理消费者。</summary>
+        private Task StopAsync() => RunDeviceOperationAsync(StopCoreAsync);
+
+        /// <summary>操作门内取消生产与消费，等待任务退出后释放驱动和通道。</summary>
+        private async Task StopCoreAsync()
         {
-            if (daqHandler == null)
+            // 逐项清理并记录插件错误，一个资源失败不能阻止其余资源释放。
+            async Task ReleaseAsync(Func<Task> action)
             {
-                return;
+                try { await action(); }
+                catch (Exception ex) { await LogHelper.ErrorAsync($"设备停止清理异常：{ex.Message}"); }
             }
+            daqHandler?.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
+            DataSyncChannel?.Writer.TryComplete();
+            UaSyncChannel?.Writer.TryComplete();
 
             // 取消
             if (TokenSource != null)
@@ -535,29 +545,31 @@ namespace Snet.Iot.Daq.viewModel
 
             }
 
-            await Task.WhenAll(_dataConsumerTask ?? Task.CompletedTask, _uaConsumerTask ?? Task.CompletedTask);
+            await ReleaseAsync(() => Task.WhenAll(_dataConsumerTask ?? Task.CompletedTask, _uaConsumerTask ?? Task.CompletedTask));
             _dataConsumerTask = null;
             _uaConsumerTask = null;
-            TokenSource?.Dispose();
+            // 先撤下可见引用，再释放取消源；迟到事件不能取到已释放的 Token。
+            var stoppedSource = TokenSource;
             TokenSource = null;
+            stoppedSource?.Dispose();
 
-            if (DaqData.WebApi != null)
+            if (DaqData?.WebApi != null)
             {
-                await WAStopAsync();
+                await ReleaseAsync(WAStopCoreAsync);
             }
 
             daqHandler?.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
             daqHandler?.OnInfoEventAsync -= DqaHandler_OnInfoEventAsync;
             if (daqHandler is not null)
             {
-                await daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList());
-                await daqHandler.DisposeAsync();
+                await ReleaseAsync(() => daqHandler.UnSubscribeAsync(DaqData.Guid, AddressDatas.Keys.ToList()));
+                await ReleaseAsync(() => daqHandler.DisposeAsync().AsTask());
             }
             daqHandler = null;
 
             foreach (var item in mqHandlers)
             {
-                await item.Value.DisposeAsync();
+                await ReleaseAsync(() => item.Value.DisposeAsync().AsTask());
             }
             mqHandlers.Clear();
 
@@ -566,6 +578,7 @@ namespace Snet.Iot.Daq.viewModel
             DeviceStatusChangLiang = false;
             IsRun = false;
             runtime.Stop();
+            _lastResultStatus = null;
 
             if (UaSyncChannel != null)
             {
@@ -596,11 +609,15 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Retry => retry ??= new AsyncRelayCommand(RetryAsync);
         private IAsyncRelayCommand? retry;
-        private async Task RetryAsync()
+        /// <summary>重试作为一个完整操作执行，停止与重新启动之间不允许配置写入。</summary>
+        private Task RetryAsync() => RunDeviceOperationAsync(RetryCoreAsync);
+
+        /// <summary>操作门内重新建立采集，重置本次运行计时。</summary>
+        private async Task RetryCoreAsync()
         {
             runtime.Reset();
-            await StopAsync();
-            await CollectAsync();
+            await StopCoreAsync();
+            await CollectCoreAsync();
             if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "重试".GetLanguageValue(App.LanguageOperate));
         }
 
@@ -650,7 +667,9 @@ namespace Snet.Iot.Daq.viewModel
                             continue;
                         }
 
-                        FolderState fs = await UaCreateFolder();
+                        var service = GlobalConfigModel.uaService;
+                        if (service is null) continue;
+                        FolderState? fs = await UaCreateFolder(service);
                         if (fs == null)
                         {
                             continue;
@@ -662,13 +681,12 @@ namespace Snet.Iot.Daq.viewModel
                         object? value = addressValue.ResultValue;
 
                         //校验
-                        var service = GlobalConfigModel.uaService;
-                        if (service is null || !service.GetStatus().Status)
+                        if (!ReferenceEquals(service, GlobalConfigModel.uaService) || !service.GetStatus().Status)
                             continue;
 
                         if (!_addressMap.ContainsKey(addressName) && !_failedAddress.ContainsKey(addressName))
                         {
-                            if (!_typeMap.TryGetValue(dataType, out var builtInType))
+                            if (!UaForwarding.TypeMap.TryGetValue(dataType, out var builtInType))
                                 continue;
 
                             if (builtInType == BuiltInType.String)
@@ -685,30 +703,19 @@ namespace Snet.Iot.Daq.viewModel
                                     DataType = builtInType,
                                     AccessLevel = 3
                                 }
-                            }, folderState);
+                            }, fs);
 
                             if (!createResult.Status)
                             {
                                 // 标记失败，避免每个数据事件重复创建并刷屏消息
                                 _failedAddress[addressName] = 0;
-                                await ShowAsync?.Invoke(createResult.Message);
+                                if (ShowAsync is not null) await ShowAsync(createResult.Message);
                                 continue;
                             }
 
-                            // 只在创建成功后刷新一次地址列表
-                            var res = service.GetAddressArray().GetSource<List<string>>();
-                            string format = $"s={uaServerAddressSpaceName}.{Project.GetHierarchyPath(".")}.{addressName}";
-                            if (res != null)
-                            {
-                                foreach (var nodeId in res)
-                                {
-                                    if (NodeId.TryParse(nodeId, out var parsedNodeId) && parsedNodeId.TryGetValue(out string identifier) && string.Equals(identifier, format[2..], StringComparison.Ordinal))
-                                    {
-                                        _addressMap[addressName] = nodeId;
-                                        break;
-                                    }
-                                }
-                            }
+                            // CreateAddress 与此映射共用父节点标识，保留命名空间且不做全量地址扫描。
+                            _addressMap[addressName] = UaForwarding.CreateAddressNodeId(fs.NodeId, addressName).ToString();
+
                         }
 
                         // 写入
@@ -722,7 +729,7 @@ namespace Snet.Iot.Daq.viewModel
 
                         _singleWriteDict[realAddress] = new WriteModel(value, dataType);
 
-                        var writeResult = await service.WriteAsync(_singleWriteDict);
+                        var writeResult = await service.WriteAsync(_singleWriteDict, token);
 
                         _singleWriteDict.Clear();
 
@@ -738,66 +745,45 @@ namespace Snet.Iot.Daq.viewModel
             {
                 await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
             }
-            catch (OperationCanceledException ex3)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 操作已取消：" + ex3.Message));
+                // 正常停止消费，不将取消显示为采集故障。
             }
             catch (Exception ex4)
             {
                 await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 异常：" + ex4.Message));
             }
         }
-        /// <summary>
-        /// 创建UA层级
-        /// </summary>
-        /// <returns></returns>
-        private async Task<FolderState?> UaCreateFolder()
+        /// <summary>在捕获的 UA 服务上创建或复用设备层级；服务实例变化时重建缓存，避免向旧地址空间写入。</summary>
+        /// <param name="service">本次消费捕获的服务，文件夹和后续写入必须使用同一实例。</param>
+        /// <returns>成功创建的设备文件夹；服务未运行或创建失败时返回 null。</returns>
+        private async Task<FolderState?> UaCreateFolder(OpcUaServiceOperate service)
         {
-            try
+            if (!ReferenceEquals(folderService, service))
             {
-                if (GlobalConfigModel.uaService is null)
-                    return null;
-
-                if (folderState != null)
+                folderService = service;
+                folderState = null;
+                folderStates.Clear();
+                _addressMap.Clear();
+                _failedAddress.Clear();
+                uaServerAddressSpaceName = string.Empty;
+            }
+            if (!service.GetStatus().Status) return null;
+            if (folderState is not null) return folderState;
+            FolderState? folder = null;
+            foreach (var name in DeviceHierarchyToolTip.TrimAll().Split('>'))
+            {
+                var result = service.CreateFolder(name, folder);
+                if (!result.Status || result.ResultData is not FolderState created)
                 {
-                    return folderState;
-                }
-
-                //比对层级
-                if (uaServerAddressSpaceName.IsNullOrWhiteSpace())
-                {
-                    uaServerAddressSpaceName = GlobalConfigModel.uaService.GetBasicsArgs().GetSource<OpcUaServiceData.Basics>().AddressSpaceName;
-                }
-
-                if (GlobalConfigModel.uaService != null && GlobalConfigModel.uaService.GetStatus().Status)
-                {
-                    FolderState folder = null;
-                    //创建层级
-                    foreach (var item in DeviceHierarchyToolTip.TrimAll().Split('>'))
-                    {
-                        OperateResult operateResult = GlobalConfigModel.uaService.CreateFolder(item, folder);
-                        if (operateResult.GetDetails(out string? msg))
-                        {
-                            folder = operateResult.GetSource<FolderState>();
-                            folderStates.Add(folder);
-                        }
-                        else
-                        {
-                            await ShowAsync.Invoke(msg);
-                        }
-                    }
-                    folderState = folder;
-                }
-                else
-                {
+                    if (ShowAsync is not null) await ShowAsync(result.Message);
                     return null;
                 }
-                return folderState;
+                folder = created;
+                folderStates.Add(created);
             }
-            catch (Exception)
-            {
-                return null;
-            }
+            folderState = folder;
+            return folder;
         }
 
         /// <summary>
@@ -839,17 +825,15 @@ namespace Snet.Iot.Daq.viewModel
                     }
                 }
             }
-            catch (TaskCanceledException ex1)
+            catch (TaskCanceledException) when (token.IsCancellationRequested)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 操作已取消：" + ex1.Message));
             }
             catch (ChannelClosedException ex2)
             {
                 await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
             }
-            catch (OperationCanceledException ex3)
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ DataSyncChannelDataEventAsync ] 操作已取消：" + ex3.Message));
             }
             catch (Exception ex4)
             {
@@ -1006,13 +990,13 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// MQ 传输
         /// </summary>
-        private async Task MqTransmissionAsync(Dictionary<IAddressModel, AddressValue> inParam, List<PluginConfigModel> pluginConfigs)
+        private async Task MqTransmissionAsync(ConcurrentDictionary<IAddressModel, AddressValue> inParam, List<PluginConfigModel> pluginConfigs)
         {
             foreach (var item in pluginConfigs)
             {
                 if (!mqHandlers.TryGetValue(item.Guid, out var mq))
                 {
-                    mq = await MqHandler.InstanceAsync(item);
+                    mq = MqHandler.CreateScoped(item);
                     mqHandlers[item.Guid] = mq;
                 }
                 var result = await mq.ProduceAsync(item.Guid, inParam);
@@ -1025,14 +1009,12 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         private void RebuildAddressCache()
         {
-            _addressIndex = AddressDatas.Keys
-                .Where(a => !string.IsNullOrEmpty(a.Address))
-                .ToDictionary(a => a.Address!);
-
-            _mqPluginMap = AddressDatas
-                .Where(kv => !string.IsNullOrEmpty(kv.Key.Address))
-                .GroupBy(kv => kv.Key.Address!)
-                .ToDictionary(g => g.Key, g => g.SelectMany(x => x.Value).ToList());
+            _addressIndex.Clear();
+            foreach (var address in AddressDatas.Keys.Where(a => !string.IsNullOrEmpty(a.Address)))
+                _addressIndex[address.Address] = address;
+            _mqPluginMap.Clear();
+            foreach (var group in AddressDatas.Where(kv => !string.IsNullOrEmpty(kv.Key.Address)).GroupBy(kv => kv.Key.Address))
+                _mqPluginMap[group.Key] = group.SelectMany(x => x.Value).ToList();
 
             //循环MQ插件路径（清空操作移出循环，避免只保留最后一组插件的路径）
             MqPluginPath ??= new();
@@ -1071,8 +1053,19 @@ namespace Snet.Iot.Daq.viewModel
         /// 配置
         /// </summary>
         /// <param name="model">项目信息</param>
-        public async Task SettingsAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
+        public Task SettingsAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
+            => RunDeviceOperationAsync(() => SettingsCoreAsync(model, resultAsync, showAsync));
+
+        /// <summary>操作门内先停止旧配置，再刷新项目引用及缓存，按原状态恢复采集。</summary>
+        private async Task SettingsCoreAsync(IProjectTreeViewModel model, Func<PluginConfigModel, BaseModel, Task> resultAsync, Func<string, Task> showAsync)
         {
+            var newAddresses = model.Details.ToAddressMqDictionary();
+            var signature = DeviceSettings.CreateSignature(model, newAddresses);
+            var first = string.IsNullOrEmpty(settingsSignature);
+            var changed = signature != settingsSignature;
+            var restart = IsRun && changed;
+            // 配置确实改变时先等待旧消费者退出，无关刷新不会打断正在运行的设备。
+            if (changed && (IsRun || daqHandler is not null)) await StopCoreAsync();
             DaqPluginPath = PluginHandlerCore.PluginOperate.GetPluginPath(model.DaqDetails.Name);
             ResultAsync = resultAsync;
             ShowAsync = showAsync;
@@ -1083,17 +1076,18 @@ namespace Snet.Iot.Daq.viewModel
             UpdateTime = model.DaqDetails.Time;
             DeviceHierarchyToolTip = model.GetHierarchyPath();
             DeviceHierarchy = DeviceHierarchyToolTip.TruncateByBytes(36);
-            AddressDatas = model.Details.ToAddressMqDictionary();
-            AddressCount = AddressDatas.Count;
-            RebuildAddressCache();
-            DaqData = model.DaqDetails;
-            if (IsRun)
+            AddressCount = ProjectHandlerCore.CountAddressNodes(model.Details);
+            if (changed)
             {
-                await RetryAsync();
+                AddressDatas = newAddresses;
+                RebuildAddressCache();
+                settingsSignature = signature;
             }
-            if (model.IsSoftStart)
+            DaqData = model.DaqDetails;
+            if (restart || (first && model.IsSoftStart))
             {
-                await CollectAsync();
+                if (restart) runtime.Reset();
+                await CollectCoreAsync();
             }
         }
 
@@ -1123,7 +1117,7 @@ namespace Snet.Iot.Daq.viewModel
                     DeviceStatusChangLiang = true;
                 }
             }
-            await ResultAsync.Invoke(pcm, bm);
+            if (ResultAsync is not null) await ResultAsync.Invoke(pcm, bm);
         }
 
         /// <summary>
@@ -1131,9 +1125,14 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public void StartPolling(RuntimeSecondsRecorderHandler recorder)
         {
-            _cts = new CancellationTokenSource();
-
-            _ = PollAsync(recorder, _cts.Token);
+            lock (disposalLock)
+            {
+                ObjectDisposedException.ThrowIf(disposed, this);
+                if (_pollTask is { IsCompleted: false }) return;
+                _cts?.Dispose();
+                _cts = new CancellationTokenSource();
+                _pollTask = PollAsync(recorder, _cts.Token);
+            }
         }
 
         private async Task PollAsync(RuntimeSecondsRecorderHandler recorder, CancellationToken token)
@@ -1148,15 +1147,16 @@ namespace Snet.Iot.Daq.viewModel
             }
             catch (OperationCanceledException) { }
         }
-        private CancellationTokenSource _cts;
+        /// <summary>运行时间轮询的取消源，停止后仍由清理流程等待任务退出。</summary>
+        private CancellationTokenSource? _cts;
+        /// <summary>本实例拥有的运行时间轮询任务。</summary>
+        private Task? _pollTask;
         /// <summary>
         /// 停止轮询
         /// </summary>
         public void StopPolling()
         {
             _cts?.Cancel();
-            _cts?.Dispose();
-            _cts = null;
         }
 
         public override string ToString()
@@ -1164,54 +1164,65 @@ namespace Snet.Iot.Daq.viewModel
             return DaqData.Guid;
         }
 
-        public void Dispose()
-        {
-            // 取消静态语言事件订阅，防止实例被静态事件根住无法回收
-            Snet.Core.handler.LanguageHandler.OnLanguageEventAsync -= LanguageHandler_OnLanguageEventAsync;
+        /// <summary>设备操作互斥门，仅使用异步等待，不阻塞界面线程。</summary>
+        private readonly SemaphoreSlim operationGate = new(1, 1);
+        /// <summary>保护清理任务的首次创建；临界区不执行或等待设备 I/O。</summary>
+        private readonly object disposalLock = new();
+        /// <summary>所有释放入口共享的清理任务，重复调用不会重复释放。</summary>
+        private Task? disposalTask;
+        /// <summary>终态标记；取得操作门后再次检查，防止释放后启动。</summary>
+        private bool disposed;
 
-            // 取消令牌，防止后台异步任务继续执行
-            if (TokenSource != null)
-            {
-                TokenSource.Cancel();
-                TokenSource.Dispose();
-                TokenSource = null;
-            }
-            daqHandler?.Dispose();
-            daqHandler = null;
-            foreach (var item in mqHandlers)
-            {
-                item.Value.Dispose();
-            }
-            mqHandlers.Clear();
-            _mqPluginMap.Clear();
-            runtime.Stop();
-            StopPolling();
-            bytesHandler?.Dispose();
-            bytesModels.Clear();
+        /// <summary>串行执行一个设备操作；已释放实例不再接受任何新的操作。</summary>
+        /// <param name="operation">须在互斥门内完成的异步操作。</param>
+        private async Task RunDeviceOperationAsync(Func<Task> operation)
+        {
+            await operationGate.WaitAsync();
+            try { if (!disposed) await operation(); }
+            finally { operationGate.Release(); }
         }
 
-        public async ValueTask DisposeAsync()
+        /// <summary>兼容同步入口，启动同一异步清理并观察异常；需要等待完成的调用方应使用 DisposeAsync。</summary>
+        public void Dispose()
         {
-            // 取消静态语言事件订阅，防止实例被静态事件根住无法回收
-            Snet.Core.handler.LanguageHandler.OnLanguageEventAsync -= LanguageHandler_OnLanguageEventAsync;
+            _ = GetDisposalTask().ContinueWith(task => LogHelper.Error(task.Exception!.GetBaseException().Message),
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+        }
 
-            if (daqHandler != null)
-                await daqHandler.DisposeAsync();
-            daqHandler = null;
-            foreach (var item in mqHandlers)
+        /// <summary>等待消费者和轮询全部退出，再释放资源；所有调用等待同一任务。</summary>
+        public ValueTask DisposeAsync() => new(GetDisposalTask());
+
+        /// <summary>取得或创建唯一清理任务，创建流程先异步让出以缩短同步临界区。</summary>
+        private Task GetDisposalTask()
+        {
+            lock (disposalLock) return disposalTask ??= DisposeCoreAsync();
+        }
+
+        /// <summary>终态清理；无论驱动停止是否成功都清理轮询和解析器。</summary>
+        private async Task DisposeCoreAsync()
+        {
+            await Task.Yield();
+            await operationGate.WaitAsync();
+            try
             {
-                await item.Value.DisposeAsync();
+                disposed = true;
+                LanguageHandler.OnLanguageEventAsync -= LanguageHandler_OnLanguageEventAsync;
+                try { await StopCoreAsync(); }
+                finally
+                {
+                    StopPolling();
+                    try { if (_pollTask is not null) await _pollTask; }
+                    finally
+                    {
+                        _cts?.Dispose();
+                        _cts = null;
+                        _mqPluginMap.Clear();
+                        try { if (bytesHandler is not null) await bytesHandler.DisposeAsync(); }
+                        finally { bytesHandler = null; bytesModels.Clear(); GC.SuppressFinalize(this); }
+                    }
+                }
             }
-            mqHandlers.Clear();
-            _mqPluginMap.Clear();
-            runtime.Stop();
-            StopPolling();
-            if (bytesHandler != null)
-            {
-                await bytesHandler.DisposeAsync();
-            }
-            bytesModels.Clear();
-            await StopAsync();
+            finally { operationGate.Release(); }
         }
         #endregion
 

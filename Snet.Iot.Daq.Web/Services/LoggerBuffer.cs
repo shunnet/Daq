@@ -6,7 +6,10 @@
 public class LoggerBuffer
 {
     private const int MaxLines = 2000;
-    private readonly List<string> _lines = new();
+    /// <summary>显示行最大长度，避免异常消息或设备数据使有限行数的缓冲占用过大内存。</summary>
+    private const int MaxLineLength = 16384;
+    /// <summary>有界先进先出队列，满容量时追加日志不搬移其余行。</summary>
+    private readonly Queue<string> _lines = new();
     private readonly object _lock = new();
 
     /// <summary>缓冲内容发生变化时触发。</summary>
@@ -19,9 +22,9 @@ public class LoggerBuffer
     {
         lock (_lock)
         {
-            _lines.Add(line);
+            _lines.Enqueue(line.Length > MaxLineLength ? line[..MaxLineLength] + "…" : line);
             if (_lines.Count > MaxLines)
-                _lines.RemoveRange(0, _lines.Count - MaxLines);
+                _lines.Dequeue();
         }
         Changed?.Invoke();
     }

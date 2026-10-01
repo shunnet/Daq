@@ -1,4 +1,4 @@
-﻿@inject MenuCoordinator MenuCoordinator
+@inject MenuCoordinator MenuCoordinator
 @page "/plugins/settings"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
@@ -155,192 +155,200 @@
 {
     <ModalDialog Title="@(_editingConfig is null ? T("添加插件配置") : T("修改插件配置"))"
                  TitleIcon="@(_editingConfig is null ? "bi-plus-circle" : "bi-pencil-square")" OnClose="CloseConfigDialog">
-        <div class="config-summary">
-            <span class="config-summary-item"><i class="bi bi-tag"></i><span class="config-summary-label">@T("类型")</span><span class="config-summary-value">@_newConfigType</span></span>
-            <span class="config-summary-item"><i class="bi bi-puzzle"></i><span class="config-summary-label">@T("插件")</span><span class="config-summary-value">@_newConfigPluginName</span></span>
-            @if (_protocolField is not null)
-            {
-                <span class="config-summary-item" title="@_protocolField.DetailsTips">
-                    <i class="bi bi-diagram-3"></i>
-                    <span class="config-summary-label">@_protocolField.Description</span>
-                    @if (_editingConfig is null)
+        <ChildContent>
+            <div class="config-summary">
+                <span class="config-summary-item"><i class="bi bi-tag"></i><span class="config-summary-label">@T("类型")</span><span class="config-summary-value">@_newConfigType</span></span>
+                <span class="config-summary-item"><i class="bi bi-puzzle"></i><span class="config-summary-label">@T("插件")</span><span class="config-summary-value">@_newConfigPluginName</span></span>
+                @if (_protocolField is not null)
+                {
+                    <span class="config-summary-item" title="@_protocolField.DetailsTips">
+                        <i class="bi bi-diagram-3"></i>
+                        <span class="config-summary-label">@_protocolField.Description</span>
+                        @if (_editingConfig is null)
+                        {
+                            // 添加：协议类型可选择
+                            <select class="config-summary-select" value="@_protocolType" @onchange="OnProtocolChange">
+                                @foreach (var o in _protocolField.Options)
+                                {
+                                    <option value="@o.Key">@o.Key</option>
+                                }
+                            </select>
+                        }
+                        else
+                        {
+                            // 修改：协议类型只读展示（已确定的配置不允许切换）
+                            <span class="config-summary-value">@_protocolType</span>
+                        }
+                    </span>
+                }
+            </div>
+            <div class="param-card">
+                <div class="param-card-header">
+                    <div class="param-card-title"><i class="bi bi-sliders"></i>@T("参数")</div>
+                    <div class="segmented">
+                        <button class="@(_paramTab == "form" ? "active" : "")" @onclick="ShowParamForm"><i class="bi bi-input-cursor-text"></i>@T("表单")</button>
+                        <button class="@(_paramTab == "json" ? "active" : "")" @onclick="ShowParamJson"><i class="bi bi-braces"></i>@T("JSON")</button>
+                    </div>
+                </div>
+                <div class="param-card-body">
+                    @if (_loadingParam)
                     {
-                        // 添加：协议类型可选择
-                        <select class="config-summary-select" value="@_protocolType" @onchange="OnProtocolChange">
-                            @foreach (var o in _protocolField.Options)
+                        <div class="upload-status">@T("正在加载插件默认参数...")</div>
+                    }
+                    @if (_paramTab == "form")
+                    {
+                        <div class="param-form">
+                            @if (_paramFields.Count == 0)
                             {
-                                <option value="@o.Key">@o.Key</option>
+                                <div class="param-empty">@T("未获取到参数定义，可切换到 JSON 视图编辑")</div>
                             }
-                        </select>
+                            @foreach (var f in _paramFields)
+                            {
+                                <div class="param-row">
+                                        <label class="param-label" title="@f.DetailsTips">@f.Description</label>
+                                        @if (f.Cate is "select" or "radio")
+                                        {
+                                            <select class="param-input" @bind="f.Value" @bind:event="onchange" @bind:after="() => OnFieldChanged(f)">
+                                                @foreach (var o in f.Options)
+                                                {
+                                                    <option value="@o.Value">@o.Key</option>
+                                                }
+                                            </select>
+                                        }
+                                        else if (f.Cate == "unmber")
+                                        {
+                                            <input class="param-input" type="number" step="any" @bind="f.Value" @bind:event="oninput" @bind:after="() => OnFieldChanged(f)" />
+                                        }
+                                        else
+                                        {
+                                            <input class="param-input" @bind="f.Value" @bind:event="oninput" @bind:after="() => OnFieldChanged(f)" />
+                                        }
+                                        @if (f.Error is not null)
+                                        {
+                                            <div class="param-error-inline">@f.Error</div>
+                                        }
+                                </div>
+                            }
+                        </div>
                     }
                     else
                     {
-                        // 修改：协议类型只读展示（已确定的配置不允许切换）
-                        <span class="config-summary-value">@_protocolType</span>
+                        <textarea value="@_configParam" @oninput="OnJsonInput" rows="10" class="mono param-json" placeholder="{ }"></textarea>
+                        @if (_paramJsonError is not null)
+                        {
+                            <div class="param-error">@_paramJsonError</div>
+                        }
                     }
-                </span>
-            }
-        </div>
-        <div class="param-card">
-            <div class="param-card-header">
-                <div class="param-card-title"><i class="bi bi-sliders"></i>@T("参数")</div>
-                <div class="segmented">
-                    <button class="@(_paramTab == "form" ? "active" : "")" @onclick="ShowParamForm"><i class="bi bi-input-cursor-text"></i>@T("表单")</button>
-                    <button class="@(_paramTab == "json" ? "active" : "")" @onclick="ShowParamJson"><i class="bi bi-braces"></i>@T("JSON")</button>
                 </div>
             </div>
-            <div class="param-card-body">
-                @if (_loadingParam)
-                {
-                    <div class="upload-status">@T("正在加载插件默认参数...")</div>
-                }
-                @if (_paramTab == "form")
-                {
-                    <div class="param-form">
-                        @if (_paramFields.Count == 0)
-                        {
-                            <div class="param-empty">@T("未获取到参数定义，可切换到 JSON 视图编辑")</div>
-                        }
-                        @foreach (var f in _paramFields)
-                        {
-                            <div class="param-row">
-                                    <label class="param-label" title="@f.DetailsTips">@f.Description</label>
-                                    @if (f.Cate is "select" or "radio")
-                                    {
-                                        <select class="param-input" @bind="f.Value" @bind:event="onchange" @bind:after="() => OnFieldChanged(f)">
-                                            @foreach (var o in f.Options)
-                                            {
-                                                <option value="@o.Value">@o.Key</option>
-                                            }
-                                        </select>
-                                    }
-                                    else if (f.Cate == "unmber")
-                                    {
-                                        <input class="param-input" type="number" step="any" @bind="f.Value" @bind:event="oninput" @bind:after="() => OnFieldChanged(f)" />
-                                    }
-                                    else
-                                    {
-                                        <input class="param-input" @bind="f.Value" @bind:event="oninput" @bind:after="() => OnFieldChanged(f)" />
-                                    }
-                                    @if (f.Error is not null)
-                                    {
-                                        <div class="param-error-inline">@f.Error</div>
-                                    }
-                            </div>
-                        }
-                    </div>
-                }
-                else
-                {
-                    <textarea value="@_configParam" @oninput="OnJsonInput" rows="10" class="mono param-json" placeholder="{ }"></textarea>
-                    @if (_paramJsonError is not null)
-                    {
-                        <div class="param-error">@_paramJsonError</div>
-                    }
-                }
-            </div>
-        </div>
-        <div class="modal-footer">
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="CloseConfigDialog"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveConfigAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_mqTestConfig is not null)
 {
     <ModalDialog Title="@T("生产测试")" TitleIcon="bi-send" OnClose="CloseMqTest">
-        <div class="form-field">
-            <label>@T("Topic")</label>
-            <input @bind="_mqTestTopic" placeholder="topic/test" />
-        </div>
-        <div class="form-field">
-            <label>@T("内容")</label>
-            <textarea @bind="_mqTestContent" rows="3" placeholder="{ }"></textarea>
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("Topic")</label>
+                <input @bind="_mqTestTopic" placeholder="topic/test" />
+            </div>
+            <div class="form-field">
+                <label>@T("内容")</label>
+                <textarea @bind="_mqTestContent" rows="3" placeholder="{ }"></textarea>
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="CloseMqTest"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="RunMqTestAsync" disabled="@_mqTestRunning">
-                <i class="bi bi-play"></i>@(_mqTestRunning ? @T("测试中...") : @T("测试"))
+            <i class="bi bi-play"></i>@(_mqTestRunning ? @T("测试中...") : @T("测试"))
             </button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_daqTestConfig is not null)
 {
     <ModalDialog Title="@(_daqTestMode == "read" ? T("读取测试") : T("写入测试"))" TitleIcon="bi-arrow-down-up" OnClose="CloseDaqTest">
-        @if (!string.IsNullOrEmpty(_daqTestProtocol))
-        {
+        <ChildContent>
+            @if (!string.IsNullOrEmpty(_daqTestProtocol))
+            {
+                <div class="form-field">
+                    <label>@T("插件")</label>
+                    <input value="@_daqTestProtocol" disabled />
+                </div>
+            }
             <div class="form-field">
-                <label>@T("插件")</label>
-                <input value="@_daqTestProtocol" disabled />
+                <label>@T("地址")</label>
+                <input @bind="_daqTestAddress" placeholder="3!40001 / DB5.DBW0" />
             </div>
-        }
-        <div class="form-field">
-            <label>@T("地址")</label>
-            <input @bind="_daqTestAddress" placeholder="3!40001 / DB5.DBW0" />
-        </div>
-        <div class="form-field">
-            <label>@T("类型")</label>
-            <select @bind="_daqTestType">
-                @foreach (var name in Enum.GetNames<DataType>())
-                {
-                    <option value="@name">@name</option>
-                }
-            </select>
-        </div>
-        <div class="form-field">
-            <label>@T("长度")</label>
-            <input type="number" min="1" max="65535" @bind="_daqTestLength" />
-        </div>
-        <div class="form-field">
-            <label>@T("编码")</label>
-            <select @bind="_daqTestEncoding">
-                @foreach (var name in Enum.GetNames<EncodingType>())
-                {
-                    <option value="@name">@name</option>
-                }
-            </select>
-        </div>
-        @if (_daqTestMode == "write")
-        {
             <div class="form-field">
-                <label>@T("值")</label>
-                <input @bind="_daqTestValue" placeholder="0" />
+                <label>@T("类型")</label>
+                <select @bind="_daqTestType">
+                    @foreach (var name in Enum.GetNames<DataType>())
+                    {
+                        <option value="@name">@name</option>
+                    }
+                </select>
             </div>
-        }
-        <div class="modal-footer">
+            <div class="form-field">
+                <label>@T("长度")</label>
+                <input type="number" min="1" max="65535" @bind="_daqTestLength" />
+            </div>
+            <div class="form-field">
+                <label>@T("编码")</label>
+                <select @bind="_daqTestEncoding">
+                    @foreach (var name in Enum.GetNames<EncodingType>())
+                    {
+                        <option value="@name">@name</option>
+                    }
+                </select>
+            </div>
+            @if (_daqTestMode == "write")
+            {
+                <div class="form-field">
+                    <label>@T("值")</label>
+                    <input @bind="_daqTestValue" placeholder="0" />
+                </div>
+            }
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="CloseDaqTest"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="RunDaqTestAsync" disabled="@_daqTestRunning">
-                <i class="bi bi-play"></i>@(_daqTestRunning ? @T("测试中...") : @T("测试"))
+            <i class="bi bi-play"></i>@(_daqTestRunning ? @T("测试中...") : @T("测试"))
             </button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_testResult is not null)
 {
     <ModalDialog Title="@T("测试结果")" TitleIcon="bi-clipboard-check" OnClose="CloseTestResult">
-        <div class="form-field">
-            <span class="tag @(_testResult.Status ? "tag-success" : "tag-danger")">
-                @(_testResult.Status ? T("成功") : T("失败"))
-            </span>
-        </div>
-        <div class="form-field">
-            <label>@T("消息")</label>
-            <div class="mono result-message">@_testResult.Message</div>
-        </div>
-        @if (!string.IsNullOrEmpty(_testResult.Data))
-        {
+        <ChildContent>
             <div class="form-field">
-                <label>@T("数据")</label>
-                <pre class="mono">@_testResult.Data</pre>
+                <span class="tag @(_testResult.Status ? "tag-success" : "tag-danger")">
+                    @(_testResult.Status ? T("成功") : T("失败"))
+                </span>
             </div>
-        }
-        <div class="modal-footer">
+            <div class="form-field">
+                <label>@T("消息")</label>
+                <div class="mono result-message">@_testResult.Message</div>
+            </div>
+            @if (!string.IsNullOrEmpty(_testResult.Data))
+            {
+                <div class="form-field">
+                    <label>@T("数据")</label>
+                    <pre class="mono">@_testResult.Data</pre>
+                </div>
+            }
+        </ChildContent>
+        <Footer>
             <button class="btn btn-primary" @onclick="CloseTestResult"><i class="bi bi-check-lg"></i>@T("关闭")</button>
-</div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -363,59 +371,63 @@
 @if (_autoPackConfig is not null)
 {
     <ModalDialog Title="@T("组包设置")" TitleIcon="bi-boxes" OnClose="CloseAutoPack">
-        <div class="form-field">
-            <label>@T("单次批量读取的最大字节数")</label>
-            <input type="number" @bind="_autoPackMaxByteLength" />
-        </div>
-        <div class="form-field">
-            <label>@T("数据字节序格式")</label>
-            <select @bind="_autoPackFormat">
-                @foreach (var fmt in Enum.GetNames(typeof(DataFormat)))
-                {
-                    <option value="@fmt">@fmt</option>
-                }
-            </select>
-        </div>
-        <div class="form-field">
-            <label>@T("String解包是否按字反转字节")</label>
-            <input type="checkbox" @bind="_isStringReverseByteWord" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("单次批量读取的最大字节数")</label>
+                <input type="number" @bind="_autoPackMaxByteLength" />
+            </div>
+            <div class="form-field">
+                <label>@T("数据字节序格式")</label>
+                <select @bind="_autoPackFormat">
+                    @foreach (var fmt in Enum.GetNames(typeof(DataFormat)))
+                    {
+                        <option value="@fmt">@fmt</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@T("String解包是否按字反转字节")</label>
+                <input type="checkbox" @bind="_isStringReverseByteWord" />
+            </div>
+        </ChildContent>
+        <Footer>
             @if (_autoPackConfig.AutoPack is not null)
             {
-                <button class="btn btn-danger" @onclick="RemoveAutoPackAsync"><i class="bi bi-trash"></i>@T("移除组包")</button>
+            <button class="btn btn-danger" @onclick="RemoveAutoPackAsync"><i class="bi bi-trash"></i>@T("移除组包")</button>
             }
             <span class="spacer"></span>
             <button class="btn" @onclick="CloseAutoPack"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveAutoPackAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_webApiConfig is not null)
 {
     <ModalDialog Title="@T("WebApi 设置")" TitleIcon="bi-globe" OnClose="CloseWebApi">
-        <div class="form-field">
-            <label>@T("Ip 地址")</label>
-            <input @bind="_webApiIp" />
-        </div>
-        <div class="form-field">
-            <label>@T("端口")</label>
-            <input type="number" @bind="_webApiPort" />
-        </div>
-        <div class="form-field">
-            <label>@T("跨域")</label>
-            <input type="checkbox" @bind="_webApiCrossDomain" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("Ip 地址")</label>
+                <input @bind="_webApiIp" />
+            </div>
+            <div class="form-field">
+                <label>@T("端口")</label>
+                <input type="number" @bind="_webApiPort" />
+            </div>
+            <div class="form-field">
+                <label>@T("跨域")</label>
+                <input type="checkbox" @bind="_webApiCrossDomain" />
+            </div>
+        </ChildContent>
+        <Footer>
             @if (_webApiConfig.WebApi is not null)
             {
-                <button class="btn btn-danger" @onclick="RemoveWebApiAsync"><i class="bi bi-trash"></i>@T("移除 WebApi")</button>
+            <button class="btn btn-danger" @onclick="RemoveWebApiAsync"><i class="bi bi-trash"></i>@T("移除 WebApi")</button>
             }
             <span class="spacer"></span>
             <button class="btn" @onclick="CloseWebApi"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveWebApiAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -537,10 +549,10 @@
     /// <summary>全局互斥回调：其他菜单打开前先收起本页菜单</summary>
     private void CloseMenu()
     {
-        if (_pluginActionsOpen.Count > 0 || _configActionsOpen.Count > 0)
+        if (_pluginAction is not null || _configAction is not null)
         {
-            _pluginActionsOpen.Clear();
-            _configActionsOpen.Clear();
+            _pluginAction = null;
+            _configAction = null;
             InvokeAsync(StateHasChanged);
         }
     }
@@ -562,7 +574,7 @@
         base.Dispose();
         MenuCoordinator.Unregister(CloseMenu);
         // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef, _outsideClickOwner);
         _jsRef = null;
         // 页面销毁时清理热更新挂起的临时目录（切页放弃上传）
         var pending = _pendingHotUpdate;
@@ -575,59 +587,61 @@
     }
 
     /// <summary>配置卡片操作按钮展开状态（⋯ 点击展开，区域外点击收起，移出不关闭）</summary>
-    private readonly Dictionary<string, bool> _configActionsOpen = new();
-    private readonly Dictionary<string, bool> _pluginActionsOpen = new();
+    private PluginConfigModel? _configAction;
+    private PluginListModel? _pluginAction;
+    /// <summary>该组件监听的唯一身份，防止延迟释放误删其他页面的监听。</summary>
+    private readonly string _outsideClickOwner = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<PluginSettingsPage>? _jsRef;
 
-    private bool IsConfigActionsOpen(PluginConfigModel item) => _configActionsOpen.GetValueOrDefault(item.Guid);
+    private bool IsConfigActionsOpen(PluginConfigModel item) => ReferenceEquals(_configAction, item);
 
     private async Task ToggleConfigActions(PluginConfigModel item)
     {
         // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         // 互斥：展开新项前先收起其他项（含插件卡片菜单）
-        var open = !_configActionsOpen.GetValueOrDefault(item.Guid);
-        _configActionsOpen.Clear();
-        _pluginActionsOpen.Clear();
-        if (open) _configActionsOpen[item.Guid] = true;
+        var open = !ReferenceEquals(_configAction, item);
+        _configAction = null;
+        _pluginAction = null;
+        if (open) _configAction = item;
         if (open)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
-    private bool IsPluginActionsOpen(PluginListModel item) => _pluginActionsOpen.GetValueOrDefault(item.Name);
+    private bool IsPluginActionsOpen(PluginListModel item) => ReferenceEquals(_pluginAction, item);
 
     private async Task TogglePluginActions(PluginListModel item)
     {
         // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         // 互斥：展开新项前先收起其他项（含配置卡片菜单）
-        var open = !_pluginActionsOpen.GetValueOrDefault(item.Name);
-        _pluginActionsOpen.Clear();
-        _configActionsOpen.Clear();
-        if (open) _pluginActionsOpen[item.Name] = true;
+        var open = !ReferenceEquals(_pluginAction, item);
+        _pluginAction = null;
+        _configAction = null;
+        if (open) _pluginAction = item;
         if (open)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
     [JSInvokable]
     public void CloseAllActions()
     {
-        _configActionsOpen.Clear();
-        _pluginActionsOpen.Clear();
+        _configAction = null;
+        _pluginAction = null;
         InvokeAsync(StateHasChanged);
     }
 
@@ -664,8 +678,6 @@
         Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
     private static readonly System.Text.RegularExpressions.Regex PluginNameRegex = new(@"^[A-Za-z0-9_\-\.]+$");
-    private const long MaxExtractBytes = 200L * 1024 * 1024;
-    private const int MaxExtractEntries = 5000;
 
     /// <summary>点击"上传插件"按钮 → 触发隐藏的文件选择框</summary>
     private async Task TriggerUploadAsync()
@@ -708,47 +720,26 @@
         }
 
         _uploading = true;
-        // 清理历史异常退出遗留的临时解压目录（同目录枚举，不误伤正式插件）
-        foreach (var leftover in Directory.GetDirectories(typePath, ".upload-tmp-*"))
-        {
-            try { Directory.Delete(leftover, true); } catch { /* 被占用/权限问题忽略，下次再清 */ }
-        }
         // 临时解压目录必须与目标 lib 目录同卷：系统临时目录（C:\Temp 或 /tmp）与数据目录
         // 分属不同卷/挂载点时 Directory.Move 抛 "Move will not work across volumes"。
         // 放在 typePath 下（与最终 libPath 同目录）保证同卷且 rename 原子。
         var tempPath = Path.Combine(typePath, ".upload-tmp-" + Guid.NewGuid().ToString("N"));
+        var zipPath = tempPath + ".zip";
         try
         {
             // 1. 先解压到临时目录（ZipSlip 校验 + zip 炸弹防护）
             Directory.CreateDirectory(tempPath);
             await using (var stream = file.OpenReadStream(maxAllowedSize: 100 * 1024 * 1024))
             {
-                var zipPath = Path.Combine(tempPath, "plugin.zip");
                 await using (var fs = File.Create(zipPath))
                     await stream.CopyToAsync(fs);
-                using var zip = ZipFile.OpenRead(zipPath);
-                long totalBytes = 0;
-                if (zip.Entries.Count > MaxExtractEntries)
-                    throw new InvalidDataException(T("压缩包条目过多"));
-                var extractRoot = Path.GetFullPath(tempPath);
-                var extractPrefix = extractRoot + Path.DirectorySeparatorChar;
-                foreach (var entry in zip.Entries)
-                {
-                    totalBytes += entry.Length;
-                    if (totalBytes > MaxExtractBytes)
-                        throw new InvalidDataException(T("解压后体积超过限制"));
-                    var dest = Path.GetFullPath(Path.Combine(tempPath, entry.FullName));
-                    if (!dest.Equals(extractRoot, StringComparison.OrdinalIgnoreCase) &&
-                        !dest.StartsWith(extractPrefix, StringComparison.OrdinalIgnoreCase))
-                        throw new InvalidDataException("非法的压缩包路径");
-                }
-                ZipFile.ExtractToDirectory(zipPath, tempPath, true);
+                await PluginArchive.ExtractAsync(zipPath, tempPath);
                 File.Delete(zipPath);
             }
 
             // 2. 在临时目录先 InitPlugin 探测验证，成功后才进入 lib 目录
             var iName = string.Format("Snet.Model.interface.I{0}", type);
-            var result = PluginHandlerCore.PluginOperate.InitPlugin(tempPath, iName);
+            var result = await PluginHandlerCore.ProbePluginAsync(tempPath, iName);
             if (result.Count == 0)
             {
                 _uploadStatus = new UploadStatus(T("插件上传失败，未检索到对应接口"), true);
@@ -773,6 +764,11 @@
         }
         finally
         {
+            if (File.Exists(zipPath))
+            {
+                try { File.Delete(zipPath); }
+                catch (IOException ex) { await Snet.Log.LogHelper.ErrorAsync($"上传临时压缩包清理失败: {ex.Message}"); }
+            }
             if (_pendingHotUpdate is null)
             {
                 if (Directory.Exists(tempPath))
@@ -793,8 +789,10 @@
     {
         var typePath = Path.Combine(WebPaths.FilePath, type.ToString().ToLower());
         var libPath = Path.Combine(typePath, zipName);
+        await PluginHandlerCore.MutationGate.WaitAsync();
         var stoppedDevices = new List<DeviceRuntime>();
         string? backupPath = null;
+        string[] suspendedServers = [];
         try
         {
             if (hotUpdate)
@@ -804,7 +802,7 @@
                 // 卸载程序集前优雅停止 UA/MQTT 服务端：释放监听端口。
                 // 否则旧服务端 socket 僵尸占用端口（程序集卸载后无法优雅关闭），
                 // 新服务端绑定失败，客户端连上僵尸报 "Unexpected error while processing a Hello message" / BadDecodingError
-                try { await Hosted.StopServerServicesAsync(); }
+                try { suspendedServers = await Hosted.SuspendServerServicesAsync(); }
                 catch (Exception ex) { Toast.Warning(T("服务端停止失败") + ": " + ex.Message); }
                 // 旧目录先原子让位（同盘 rename）：新包 Move 失败时立即恢复，旧插件不毁
                 backupPath = libPath + ".old-" + Guid.NewGuid().ToString("N")[..8];
@@ -828,7 +826,7 @@
 
             var names = new List<string>();
             // 落盘用副本：界面列表保持旧引用——上传成功不自动刷新列表，由工具栏"刷新"按钮手动加载
-            var newList = _plugins.ToList();
+            var newList = LoadPluginList();
             foreach (var (model, _) in result)
             {
                 model.Path = libPath;
@@ -840,13 +838,13 @@
             var iName = string.Format("Snet.Model.interface.I{0}", type);
             try
             {
-                // 探测阶段注册的是临时路径；先移除旧/临时注册，再从最终目录注册并验证。
+                // 独立探测不改变正式注册；替换前卸载旧包，再从最终目录注册并验证。
                 foreach (var name in names.Concat(
-                    _plugins.Where(p => SamePluginPath(p.PluginDetails?.Path, libPath)).Select(p => p.Name)).Distinct())
+                    newList.Where(p => SamePluginPath(p.PluginDetails?.Path, libPath)).Select(p => p.Name)).Distinct())
                 {
                     try { await PluginHandlerCore.PluginOperate.RemovePluginAsync(name); } catch { /* 未注册忽略 */ }
                 }
-                var registered = PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
+                var registered = await PluginHandlerCore.PluginOperate.InitPluginAsync(libPath, iName);
                 if (registered.Count == 0)
                     throw new InvalidDataException(string.Format(T("插件最终目录未检索到接口：{0}"), iName));
                 await SavePluginListAsync(newList);
@@ -874,7 +872,7 @@
                 {
                     Directory.Move(backupPath, libPath);
                     backupPath = null;
-                    PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
+                    await PluginHandlerCore.PluginOperate.InitPluginAsync(libPath, iName);
                 }
                 throw;
             }
@@ -900,15 +898,23 @@
         }
         finally
         {
-            if (hotUpdate)
+            PluginHandlerCore.MutationGate.Release();
+            foreach (var kind in suspendedServers)
             {
-                try { await Hosted.InitServerServicesAsync(); }
+                try
+                {
+                    var started = await Hosted.StartServerAsync(kind);
+                    if (!started.Ok) Toast.Warning(started.Message);
+                }
                 catch (Exception ex) { Toast.Warning(T("热更新后服务端恢复失败") + ": " + ex.Message); }
             }
             // 恢复热更新前正在运行的设备（只恢复本次停掉的，不复活用户手动停止的）。
             // 对齐 WPF PrivateInit：更新完成后走 Retry（重置计时 → 停止 → 用新插件重建 handler 后启动采集）
             foreach (var rt in stoppedDevices)
-                await rt.RetryAsync();
+            {
+                try { await rt.RetryAsync(); }
+                catch (Exception ex) { await Snet.Log.LogHelper.ErrorAsync($"恢复设备失败: {rt.DeviceName}, {ex.Message}"); }
+            }
             // 感知更新：同步设备底层版本号（设备卡展示热更新后的新版本）
             AppState.NotifyEntityChanged();
         }
@@ -988,53 +994,39 @@
         _confirmRemove = true;
     }
 
+    /// <summary>串行卸载插件并提交最新清单；失败保留列表，避免隐藏仍然加载的插件或覆盖其他会话的变更。</summary>
     private async Task ConfirmRemoveAsync()
     {
         var selected = _removingPlugin;
         _confirmRemove = false;
         _removingPlugin = null;
-        var sharedCount = _removingSharedCount;
         _removingSharedCount = 0;
         if (selected is null) return;
-        await OperateInfoAsync($"移除插件：{selected.Name}");
-        var path = selected.PluginDetails?.Path;
-        var coreOk = false;
+        await PluginHandlerCore.MutationGate.WaitAsync();
         try
         {
-            // 停用相关设备（对齐 WPF 按 Path 停设备：同包内所有插件名的设备都受影响）。
-            // 包名 = 插件目录名（lib/{type}/{包名}），类名→包名映射由 RuntimeManager 统一处理
-            var packName = string.IsNullOrEmpty(path)
-                ? selected.Name
-                : Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
+            await OperateInfoAsync($"移除插件：{selected.Name}");
+            var path = selected.PluginDetails?.Path;
+            var packName = string.IsNullOrEmpty(path) ? selected.Name : Path.GetFileName(Path.TrimEndingDirectorySeparator(path));
             await RuntimeManager.StopDevicesUsingPluginAsync(selected.Type, packName);
-            // 传 className（Core 按插件名实时扫描 lib 目录定位），传路径会查不到导致永远失败
-            coreOk = await PluginHandlerCore.PluginOperate.RemovePluginAsync(selected.Name);
-            if (coreOk && !string.IsNullOrEmpty(path) && Directory.Exists(path))
-            {
-                try
-                {
-                    Directory.Delete(path, true);
-                }
-                catch (Exception ex)
-                {
-                    Toast.Warning(T("插件目录清理失败") + ": " + ex.Message + "，" + T("重启服务器后可彻底清理"));
-                }
-            }
+            var removed = await PluginHandlerCore.PluginOperate.RemovePluginAsync(selected.Name);
+            if (!removed && !string.IsNullOrEmpty(path) && Directory.Exists(path))
+                throw new IOException(T("插件移除失败"));
+            if (!string.IsNullOrEmpty(path) && Directory.Exists(path)) Directory.Delete(path, true);
+            var current = LoadPluginList();
+            current.RemoveAll(p => SamePluginPath(p.PluginDetails?.Path, path) || p.Name == selected.Name);
+            await SavePluginListAsync(current);
+            _plugins = current;
+            _uploadStatus = new UploadStatus(string.Format(T("插件已移除：{0}"), selected.Name), false);
+            Toast.Success(T("插件移除成功"));
+            AppState.NotifyEntityChanged();
         }
         catch (Exception ex)
         {
+            _uploadStatus = new UploadStatus(T("插件移除失败") + ": " + ex.Message, true);
             Toast.Error(T("插件移除失败") + ": " + ex.Message);
         }
-        // 无论 Core 调用结果如何，列表与配置文件都要同步（目录可能已删，避免残留幽灵条目）：
-        // 同 Path 的其余插件一并移除（对齐 WPF 倒序删除同路径条目）
-        var removedCount = _plugins.RemoveAll(p => SamePluginPath(p.PluginDetails?.Path, path));
-        try { await SavePluginListAsync(); } catch { /* 文件写失败下次刷新纠正 */ }
-        _uploadStatus = new UploadStatus(coreOk
-            ? string.Format(T("插件已移除：{0}"), removedCount > 1 ? $"{selected.Name} 等 {removedCount} 个插件" : selected.Name)
-            : string.Format(T("插件目录移除失败（列表已清理）：{0}"), selected.Name), !coreOk);
-        Toast.Success(coreOk ? T("插件移除成功") : T("插件已从列表移除，目录清理失败"));
-        // 感知更新：使用该插件的设备配置可能已失效，刷新项目树引用
-        AppState.NotifyEntityChanged();
+        finally { PluginHandlerCore.MutationGate.Release(); }
         StateHasChanged();
     }
 

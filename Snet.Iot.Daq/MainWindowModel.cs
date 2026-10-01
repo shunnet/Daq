@@ -1,10 +1,12 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using Microsoft.Extensions.DependencyInjection;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
 using Snet.Iot.Daq.view;
 using Snet.Iot.Daq.viewModel;
 using Snet.Model.data;
 using Snet.Windows.Controls.handler;
+using Snet.Windows.Core.handler;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Windows;
@@ -155,16 +157,26 @@ namespace Snet.Iot.Daq
         /// <summary>
         /// 关闭应用程序，设置强制关闭标志后执行退出
         /// </summary>
-        /// <returns>已完成的任务</returns>
-        private Task CloseAsync()
+        /// <returns>完成运行资源清理并请求应用退出的任务。</returns>
+        private async Task CloseAsync()
         {
+            // 只获取已登记的控制台，不在退出时创建新的监控或服务端实例。
+            if (InjectionWpf.ExistService<ConsoleModel>())
+            {
+                var console = InjectionWpf.GetProvider().GetService<ConsoleModel>();
+                if (console is not null) await console.DisposeAsync();
+            }
+            if (InjectionWpf.ExistService<PluginBrowseModel>())
+            {
+                var browser = InjectionWpf.GetProvider().GetService<PluginBrowseModel>();
+                if (browser is not null) await browser.DisposeAsync();
+            }
             // 设置强制关闭标志，避免 OnClosing 拦截
             if (Application.Current.MainWindow is MainWindow mainWindow)
             {
                 mainWindow.IsForceClose = true;
             }
             Application.Current.Shutdown();
-            return Task.CompletedTask;
         }
     }
 }

@@ -133,9 +133,13 @@ namespace Snet.Iot.Daq.Core.data
         [Description("子设备详情")]
         public ObservableCollection<IProjectDetailsTreeViewModel> Details
         {
-            get => GetProperty(() => Details);
-            set => SetProperty(() => Details, value);
+            get => details;
+            set => SetProperty(ref details, value ?? new ObservableCollection<IProjectDetailsTreeViewModel>());
         }
+        /// <summary>新设备默认拥有空详情集合，导入 null 时归一化为空；仅公开属性参与序列化。</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        [Newtonsoft.Json.JsonIgnore]
+        private ObservableCollection<IProjectDetailsTreeViewModel> details = new();
 
         /// <summary>
         /// 随软启动状态<br/>

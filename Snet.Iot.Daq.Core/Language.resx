@@ -1702,4 +1702,16 @@
   <data name="[{0}] UA 层级清理异常: {1}" xml:space="preserve">
     <value>[{0}] UA 层级清理异常: {1}</value>
   </data>
+  <data name="地址长度必须大于零" xml:space="preserve">
+    <value>地址长度必须大于零</value>
+  </data>
+  <data name="地址、别名和长度必须有效" xml:space="preserve">
+    <value>地址、别名和长度必须有效</value>
+  </data>
+  <data name="服务已停止" xml:space="preserve">
+    <value>服务已停止</value>
+  </data>
+  <data name="添加失败" xml:space="preserve">
+    <value>添加失败</value>
+  </data>
 </root>

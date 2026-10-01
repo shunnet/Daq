@@ -23,12 +23,24 @@ namespace Snet.Iot.Daq.handler
         /// <param name="keySelectors">查重字段选择器（可多个）</param>
         public static BatchInsertResult InsertUnique<T, TKey>(SQLiteConnection db, IEnumerable<T> items, params Func<T, TKey>[] keySelectors) where T : class, new()
         {
-            return ProjectHandlerCore.InsertUnique(
+            var inserted = new List<T>();
+            var result = ProjectHandlerCore.InsertUnique(
                 db,
                 GlobalConfigModel.DbLock,
                 items,
-                onInserted: item => (item as IAddressModel)?.SetAddress(),
+                onInserted: inserted.Add,
                 keySelectors);
+            foreach (var item in inserted.OfType<IAddressModel>())
+            {
+                GlobalConfigModel.AddressDict[item.Guid] = item;
+                _ = item.OnInfoEventHandlerAsync(item, EventInfoResult.CreateSuccessResult("set event"))
+                    .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
+            }
+            // 批量导入全部提交后只刷新一次，避免每个地址重复重载所有设备。
+            if (inserted.Count > 0)
+                _ = GlobalConfigModel.RefreshAsync()
+                    .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
+            return result;
         }
 
         /// <summary>
@@ -48,7 +60,7 @@ namespace Snet.Iot.Daq.handler
                 GlobalConfigModel.AddressDict[item.Guid] = item;
                 _ = GlobalConfigModel.AddressDict[item.Guid]
                     .OnInfoEventHandlerAsync(item, EventInfoResult.CreateSuccessResult("set event"))
-                    .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message), TaskContinuationOptions.OnlyOnFaulted);
+                    .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
             }
             return GlobalConfigModel.AddressDict;
         }
@@ -63,9 +75,9 @@ namespace Snet.Iot.Daq.handler
             GlobalConfigModel.AddressDict[address.Guid] = address;
             _ = GlobalConfigModel.AddressDict[address.Guid]
                 .OnInfoEventHandlerAsync(address, EventInfoResult.CreateSuccessResult("set event"))
-                .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message), TaskContinuationOptions.OnlyOnFaulted);
+                .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
             _ = GlobalConfigModel.RefreshAsync()
-                .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message), TaskContinuationOptions.OnlyOnFaulted);
+                .ContinueWith(t => Snet.Log.LogHelper.Error(t.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
         }
 
         /// <summary>

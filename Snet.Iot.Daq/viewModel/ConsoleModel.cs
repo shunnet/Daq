@@ -26,7 +26,7 @@ namespace Snet.Iot.Daq.viewModel
     /// <summary>
     /// 控制台视图模型，负责系统监控信息显示、OPC UA/MQTT 服务端管理、日志输出以及采集设备运行状态的综合管理。
     /// </summary>
-    public class ConsoleModel : BindNotify
+    public class ConsoleModel : BindNotify, IDisposable, IAsyncDisposable
     {
         #region 构造函数
         /// <summary>
@@ -34,9 +34,26 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public ConsoleModel()
         {
-            _ = InitAsync();
+            _initializationTask = InitializeObservedAsync();
         }
         #endregion
+
+        /// <summary>初始化、系统采样和清理均由视图模型持有，应用退出时等待任务结束。</summary>
+        private readonly Task _initializationTask;
+        private Task? _monitorTask;
+        private readonly SemaphoreSlim _refreshGate = new(1, 1);
+        private readonly SemaphoreSlim _serverGate = new(1, 1);
+        private readonly object _disposalGate = new();
+        private Task? _disposalTask;
+        private int _stopping;
+
+        /// <summary>观察构造时启动的初始化；错误记录到日志，避免丢弃任务导致异常无人处理。</summary>
+        private async Task InitializeObservedAsync()
+        {
+            try { await InitAsync(); }
+            catch (OperationCanceledException) when (globalToken.IsCancellationRequested) { }
+            catch (Exception ex) { LogHelper.Error($"控制台初始化失败: {ex.Message}"); }
+        }
 
         #region 监控信息
 
@@ -96,11 +113,12 @@ namespace Snet.Iot.Daq.viewModel
                 await Task.Run(async () =>
                 {
                     // 在循环外分配字典，避免每次迭代产生 GC 压力
-                    Dictionary<string, double> values = new Dictionary<string, double>(4);
+                    System.Collections.Concurrent.ConcurrentDictionary<string, double> values = new();
 
                     using var timer = new PeriodicTimer(TimeSpan.FromMilliseconds(200));
                     while (await timer.WaitForNextTickAsync(token))
                     {
+                        values.Clear(); // 每次采样独立，缺失传感器不沿用上次数据。
                         HardwareData hardwareData = systemMonitoring.GetInfo();
 
                         foreach (var iteminfolist in hardwareData.Info)
@@ -110,7 +128,7 @@ namespace Snet.Iot.Daq.viewModel
                                 foreach (var item in iteminfolist.Values)
                                 {
                                     if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
-                                        && item.Key.Equals("负载,Memory") && value > 0)
+                                        && item.Key.Equals("负载,Memory") && double.IsFinite(value))
                                     {
                                         values["RAM"] = value;
                                     }
@@ -121,7 +139,7 @@ namespace Snet.Iot.Daq.viewModel
                                 foreach (var item in iteminfolist.Values)
                                 {
                                     if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
-                                        && item.Key.Equals("负载,GPU Core") && value > 0)
+                                        && item.Key.Equals("负载,GPU Core") && double.IsFinite(value))
                                     {
                                         values["Gpu"] = value;
                                     }
@@ -132,14 +150,14 @@ namespace Snet.Iot.Daq.viewModel
                                 foreach (var item in iteminfolist.Values)
                                 {
                                     if (double.TryParse(item.Value, System.Globalization.CultureInfo.InvariantCulture, out double value)
-                                        && item.Key.Equals("负载,CPU Total") && value > 0)
+                                        && item.Key.Equals("负载,CPU Total") && double.IsFinite(value))
                                     {
                                         values["Cpu"] = value;
                                     }
                                 }
                             }
                         }
-                        if (values.Count == 3)
+                        if (!values.IsEmpty)
                         {
                             foreach (var item in values)
                             {
@@ -272,6 +290,18 @@ namespace Snet.Iot.Daq.viewModel
         IAsyncRelayCommand p_MqttServerStart;
         public async Task MqttServerStartAsync()
         {
+            await _serverGate.WaitAsync();
+            try
+            {
+                if (Volatile.Read(ref _stopping) != 0) return;
+                await MqttServerStartCoreAsync();
+            }
+            finally { _serverGate.Release(); }
+        }
+
+        /// <summary>在服务端生命周期门内执行实际操作；调用方拥有该门。</summary>
+        private async Task MqttServerStartCoreAsync()
+        {
             if (GlobalConfigModel.mqttService is null)
             {
                 GlobalConfigModel.param.SetBasics(new MqttServiceData.Basics());
@@ -286,7 +316,8 @@ namespace Snet.Iot.Daq.viewModel
                     }
                     FileHandler.StringToFile(GlobalConfigModel.MqttServerConfigPath, basics.ToJson(true));
 
-                    await MqttServerInitAsync();
+                    await MqttServerInitCoreAsync();
+                    globalToken.Token.ThrowIfCancellationRequested();
                     await RefreshAsync();
                 }
             }
@@ -301,6 +332,18 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         /// <returns></returns>
         private async Task MqttServerInitAsync()
+        {
+            await _serverGate.WaitAsync();
+            try
+            {
+                if (Volatile.Read(ref _stopping) != 0) return;
+                await MqttServerInitCoreAsync();
+            }
+            finally { _serverGate.Release(); }
+        }
+
+        /// <summary>在服务端生命周期门内执行实际操作；调用方拥有该门。</summary>
+        private async Task MqttServerInitCoreAsync()
         {
             if (File.Exists(GlobalConfigModel.MqttServerConfigPath))
             {
@@ -336,13 +379,29 @@ namespace Snet.Iot.Daq.viewModel
         IAsyncRelayCommand p_MqttServerStop;
         public async Task MqttServerStopAsync()
         {
+            await _serverGate.WaitAsync();
+            try
+            {
+                if (Volatile.Read(ref _stopping) != 0) return;
+                await MqttServerStopCoreAsync();
+            }
+            finally { _serverGate.Release(); }
+        }
+
+        /// <summary>在服务端生命周期门内执行实际操作；调用方拥有该门。</summary>
+        private async Task MqttServerStopCoreAsync()
+        {
             if (GlobalConfigModel.mqttService is not null)
             {
-                OperateResult result = await GlobalConfigModel.mqttService.OffAsync();
-                await ShowAsync(result.ToJson(true));
-                GlobalConfigModel.mqttService.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
-                await GlobalConfigModel.mqttService.DisposeAsync();
+                var service = GlobalConfigModel.mqttService;
                 GlobalConfigModel.mqttService = null;
+                service.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
+                try
+                {
+                    OperateResult result = await service.OffAsync();
+                    await ShowAsync(result.ToJson(true));
+                }
+                finally { await service.DisposeAsync(); }
                 await RefreshAsync();
             }
             else
@@ -378,6 +437,18 @@ namespace Snet.Iot.Daq.viewModel
         IAsyncRelayCommand p_OpcUaServerStart;
         public async Task OpcUaServerStartAsync()
         {
+            await _serverGate.WaitAsync();
+            try
+            {
+                if (Volatile.Read(ref _stopping) != 0) return;
+                await OpcUaServerStartCoreAsync();
+            }
+            finally { _serverGate.Release(); }
+        }
+
+        /// <summary>在服务端生命周期门内执行实际操作；调用方拥有该门。</summary>
+        private async Task OpcUaServerStartCoreAsync()
+        {
             if (GlobalConfigModel.uaService is null)
             {
                 GlobalConfigModel.param.SetBasics(new OpcUaServiceData.Basics());
@@ -392,7 +463,8 @@ namespace Snet.Iot.Daq.viewModel
                     }
                     FileHandler.StringToFile(GlobalConfigModel.UaServerConfigPath, basics.ToJson(true));
 
-                    await OpcUaServerInitAsync();
+                    await OpcUaServerInitCoreAsync();
+                    globalToken.Token.ThrowIfCancellationRequested();
                     await RefreshAsync();
                 }
             }
@@ -407,6 +479,18 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         /// <returns></returns>
         private async Task OpcUaServerInitAsync()
+        {
+            await _serverGate.WaitAsync();
+            try
+            {
+                if (Volatile.Read(ref _stopping) != 0) return;
+                await OpcUaServerInitCoreAsync();
+            }
+            finally { _serverGate.Release(); }
+        }
+
+        /// <summary>在服务端生命周期门内执行实际操作；调用方拥有该门。</summary>
+        private async Task OpcUaServerInitCoreAsync()
         {
             if (File.Exists(GlobalConfigModel.UaServerConfigPath))
             {
@@ -442,13 +526,29 @@ namespace Snet.Iot.Daq.viewModel
         IAsyncRelayCommand p_OpcUaServerStop;
         public async Task OpcUaServerStopAsync()
         {
+            await _serverGate.WaitAsync();
+            try
+            {
+                if (Volatile.Read(ref _stopping) != 0) return;
+                await OpcUaServerStopCoreAsync();
+            }
+            finally { _serverGate.Release(); }
+        }
+
+        /// <summary>在服务端生命周期门内执行实际操作；调用方拥有该门。</summary>
+        private async Task OpcUaServerStopCoreAsync()
+        {
             if (GlobalConfigModel.uaService is not null)
             {
-                OperateResult result = await GlobalConfigModel.uaService.OffAsync();
-                await ShowAsync(result.ToJson(true));
-                GlobalConfigModel.uaService.OnInfoEventAsync -= UaService_OnInfoEventAsync;
-                await GlobalConfigModel.uaService.DisposeAsync();
+                var service = GlobalConfigModel.uaService;
                 GlobalConfigModel.uaService = null;
+                service.OnInfoEventAsync -= UaService_OnInfoEventAsync;
+                try
+                {
+                    OperateResult result = await service.OffAsync();
+                    await ShowAsync(result.ToJson(true));
+                }
+                finally { await service.DisposeAsync(); }
                 await RefreshAsync();
             }
             else
@@ -462,11 +562,19 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Refresh => refresh ??= new AsyncRelayCommand(GlobalConfigModel.RefreshAsyncFunc ??= RefreshAsync);
         private IAsyncRelayCommand refresh;
+        /// <summary>串行同步设备集合；等待前后检查退出状态，避免多个刷新创建同一设备或在关闭后启动设备。</summary>
         public async Task RefreshAsync()
         {
-            List<IProjectTreeViewModel> devices = GlobalConfigModel.ProjectDict.GetAllDeviceNodes();
-            await ShowAsync(devices.Count + " " + "台设备已成功加载".GetLanguageValue(App.LanguageOperate));
-            await SyncDevicesAsync(devices, Devices, ResultAsync, ShowAsync);
+            if (Volatile.Read(ref _stopping) != 0) return;
+            await _refreshGate.WaitAsync();
+            try
+            {
+                if (Volatile.Read(ref _stopping) != 0) return;
+                List<IProjectTreeViewModel> devices = GlobalConfigModel.ProjectDict.GetAllDeviceNodes();
+                await ShowAsync(devices.Count + " " + "台设备已成功加载".GetLanguageValue(App.LanguageOperate));
+                await SyncDevicesAsync(devices, Devices, ResultAsync, ShowAsync);
+            }
+            finally { _refreshGate.Release(); }
         }
 
         /// <summary>
@@ -486,7 +594,7 @@ namespace Snet.Iot.Daq.viewModel
                 return;
 
             //构建 guid → device 索引，避免 O(n2) 查找
-            var deviceMap = new Dictionary<string, ConsoleDevice>(uiDevices.Count);
+            var deviceMap = new System.Collections.Concurrent.ConcurrentDictionary<string, ConsoleDevice>();
             foreach (var d in uiDevices)
                 deviceMap[d.DataContext.GetSource<ConsoleDeviceModel>().ToString()] = d;
 
@@ -589,8 +697,9 @@ namespace Snet.Iot.Daq.viewModel
         private async Task InitAsync()
         {
             // 界面消息处理
-            uiMessage.OnInfoEventAsync += async (object? sender, Model.data.EventInfoResult e) => Info = e.Message;
+            uiMessage.OnInfoEventAsync += UiMessage_OnInfoEventAsync;
             await uiMessage.StartAsync();
+            globalToken.Token.ThrowIfCancellationRequested();
 
             // 图表操作
             chartOperate = ChartOperate.Instance(new()
@@ -608,13 +717,15 @@ namespace Snet.Iot.Daq.viewModel
             systemMonitoring = SystemMonitoring.Instance();
 
             // 更新系统检测值
-            _ = UpdateSystemMonitoringValueAsync(globalToken.Token).ConfigureAwait(false);
+            _monitorTask = UpdateSystemMonitoringValueAsync(globalToken.Token);
 
             //OPCUA服务端启动
             await OpcUaServerInitAsync();
+            globalToken.Token.ThrowIfCancellationRequested();
 
             //Mqtt服务端启动
             await MqttServerInitAsync();
+            globalToken.Token.ThrowIfCancellationRequested();
 
             //赋值插件信息
             GlobalConfigModel.RefreshAsyncFunc = RefreshAsync;
@@ -623,5 +734,77 @@ namespace Snet.Iot.Daq.viewModel
             await RefreshAsync();
         }
         #endregion
+        /// <summary>把信息处理器事件转换为绑定文本；命名委托用于退出时准确退订。</summary>
+        private Task UiMessage_OnInfoEventAsync(object? sender, EventInfoResult e)
+        {
+            Info = e.Message;
+            return Task.CompletedTask;
+        }
+
+        /// <summary>同步容器兼容入口只启动并观察清理；正常应用退出必须先等待 DisposeAsync。</summary>
+        public void Dispose()
+        {
+            _ = DisposeAsync().AsTask().ContinueWith(task => LogHelper.Error($"控制台退出清理失败: {task.Exception}"),
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously);
+        }
+
+        /// <summary>进入终态并共同等待初始化、采样、设备及服务端的释放；UI 调用须异步等待，以允许已排队绘图完成。</summary>
+        public ValueTask DisposeAsync()
+        {
+            lock (_disposalGate)
+            {
+                Volatile.Write(ref _stopping, 1);
+                return new ValueTask(_disposalTask ??= DisposeCoreAsync());
+            }
+        }
+
+        /// <summary>取消后台采样后逐项清理；一个插件异常不阻止其余设备或服务端退出。</summary>
+        private async Task DisposeCoreAsync()
+        {
+            await Task.Yield();
+            async Task ReleaseAsync(Func<Task> action)
+            {
+                try { await action(); }
+                catch (Exception ex) { LogHelper.Error($"控制台资源清理失败: {ex.Message}"); }
+            }
+            globalToken.Cancel();
+            await _initializationTask;
+            if (_monitorTask is not null) await ReleaseAsync(() => _monitorTask);
+            await _refreshGate.WaitAsync();
+            try
+            {
+                foreach (var device in Devices.ToArray())
+                    await ReleaseAsync(() => device.DataContext.GetSource<ConsoleDeviceModel>().DisposeAsync().AsTask());
+                Devices.Clear();
+                GlobalConfigModel.TrayDevices.Clear();
+                if (GlobalConfigModel.RefreshAsyncFunc == RefreshAsync) GlobalConfigModel.RefreshAsyncFunc = null;
+            }
+            finally { _refreshGate.Release(); }
+            await _serverGate.WaitAsync();
+            try
+            {
+                var mqtt = GlobalConfigModel.mqttService;
+                var ua = GlobalConfigModel.uaService;
+                GlobalConfigModel.mqttService = null;
+                GlobalConfigModel.uaService = null;
+                if (mqtt is not null)
+                {
+                    mqtt.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
+                    await ReleaseAsync(async () => { try { await mqtt.OffAsync(); } finally { await mqtt.DisposeAsync(); } });
+                }
+                if (ua is not null)
+                {
+                    ua.OnInfoEventAsync -= UaService_OnInfoEventAsync;
+                    await ReleaseAsync(async () => { try { await ua.OffAsync(); } finally { await ua.DisposeAsync(); } });
+                }
+            }
+            finally { _serverGate.Release(); }
+            if (chartOperate is not null) await ReleaseAsync(() => chartOperate.DisposeAsync().AsTask());
+            systemMonitoring?.Dispose();
+            uiMessage.OnInfoEventAsync -= UiMessage_OnInfoEventAsync;
+            await ReleaseAsync(() => uiMessage.DisposeAsync().AsTask());
+            globalToken.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
 }

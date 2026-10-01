@@ -98,125 +98,143 @@
 @if (_showAddDialog)
 {
     <ModalDialog Title="@(_targetParent is null ? T("添加项目") : T("添加子项"))" TitleIcon="@(_targetParent is null ? "bi-folder-plus" : "bi-plus-square")" OnClose="CloseAddDialog">
-        <div class="form-field">
-            <label>@T("项目名称")</label>
-            <input @bind="_newProjectName" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("项目名称")</label>
+                <input @bind="_newProjectName" />
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="CloseAddDialog"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveProjectAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_showDeviceDialog)
 {
     <ModalDialog Title="@T("添加设备")" TitleIcon="bi-hdd-stack" OnClose="() => _showDeviceDialog = false">
-        @if (_deviceCandidates.Count == 0)
-        {
-            <div class="empty" style="padding:24px 8px">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                    <rect x="2" y="3" width="20" height="14" rx="2" />
-                    <path d="M8 21h8M12 17v4M8 7l4 4-4 4M13 7h3" />
-                </svg>
-                <span>@T("暂无 Daq 采集插件配置。请先在「插件设置 → 插件配置」添加 Daq 类型配置")</span>
-                <a href="/plugins/settings" class="btn btn-primary"><i class="bi bi-gear"></i>@T("前往插件设置")</a>
-            </div>
-        }
-        else
-        {
-            <div class="form-field">
-                <label>@T("采集设备")</label>
-                <select @bind="_selectedDeviceConfig">
-                    @foreach (var c in _deviceCandidates)
-                    {
-                        <option value="@c.Guid">@c.Name (@c.SN)</option>
-                    }
-                </select>
-            </div>
-            <div class="modal-footer">
+        <ChildContent>
+            @if (_deviceCandidates.Count == 0)
+            {
+                <div class="empty" style="padding:24px 8px">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <rect x="2" y="3" width="20" height="14" rx="2" />
+                        <path d="M8 21h8M12 17v4M8 7l4 4-4 4M13 7h3" />
+                    </svg>
+                    <span>@T("暂无 Daq 采集插件配置。请先在「插件设置 → 插件配置」添加 Daq 类型配置")</span>
+                    <a href="/plugins/settings" class="btn btn-primary"><i class="bi bi-gear"></i>@T("前往插件设置")</a>
+                </div>
+            }
+            else
+            {
+                <div class="form-field">
+                    <label>@T("采集设备")</label>
+                    <select @bind="_selectedDeviceConfig">
+                        @foreach (var c in _deviceCandidates)
+                        {
+                            <option value="@c.Guid">@c.Name (@c.SN)</option>
+                        }
+                    </select>
+                </div>
+
+            }
+        </ChildContent>
+        <Footer>
+            @if (_deviceCandidates.Count > 0)
+            {
                 <button class="btn" @onclick="() => _showDeviceDialog = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
                 <button class="btn btn-primary" @onclick="ConfirmAddDeviceAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-            </div>
-        }
+            }
+        </Footer>
     </ModalDialog>
 }
 
 @if (_showAddressPicker)
 {
     <ModalDialog Title="@T("选择采集地址")" TitleIcon="bi-list-check" OnClose="() => _showAddressPicker = false">
-        <div class="form-field">
-            <div class="picker-toolbar">
-                <span class="spacer"></span>
-                <span class="picker-count">@T("已选") @_pickedAddresses.Count</span>
-                <button class="btn btn-sm" @onclick="SelectAllPicked"><i class="bi bi-check2-square"></i>@T("全选")</button>
-                <button class="btn btn-sm" @onclick="InversePicked"><i class="bi bi-square-half"></i>@T("反选")</button>
+        <ChildContent>
+            <div class="form-field">
+                <div class="picker-toolbar">
+                    <span class="spacer"></span>
+                    <span class="picker-count">@T("已选") @_pickedAddresses.Count</span>
+                    <button class="btn btn-sm" @onclick="SelectAllPicked"><i class="bi bi-check2-square"></i>@T("全选")</button>
+                    <button class="btn btn-sm" @onclick="InversePicked"><i class="bi bi-square-half"></i>@T("反选")</button>
+                </div>
+                <div class="picker-list">
+                    @foreach (var a in _addressCandidates)
+                    {
+                        <label class="picker-item">
+                            <input type="checkbox" checked="@_pickedAddresses.Contains(a.Guid)" @onchange="(e) => TogglePick(a.Guid, e)" />
+                            <span class="mono">@a.Address</span>
+                            <span class="tag">@a.AnotherName</span>
+                            <span class="tag tag-primary">@a.Type</span>
+                        </label>
+                    }
+                </div>
             </div>
-            <div class="picker-list">
-                @foreach (var a in _addressCandidates)
-                {
-                    <label class="picker-item">
-                        <input type="checkbox" checked="@_pickedAddresses.Contains(a.Guid)" @onchange="(e) => TogglePick(a.Guid, e)" />
-                        <span class="mono">@a.Address</span>
-                        <span class="tag">@a.AnotherName</span>
-                        <span class="tag tag-primary">@a.Type</span>
-                    </label>
-                }
-            </div>
-        </div>
-        <div class="modal-footer">
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="() => _showAddressPicker = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="ConfirmAddAddressesAsync"><i class="bi bi-check-lg"></i>@T("确定")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_showMqDialog)
 {
     <ModalDialog Title="@(_bulkMq ? T("批量添加 MQ 传输设备") : T("添加 MQ 传输设备"))" TitleIcon="bi-send" OnClose="() => _showMqDialog = false">
-        @if (_mqCandidates.Count == 0)
-        {
-            <div class="empty" style="padding:24px 8px">
-                <span>@T("暂无 Mq 插件配置。请先在「插件设置 → 插件配置」添加 Mq 类型配置")</span>
-                <a href="/plugins/settings" class="btn btn-primary"><i class="bi bi-gear"></i>@T("前往插件设置")</a>
-            </div>
-        }
-        else
-        {
-            @if (_bulkMq)
+        <ChildContent>
+            @if (_mqCandidates.Count == 0)
             {
-                <div class="form-field form-field-block">
-                    <div class="form-hint-text">@T("将应用到该设备下的全部采集地址（已有相同 SN 的跳过）")</div>
+                <div class="empty" style="padding:24px 8px">
+                    <span>@T("暂无 Mq 插件配置。请先在「插件设置 → 插件配置」添加 Mq 类型配置")</span>
+                    <a href="/plugins/settings" class="btn btn-primary"><i class="bi bi-gear"></i>@T("前往插件设置")</a>
                 </div>
             }
-            <div class="form-field">
-                <label>@T("MQ 传输设备")</label>
-                <select @bind="_selectedMq">
-                    @foreach (var c in _mqCandidates)
-                    {
-                        <option value="@c.Guid">@c.Name (@c.SN)</option>
-                    }
-                </select>
-            </div>
-            <div class="modal-footer">
+            else
+            {
+                @if (_bulkMq)
+                {
+                    <div class="form-field form-field-block">
+                        <div class="form-hint-text">@T("将应用到该设备下的全部采集地址（已有相同 SN 的跳过）")</div>
+                    </div>
+                }
+                <div class="form-field">
+                    <label>@T("MQ 传输设备")</label>
+                    <select @bind="_selectedMq">
+                        @foreach (var c in _mqCandidates)
+                        {
+                            <option value="@c.Guid">@c.Name (@c.SN)</option>
+                        }
+                    </select>
+                </div>
+
+            }
+        </ChildContent>
+        <Footer>
+            @if (_mqCandidates.Count > 0)
+            {
                 <button class="btn" @onclick="() => _showMqDialog = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
                 <button class="btn btn-primary" @onclick="@(_bulkMq ? ConfirmAddAllMqAsync : ConfirmAddMqAsync)"><i class="bi bi-check-lg"></i>@T("保存")</button>
-            </div>
-        }
+            }
+        </Footer>
     </ModalDialog>
 }
 
 @if (_showRenameDialog)
 {
     <ModalDialog Title="@T("重命名")" TitleIcon="bi-pencil" OnClose="() => _showRenameDialog = false">
-        <div class="form-field">
-            <label>@T("名称")</label>
-            <input @bind="_renameName" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("名称")</label>
+                <input @bind="_renameName" />
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="() => _showRenameDialog = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="ConfirmRenameAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -241,106 +259,114 @@
 @if (_writeTarget is not null)
 {
     <ModalDialog Title="@T("写入")" TitleIcon="bi-pencil-square" OnClose="() => _writeTarget = null">
-        <div class="form-field">
-            <label>@T("地址")</label>
-            <span class="mono config-summary-value">@_writeTarget.AddressDetails?.Address</span>
-        </div>
-        <div class="form-field">
-            <label>@T("类型")</label>
-            <span class="tag tag-primary">@_writeTarget.AddressDetails?.Type</span>
-        </div>
-        <div class="form-field">
-            <label>@T("值")</label>
-            <input @bind="_writeValue" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("地址")</label>
+                <span class="mono config-summary-value">@_writeTarget.AddressDetails?.Address</span>
+            </div>
+            <div class="form-field">
+                <label>@T("类型")</label>
+                <span class="tag tag-primary">@_writeTarget.AddressDetails?.Type</span>
+            </div>
+            <div class="form-field">
+                <label>@T("值")</label>
+                <input @bind="_writeValue" />
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="() => _writeTarget = null"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="WriteAddressAsync"><i class="bi bi-check-lg"></i>@T("确定")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_testResult is not null)
 {
     <ModalDialog Title="@T("测试结果")" TitleIcon="bi-clipboard-check" OnClose="CloseTestResult">
-        <div class="form-field">
-            <span class="tag @(_testResult.Status ? "tag-success" : "tag-danger")">
-                @(_testResult.Status ? T("成功") : T("失败"))
-            </span>
-        </div>
-        <div class="form-field">
-            <label>@T("消息")</label>
-            <div class="mono result-message">@_testResult.Message</div>
-        </div>
-        @if (!string.IsNullOrEmpty(_testResult.Data))
-        {
+        <ChildContent>
             <div class="form-field">
-                <label>@T("数据")</label>
-                <pre class="mono">@_testResult.Data</pre>
+                <span class="tag @(_testResult.Status ? "tag-success" : "tag-danger")">
+                    @(_testResult.Status ? T("成功") : T("失败"))
+                </span>
             </div>
-        }
-        <div class="modal-footer">
+            <div class="form-field">
+                <label>@T("消息")</label>
+                <div class="mono result-message">@_testResult.Message</div>
+            </div>
+            @if (!string.IsNullOrEmpty(_testResult.Data))
+            {
+                <div class="form-field">
+                    <label>@T("数据")</label>
+                    <pre class="mono">@_testResult.Data</pre>
+                </div>
+            }
+        </ChildContent>
+        <Footer>
             <button class="btn btn-primary" @onclick="CloseTestResult"><i class="bi bi-check-lg"></i>@T("关闭")</button>
-</div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_autoPackTarget is not null)
 {
     <ModalDialog Title="@T("组包设置")" TitleIcon="bi-boxes" OnClose="CloseAutoPack">
-        <div class="form-field">
-            <label>@T("单次批量读取的最大字节数")</label>
-            <input type="number" @bind="_autoPackMaxByteLength" />
-        </div>
-        <div class="form-field">
-            <label>@T("数据字节序格式")</label>
-            <select @bind="_autoPackFormat">
-                @foreach (var fmt in Enum.GetNames(typeof(DataFormat)))
-                {
-                    <option value="@fmt">@fmt</option>
-                }
-            </select>
-        </div>
-        <div class="form-field">
-            <label>@T("String解包是否按字反转字节")</label>
-            <input type="checkbox" @bind="_isStringReverseByteWord" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("单次批量读取的最大字节数")</label>
+                <input type="number" @bind="_autoPackMaxByteLength" />
+            </div>
+            <div class="form-field">
+                <label>@T("数据字节序格式")</label>
+                <select @bind="_autoPackFormat">
+                    @foreach (var fmt in Enum.GetNames(typeof(DataFormat)))
+                    {
+                        <option value="@fmt">@fmt</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@T("String解包是否按字反转字节")</label>
+                <input type="checkbox" @bind="_isStringReverseByteWord" />
+            </div>
+        </ChildContent>
+        <Footer>
             @if (_autoPackTarget.AutoPack is not null)
             {
-                <button class="btn btn-danger" @onclick="RemoveAutoPackAsync"><i class="bi bi-trash"></i>@T("移除组包")</button>
+            <button class="btn btn-danger" @onclick="RemoveAutoPackAsync"><i class="bi bi-trash"></i>@T("移除组包")</button>
             }
             <span class="spacer"></span>
             <button class="btn" @onclick="CloseAutoPack"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveAutoPackAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_webApiTarget is not null)
 {
     <ModalDialog Title="@T("WebApi 设置")" TitleIcon="bi-globe" OnClose="CloseWebApi">
-        <div class="form-field">
-            <label>@T("Ip 地址")</label>
-            <input @bind="_webApiIp" />
-        </div>
-        <div class="form-field">
-            <label>@T("端口")</label>
-            <input type="number" @bind="_webApiPort" />
-        </div>
-        <div class="form-field">
-            <label>@T("跨域")</label>
-            <input type="checkbox" @bind="_webApiCrossDomain" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("Ip 地址")</label>
+                <input @bind="_webApiIp" />
+            </div>
+            <div class="form-field">
+                <label>@T("端口")</label>
+                <input type="number" @bind="_webApiPort" />
+            </div>
+            <div class="form-field">
+                <label>@T("跨域")</label>
+                <input type="checkbox" @bind="_webApiCrossDomain" />
+            </div>
+        </ChildContent>
+        <Footer>
             @if (_webApiTarget.WebApi is not null)
             {
-                <button class="btn btn-danger" @onclick="RemoveWebApiAsync"><i class="bi bi-trash"></i>@T("移除 WebApi")</button>
+            <button class="btn btn-danger" @onclick="RemoveWebApiAsync"><i class="bi bi-trash"></i>@T("移除 WebApi")</button>
             }
             <span class="spacer"></span>
             <button class="btn" @onclick="CloseWebApi"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveWebApiAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -375,20 +401,22 @@
 
     /// <summary>详情工具栏操作按钮：⋯ 点击展开，区域外点击收起</summary>
     private bool _detailActionsOpen;
+    /// <summary>该组件监听的唯一身份，防止延迟释放误删其他页面的监听。</summary>
+    private readonly string _outsideClickOwner = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<ProjectSettingsPage>? _jsRef;
 
     private async Task ToggleDetailActions()
     {
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         _detailActionsOpen = !_detailActionsOpen;
         if (_detailActionsOpen)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
@@ -441,7 +469,7 @@
     {
         AppState.EntityChanged -= OnEntityChanged;
         MenuCoordinator.Unregister(CloseMenu);
-        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef, _outsideClickOwner);
         _jsRef = null;
         base.Dispose();
     }
@@ -568,15 +596,31 @@
                 ToastSvc.Error(T("导入失败：未识别到项目数据"));
                 return;
             }
-            AppState.PrepareImportedProjects(projects);
-            // 替换整棵树并立即保存（对齐 WPF 清空重填语义）
-            lock (AppState.ProjectTreeLock)
+            // 持久化门先于结构锁；原树在新文件写入失败时仍保持有效。
+            await AppState.ConfigSaveGate.WaitAsync();
+            try
             {
-                AppState.ProjectDict.Clear();
-                foreach (var node in projects)
-                    AppState.ProjectDict.Add(node);
+                string projectJson;
+                lock (AppState.ProjectTreeLock)
+                {
+                    AppState.PrepareImportedProjects(projects);
+                    projectJson = projects.ToJson(true);
+                }
+                if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.ProjectConfigPath, projectJson))
+                {
+                    ToastSvc.Error(T("项目配置写入失败，请检查磁盘和文件占用情况"));
+                    return;
+                }
+                lock (AppState.ProjectTreeLock)
+                {
+                    AppState.ProjectDict.Clear();
+                    foreach (var node in projects) AppState.ProjectDict.Add(node);
+                }
+                _selectedDevice = null;
+                var selected = ProjectHandlerCore.GetFirstSelectItem(projects);
+                if (selected?.NodeType == ProjectNodeType.Device) ShowDeviceDetails(selected);
             }
-            if (!await SaveProjectsCheckedAsync()) return;
+            finally { AppState.ConfigSaveGate.Release(); }
             RuntimeManager.SyncFromProjects(AppState);
             ToastSvc.Success(string.Format(T("导入成功：{0} 个项目"), projects.Count));
         }

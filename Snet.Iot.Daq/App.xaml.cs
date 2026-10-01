@@ -194,7 +194,7 @@ namespace Snet.Iot.Daq
         /// 唯一实例处理流程
         /// </summary>
         /// <param name="e"></param>
-        private void SingleInstance(StartupEventArgs e)
+        private bool SingleInstance(StartupEventArgs e)
         {
             _singleInstance = new SingleInstanceHandler("Snet.Iot.Daq", out bool isFirst);      // 输出：是否是首实例
 
@@ -203,9 +203,10 @@ namespace Snet.Iot.Daq
                 _singleInstance.SignalFirstInstance(e.Args);
                 _singleInstance.Dispose();
                 Shutdown(0);
-                return;
+                return false;
             }
             _singleInstance.SignalReceived += OnWakeup;
+            return true;
         }
 
         /// <summary>
@@ -231,7 +232,7 @@ namespace Snet.Iot.Daq
         private void OnStartup(object sender, StartupEventArgs e)
         {
             //判断是不是唯一打开
-            SingleInstance(e);
+            if (!SingleInstance(e)) return;
 
             // 初始化依赖注入、数据库、插件等
             Init();

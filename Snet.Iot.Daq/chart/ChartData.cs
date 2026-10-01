@@ -177,6 +177,12 @@ namespace Snet.Iot.Daq.chart
             /// <param name="v">值</param>
             public void Update(double v)
             {
+                // 数据队列和 ScottPlot 对象由控件线程共同拥有，更新、清空和导出不能交错访问。
+                if (!plot.Dispatcher.CheckAccess())
+                {
+                    plot.Dispatcher.Invoke(() => Update(v));
+                    return;
+                }
                 bool hasMax = !double.IsNaN(model.MaxValue);
                 bool hasMin = !double.IsNaN(model.MinValue);
 
@@ -215,10 +221,15 @@ namespace Snet.Iot.Daq.chart
             }
 
             /// <summary>
-            /// 清空当前线条数据
+            /// 在控件线程清空曲线及其数据队列；后台调用同步等待调度完成
             /// </summary>
             public void Clear()
             {
+                if (!plot.Dispatcher.CheckAccess())
+                {
+                    plot.Dispatcher.Invoke(Clear);
+                    return;
+                }
                 data.Clear();
                 sinceRebuild = 0;
                 logger.Data.Clear();
@@ -226,11 +237,13 @@ namespace Snet.Iot.Daq.chart
             }
 
             /// <summary>
-            /// 获取XY轴数据
+            /// 在控件线程读取 XY 轴独立数组快照；后台调用同步等待调度完成
             /// </summary>
-            /// <returns></returns>
+            /// <returns>Y 值为当前保留的数据，X 值为对应的顺序索引；调用方可以独立修改数组。</returns>
             public (double[] Ys, double[] Xs) Get()
             {
+                if (!plot.Dispatcher.CheckAccess())
+                    return plot.Dispatcher.Invoke(Get);
                 if (data.Count > 0)
                 {
                     double[] ys = data.ToArray();

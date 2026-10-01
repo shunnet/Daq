@@ -86,9 +86,9 @@
     /// <summary>全局互斥回调：其他菜单打开前先收起本组件全部菜单</summary>
     private void CloseMenu()
     {
-        if (_openActions.Count > 0)
+        if (_openAction is not null)
         {
-            _openActions.Clear();
+            _openAction = null;
             InvokeAsync(StateHasChanged);
         }
     }
@@ -99,36 +99,37 @@
 
     [Inject] private IJSRuntime JS { get; set; } = default!;
 
-    private readonly Dictionary<string, bool> _openActions = new();
+    private IProjectTreeViewModel? _openAction;
+    /// <summary>该组件监听的唯一身份，防止延迟释放误删其他页面的监听。</summary>
+    private readonly string _outsideClickOwner = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<ProjectTree>? _jsRef;
 
-    private bool IsActionOpen(IProjectTreeViewModel node) => _openActions.GetValueOrDefault(KeyOf(node));
+    private bool IsActionOpen(IProjectTreeViewModel node) => ReferenceEquals(_openAction, node);
 
     private async Task ToggleActionOpen(IProjectTreeViewModel node)
     {
         // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
-        MenuCoordinator.CloseAllOthers();
-        var key = KeyOf(node);
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         // 互斥：展开新项前先收起其他项（点 A 再点 B 时 A 收起）
-        var open = !_openActions.GetValueOrDefault(key);
-        _openActions.Clear();
-        if (open) _openActions[key] = true;
+        var open = !IsActionOpen(node);
+        _openAction = null;
+        if (open) _openAction = node;
         // 展开后注册「区域外点击收起」；收起时注销（移出不关闭）
         if (open)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
     [JSInvokable]
     public void CloseAllActions()
     {
-        _openActions.Clear();
+        _openAction = null;
         InvokeAsync(StateHasChanged);
     }
 
@@ -138,9 +139,8 @@
         MenuCoordinator.Unregister(CloseMenu);
         GC.SuppressFinalize(this);
         // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef, _outsideClickOwner);
         _jsRef = null;
     }
 
-    private static string KeyOf(IProjectTreeViewModel node) => node.DaqDetails?.Guid ?? node.Name + "|" + node.NodeType;
 }

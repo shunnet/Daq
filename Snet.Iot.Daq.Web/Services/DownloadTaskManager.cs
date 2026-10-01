@@ -20,6 +20,12 @@ public sealed class DownloadTaskManager : IAsyncDisposable
     private readonly List<DownloadJob> _jobs = new();
     private readonly List<Task> _runningTasks = new();
     private CancellationTokenSource? _stopCts;
+    /// <summary>已取消批次的令牌源及其任务；任务结束后才允许释放令牌源。</summary>
+    private readonly List<(CancellationTokenSource Source, Task Task)> _retiredBatches = new();
+    /// <summary>在队列锁内设置的终态；释放开始后不再接受新作业。</summary>
+    private bool _disposed;
+    /// <summary>所有释放调用共同等待的清理任务。</summary>
+    private Task? _disposeTask;
 
     #endregion
 
@@ -29,9 +35,11 @@ public sealed class DownloadTaskManager : IAsyncDisposable
     {
         lock (_gate)
         {
-            _stopCts?.Cancel();
-            _stopCts?.Dispose();
+            if (_stopCts is null) return;
+            _stopCts.Cancel();
+            _retiredBatches.Add((_stopCts, Task.WhenAll(_runningTasks)));
             _stopCts = null;
+            ReleaseCompletedBatches();
         }
     }
 
@@ -136,8 +144,11 @@ public sealed class DownloadTaskManager : IAsyncDisposable
         { PackName = m.PackName, Version = m.Version }).ToList();
         var names = packages.Select(m => m.PackName).ToList();
         if (names.Count == 0) throw new ArgumentException("请选择至少一个插件", nameof(models));
+        DownloadJob job;
         lock (_gate)
         {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            ReleaseCompletedBatches();
             // 入队前清理终态任务（否则第 10 次下载后队列永久满）
             _jobs.RemoveAll(j => j.Status is "完成" or "失败" or "已取消");
             // 同名去重 + 队列上限，防反复点击积压
@@ -150,12 +161,12 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                 throw new InvalidOperationException("下载队列已满（上限 10）");
             // 取消令牌在入队即创建：SDK 探测窗口内的「停止下载」也能生效
             _stopCts ??= new CancellationTokenSource();
-            var job = new DownloadJob(id, string.Join(", ", names.Take(3)), "排队", 0, null);
+            job = new DownloadJob(id, string.Join(", ", names.Take(3)), "排队", 0, null);
             _jobs.Add(job);
-            JobChanged?.Invoke(job);
             _runningTasks.RemoveAll(static task => task.IsCompleted);
             _runningTasks.Add(RunAsync(job, packages, _stopCts.Token));
         }
+        NotifyJobChanged(job);
         return Task.FromResult(id);
     }
 
@@ -236,9 +247,11 @@ public sealed class DownloadTaskManager : IAsyncDisposable
     /// </summary>
     private async Task<int> TryAutoInstallAsync(List<string> names, CancellationToken token)
     {
+        await PluginHandlerCore.MutationGate.WaitAsync(token);
         var installed = 0;
         var stopped = new List<DeviceRuntime>();
-        var serverServicesNeedRestart = false;
+        string[] suspendedServers = [];
+        var serversSuspended = false;
         try
         {
             foreach (var name in names)
@@ -254,7 +267,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                         // 探测可能加载程序集；从这里到配置落盘必须作为一个提交单元完成。
                         if (token.IsCancellationRequested) break;
                         var iName = $"Snet.Model.interface.I{type}";
-                        var result = PluginHandlerCore.PluginOperate.InitPlugin(srcPath, iName);
+                        var result = await PluginHandlerCore.ProbePluginAsync(srcPath, iName, token);
                         if (result.Count == 0) continue;
                         // 归位到 lib/{type小写}/{name}/
                         var typePath = Path.Combine(WebPaths.FilePath, type.ToString().ToLower());
@@ -264,15 +277,17 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                         string? backupPath = null;
                         if (isHotUpdate)
                         {
-                            serverServicesNeedRestart = true;
                             _logger.Push($"[Info] 检测到同名插件 {name}，执行热更新");
                             // 停用使用该插件的运行设备：设备插件类型是插件类名（如 SiemensOperate），
                             // 下载名是包名（如 Snet.Siemens），类名→包名映射由 RuntimeManager 统一处理
                             // （对齐 WPF libPath == DaqPluginPath 语义）
                             stopped.AddRange(await _runtimeManager.StopDevicesUsingPluginAsync(type, name));
                             // 卸载程序集前优雅停止 UA/MQTT 服务端：释放监听端口，防僵尸 socket 占用导致新服务端绑定失败
-                            try { await _hosted.StopServerServicesAsync(); }
-                            catch (Exception ex) { _logger.Push($"[Error] 服务端停止失败: {ex.Message}"); }
+                            if (!serversSuspended)
+                            {
+                                suspendedServers = await _hosted.SuspendServerServicesAsync();
+                                serversSuspended = true;
+                            }
                             // 卸载旧程序集并回收，避免文件锁/旧实例残留（对齐 WPF PrivateRemovalPlugin）
                             foreach (var old in LoadPluginList().Where(p => p.Name == name))
                             {
@@ -306,7 +321,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                                 Directory.Move(backupPath, targetPath);
                             throw;
                         }
-                        // 重新注册最终路径：探测注册的是下载临时目录（Move 后失效），
+                        // 独立探测不会改变正式注册，归位后仍须从最终目录加载插件，
                         // 不重注册则设备启动采集报"插件尚未加载"（对齐 WPF InitPlugin(libPath) 流程）
                         foreach (var (model, _) in result)
                         {
@@ -314,7 +329,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                         }
                         try
                         {
-                            var registered = PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                            var registered = await PluginHandlerCore.PluginOperate.InitPluginAsync(targetPath, iName);
                             if (registered.Count == 0)
                                 throw new InvalidDataException($"插件 {name} 在最终目录中未发现 {iName} 实现");
                         }
@@ -325,7 +340,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                             if (backupPath is not null && Directory.Exists(backupPath))
                             {
                                 Directory.Move(backupPath, targetPath);
-                                PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                                await PluginHandlerCore.PluginOperate.InitPluginAsync(targetPath, iName);
                             }
                             throw;
                         }
@@ -354,7 +369,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                             if (backupPath is not null && Directory.Exists(backupPath))
                             {
                                 Directory.Move(backupPath, targetPath);
-                                PluginHandlerCore.PluginOperate.InitPlugin(targetPath, iName);
+                                await PluginHandlerCore.PluginOperate.InitPluginAsync(targetPath, iName);
                             }
                             throw;
                         }
@@ -371,17 +386,23 @@ public sealed class DownloadTaskManager : IAsyncDisposable
                         break;
                     }
                 }
+                catch (OperationCanceledException) when (token.IsCancellationRequested) { break; }
                 catch (Exception ex)
                 {
-                    Console.WriteLine($"[DownloadTaskManager] 自动安装失败 {name}: {ex.Message}");
+                    _logger.Push($"[Error] 自动安装失败 {name}: {ex.Message}");
                 }
             }
         }
         finally
         {
-            if (serverServicesNeedRestart)
+            PluginHandlerCore.MutationGate.Release();
+            foreach (var kind in suspendedServers)
             {
-                try { await _hosted.InitServerServicesAsync(); }
+                try
+                {
+                    var started = await _hosted.StartServerAsync(kind);
+                    if (!started.Ok) _logger.Push($"[Warning] {started.Message}");
+                }
                 catch (Exception ex) { _logger.Push($"[Error] 热更新后恢复服务端失败: {ex.Message}"); }
             }
             // 恢复热更新前正在运行的设备（只恢复本次停掉的）。
@@ -424,12 +445,46 @@ public sealed class DownloadTaskManager : IAsyncDisposable
             var index = _jobs.FindIndex(j => j.Id == job.Id);
             if (index >= 0) _jobs[index] = job;
         }
-        JobChanged?.Invoke(job);
+        NotifyJobChanged(job);
+    }
+
+    /// <summary>在队列锁外通知订阅者；一个界面回调失败不能中断作业或阻止其他界面接收状态。</summary>
+    private void NotifyJobChanged(DownloadJob job)
+    {
+        var subscribers = JobChanged;
+        if (subscribers is null) return;
+        foreach (Action<DownloadJob> subscriber in subscribers.GetInvocationList())
+        {
+            try { subscriber(job); }
+            catch (Exception ex) { _logger.Push($"[Error] 下载状态通知失败: {ex.Message}"); }
+        }
+    }
+
+    /// <summary>在队列锁内释放已完成批次的令牌源；仍在下载或安装的批次继续拥有其令牌。</summary>
+    private void ReleaseCompletedBatches()
+    {
+        for (var i = _retiredBatches.Count - 1; i >= 0; i--)
+        {
+            if (!_retiredBatches[i].Task.IsCompleted) continue;
+            _retiredBatches[i].Source.Dispose();
+            _retiredBatches.RemoveAt(i);
+        }
     }
 
     /// <summary>取消并等待管理器拥有的全部下载作业，然后释放同步资源。</summary>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
+        lock (_gate)
+        {
+            _disposed = true;
+            return new ValueTask(_disposeTask ??= DisposeCoreAsync());
+        }
+    }
+
+    /// <summary>让创建清理任务的队列锁先退出，再取消并等待全部作业，最后释放令牌及串行门。</summary>
+    private async Task DisposeCoreAsync()
+    {
+        await Task.Yield();
         Task[] tasks;
         lock (_gate)
         {
@@ -443,6 +498,7 @@ public sealed class DownloadTaskManager : IAsyncDisposable
             _stopCts?.Dispose();
             _stopCts = null;
             _runningTasks.Clear();
+            ReleaseCompletedBatches();
         }
         _runGate.Dispose();
         GC.SuppressFinalize(this);

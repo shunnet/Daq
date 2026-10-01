@@ -153,43 +153,47 @@
 @if (_showAdd)
 {
     <ModalDialog Title="@T("添加用户")" TitleIcon="bi-person-plus" OnClose="() => _showAdd = false">
-        <div class="form-field">
-            <label>@T("用户名")</label>
-            <input @bind="_newUsername" />
-        </div>
-        <div class="form-field">
-            <label>@T("密码")</label>
-            <input type="password" @bind="_newPassword" />
-        </div>
-        <div class="form-field">
-            <label>@T("角色")</label>
-            <select @bind="_newRole">
-                <option value="@AuthService.RoleUser">@T("普通用户")</option>
-                <option value="@AuthService.RoleAdmin">@T("管理员")</option>
-            </select>
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("用户名")</label>
+                <input @bind="_newUsername" />
+            </div>
+            <div class="form-field">
+                <label>@T("密码")</label>
+                <input type="password" @bind="_newPassword" />
+            </div>
+            <div class="form-field">
+                <label>@T("角色")</label>
+                <select @bind="_newRole">
+                    <option value="@AuthService.RoleUser">@T("普通用户")</option>
+                    <option value="@AuthService.RoleAdmin">@T("管理员")</option>
+                </select>
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="() => _showAdd = false"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="AddUserAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
 @if (_resetUser is not null)
 {
     <ModalDialog Title="@T("重置密码")" TitleIcon="bi-key" OnClose="() => _resetUser = null">
-        <div class="form-field">
-            <label>@T("用户名")</label>
-            <span class="config-summary-value">@_resetUser</span>
-        </div>
-        <div class="form-field">
-            <label>@T("新密码")</label>
-            <input type="password" @bind="_resetPassword" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("用户名")</label>
+                <span class="config-summary-value">@_resetUser</span>
+            </div>
+            <div class="form-field">
+                <label>@T("新密码")</label>
+                <input type="password" @bind="_resetPassword" />
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="() => _resetUser = null"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="ResetPasswordAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -262,6 +266,8 @@
     // 行操作/日志操作弹出菜单（对齐 ConsolePage device-more 模式：互斥 + 区域外点击收起）
     private string? _menuUser;
     private bool _menuLog;
+    /// <summary>该组件监听的唯一身份，防止延迟释放误删其他页面的监听。</summary>
+    private readonly string _outsideClickOwner = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<UserManagementPage>? _jsRef;
     private ElementReference _root;
 
@@ -275,25 +281,41 @@
     private static string LineClass(string line)
         => line.Contains("ERR") ? "log-err" : line.Contains("WRN") ? "log-warn" : "log-ok";
 
-    private void LoadLogDates()
+    private async Task LoadLogDates()
     {
         _logDates = OperateLogReader.GetDates();
         _logDate = _logDates.FirstOrDefault() ?? "";
-        LoadLogUsers();
+        await LoadLogUsers();
     }
 
-    private void LoadLogUsers()
+    private async Task LoadLogUsers()
     {
         _logUsers = OperateLogReader.GetUsers(_logDate);
         _logUser = _logUsers.FirstOrDefault() ?? "";
-        LoadLogLines();
+        await LoadLogLines();
     }
 
-    private void LoadLogLines()
+    /// <summary>当前日志读取的取消源；切换日期、用户或退出页面时终止旧读取，完成后由该读取释放。</summary>
+    private CancellationTokenSource? _logLoadCts;
+
+    /// <summary>异步加载有界日志快照；旧请求不能覆盖用户后来选择的日期和账号。</summary>
+    private async Task LoadLogLines()
     {
-        _logLines = string.IsNullOrEmpty(_logDate) || string.IsNullOrEmpty(_logUser)
-            ? new List<string>()
-            : OperateLogReader.GetLines(_logDate, _logUser);
+        var previous = _logLoadCts;
+        var source = _logLoadCts = new CancellationTokenSource();
+        previous?.Cancel();
+        try
+        {
+            var lines = string.IsNullOrEmpty(_logDate) || string.IsNullOrEmpty(_logUser)
+                ? new List<string>() : await OperateLogReader.GetLinesAsync(_logDate, _logUser, source.Token);
+            if (ReferenceEquals(_logLoadCts, source)) _logLines = lines;
+        }
+        catch (OperationCanceledException) when (source.IsCancellationRequested) { }
+        finally
+        {
+            if (ReferenceEquals(_logLoadCts, source)) _logLoadCts = null;
+            source.Dispose();
+        }
     }
 
     private async Task ClearCurrentLog()
@@ -302,7 +324,7 @@
         if (string.IsNullOrEmpty(_logDate) || string.IsNullOrEmpty(_logUser)) return;
         await OperateLogReader.ClearUserAsync(_logDate, _logUser);
         await OperateInfoAsync($"清空操作日志：{_logUser}（{_logDate}）");
-        LoadLogUsers();
+        await LoadLogUsers();
         Toast.Success(T("已清空"));
     }
 
@@ -312,7 +334,7 @@
         if (string.IsNullOrEmpty(_logDate)) return;
         await OperateLogReader.ClearAllAsync(_logDate);
         await OperateInfoAsync($"清空全部操作日志（{_logDate}）");
-        LoadLogUsers();
+        await LoadLogUsers();
         Toast.Success(T("已清空"));
     }
 
@@ -341,7 +363,7 @@
             _currentUser = state.User.Identity?.Name ?? "";
         }
         _users = Auth.ListUsers();
-        LoadLogDates();
+        await LoadLogDates();
     }
 
     /// <summary>全局互斥回调：其他菜单打开前先收起本页全部菜单</summary>
@@ -358,34 +380,36 @@
     private async Task ToggleUserMenuAsync(AuthService.UserInfo u)
     {
         // 全局互斥：先收起其他组件已打开的菜单
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         _menuUser = _menuUser == u.Username ? null : u.Username;
+        _menuLog = false;
         // 展开后注册「区域外点击收起」；收起时注销
         if (_menuUser is not null)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
     private async Task ToggleLogMenuAsync()
     {
         // 全局互斥：先收起其他组件已打开的菜单
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         _menuLog = !_menuLog;
+        _menuUser = null;
         // 展开后注册「区域外点击收起」；收起时注销
         if (_menuLog)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
@@ -399,10 +423,12 @@
 
     public override void Dispose()
     {
+        _logLoadCts?.Cancel();
+        _logLoadCts = null;
         base.Dispose();
         MenuCoordinator.Unregister(CloseMenu);
         // 注销 document 上的外部点击监听：先让 JS 移除监听，再释放引用（避免残留回调打到已释放对象 → EndInvokeDotNet NRE）
-        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef, _outsideClickOwner);
         _jsRef = null;
     }
 

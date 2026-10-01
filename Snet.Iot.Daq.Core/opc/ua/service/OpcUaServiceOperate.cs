@@ -255,6 +255,8 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         /// 文件夹信息
         /// </summary>
         private readonly ConcurrentDictionary<string, FolderState> FolderInfo = new();
+        /// <summary>保证文件夹查重、SDK 节点修改和外部缓存修改一起完成；临界区只包含同步操作。</summary>
+        private readonly object folderGate = new();
 
         /// <summary>
         /// 创建文件夹
@@ -262,43 +264,47 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         /// <returns></returns>
         public OperateResult CreateFolder(string folderName, FolderState? fs = null)
         {
-            //开始记录运行时间
-            BegOperate();
-            try
+            lock (folderGate)
             {
-                if (!GetStatus().GetDetails(out string? message))
+                //开始记录运行时间
+                BegOperate();
+                try
                 {
-                    return EndOperate(false, message);
+                    if (!GetStatus().GetDetails(out string? message))
+                    {
+                        return EndOperate(false, message);
+                    }
+
+                    string key = folderName;
+                    if (fs != null)
+                    {
+                        key = $"{fs.NodeId.IdentifierAsString}.{folderName}";
+                    }
+                    else
+                    {
+                        key = $"{basics.AddressSpaceName}.{folderName}";
+                    }
+                    //不存在此节点，创建一个
+                    if (!FolderInfo.ContainsKey(key))
+                    {
+                        FolderState folder = service.NodeManage.CreateFolder(folderName, fs);
+                        if (folder == null)
+                        {
+                            return EndOperate(false, $"{folderName} 文件夹创建失败，原因未知");
+                        }
+                        FolderInfo.AddOrUpdate(folder.NodeId.IdentifierAsString, folder, (k, v) => folder);
+                        return EndOperate(true, resultData: folder);
+                    }
+                    else
+                    {
+                        return EndOperate(false, $"文件夹创建失败，已存在此同名文件夹");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    return EndOperate(false, ex.Message, exception: ex);
                 }
 
-                string key = folderName;
-                if (fs != null)
-                {
-                    key = $"{fs.NodeId.IdentifierAsString}.{folderName}";
-                }
-                else
-                {
-                    key = $"{basics.AddressSpaceName}.{folderName}";
-                }
-                //不存在此节点，创建一个
-                if (!FolderInfo.ContainsKey(key))
-                {
-                    FolderState folder = service.NodeManage.CreateFolder(folderName, fs);
-                    if (folder == null)
-                    {
-                        return EndOperate(false, $"{folderName} 文件夹创建失败，原因未知");
-                    }
-                    FolderInfo.AddOrUpdate(folder.NodeId.IdentifierAsString, folder, (k, v) => folder);
-                    return EndOperate(true, resultData: folder);
-                }
-                else
-                {
-                    return EndOperate(false, $"文件夹创建失败，已存在此同名文件夹");
-                }
-            }
-            catch (Exception ex)
-            {
-                return EndOperate(false, ex.Message, exception: ex);
             }
         }
 
@@ -309,46 +315,49 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         /// <returns>统一出参</returns>
         public OperateResult RemoveFolder(List<NodeId> folderNameArray)
         {
-            //开始记录运行时间
-            BegOperate();
-            try
+            lock (folderGate)
             {
-                if (!GetStatus().GetDetails(out string? message))
+                //开始记录运行时间
+                BegOperate();
+                try
                 {
-                    return EndOperate(false, message);
+                    if (!GetStatus().GetDetails(out string? message))
+                    {
+                        return EndOperate(false, message);
+                    }
+
+                    var failures = new List<string>();
+                    foreach (var folderId in folderNameArray)
+                    {
+                        var result = service.NodeManage.RemoveFolder([folderId]);
+                        if (!result.Status)
+                        {
+                            failures.Add(result.Message ?? $"{folderId} 删除失败");
+                            continue;
+                        }
+                        // 一项成功立即同步这一项的缓存；后续节点失败不能留下已删除节点的旧引用。
+                        foreach (var pair in FolderInfo.Where(pair => IsFolderWithin(pair.Value, folderId)).ToArray())
+                            FolderInfo.TryRemove(pair);
+                    }
+                    return failures.Count == 0 ? EndOperate(true) : EndOperate(false, string.Join(Environment.NewLine, failures));
+                }
+                catch (Exception ex)
+                {
+                    return EndOperate(false, ex.Message, exception: ex);
                 }
 
-                OperateResult result = service.NodeManage.RemoveFolder(folderNameArray);
-                if (result.Status)
-                {
-                    var failMessages = new List<string>();
-                    //在看外部是否存在此文件夹，有的话就移除
-                    foreach (NodeId item in folderNameArray)
-                    {
-                        List<KeyValuePair<string, FolderState>> pair = FolderInfo.Where(c => c.Value.NodeId.ToString() == item.ToString() || c.Value.NodeId.ToString().Contains(item.ToString())).ToList();
-                        foreach (var index in pair)
-                        {
-                            if (!FolderInfo.TryRemove(index))
-                            {
-                                failMessages.Add($"{index.Value.NodeId.IdentifierAsString} 删除失败");
-                            }
-                        }
-                    }
-                    if (failMessages.Count > 0)
-                    {
-                        return EndOperate(false, $"内部异常：{failMessages.ToJson(true)}");
-                    }
-                    return EndOperate(true);
-                }
-                else
-                {
-                    return EndOperate(result);
-                }
             }
-            catch (Exception ex)
-            {
-                return EndOperate(false, ex.Message, exception: ex);
-            }
+        }
+
+        /// <summary>按真实父节点关系判断缓存文件夹是否等于或位于目标内，避免相似名称导致误删。</summary>
+        /// <param name="folder">待检查的缓存文件夹。</param>
+        /// <param name="ancestor">被删除文件夹的完整 NodeId。</param>
+        /// <returns>同一文件夹或后代返回 true。</returns>
+        private static bool IsFolderWithin(FolderState folder, NodeId ancestor)
+        {
+            for (NodeState? current = folder; current is not null; current = (current as BaseInstanceState)?.Parent)
+                if (current.NodeId == ancestor) return true;
+            return false;
         }
 
         /// <summary>
@@ -396,27 +405,31 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
         /// <returns></returns>
         public OperateResult IncAddress(NodeBody node, FolderState? folder = null)
         {
-            //开始记录运行时间
-            BegOperate();
-            try
+            lock (folderGate)
             {
-                if (!GetStatus().GetDetails(out string? message))
+                //开始记录运行时间
+                BegOperate();
+                try
                 {
-                    return EndOperate(false, message);
+                    if (!GetStatus().GetDetails(out string? message))
+                    {
+                        return EndOperate(false, message);
+                    }
+                    //创建节点
+                    OperateResult result = service.NodeManage.StructuralBodyCreateAddress(node, folder);
+                    FolderState? folderState = result.GetSource<FolderState>();
+                    if (folderState == null)
+                    {
+                        return EndOperate(false, $"导入地址失败，原因未知");
+                    }
+                    FolderInfo.AddOrUpdate(folderState.NodeId.IdentifierAsString, folderState, (k, v) => folderState);
+                    return EndOperate(true, resultData: folderState);
                 }
-                //创建节点
-                OperateResult result = service.NodeManage.StructuralBodyCreateAddress(node, folder);
-                FolderState? folderState = result.GetSource<FolderState>();
-                if (folderState == null)
+                catch (Exception ex)
                 {
-                    return EndOperate(false, $"导入地址失败，原因未知");
+                    return EndOperate(false, ex.Message, exception: ex);
                 }
-                FolderInfo.AddOrUpdate(folderState.NodeId.IdentifierAsString, folderState, (k, v) => folderState);
-                return EndOperate(true, resultData: folderState);
-            }
-            catch (Exception ex)
-            {
-                return EndOperate(false, ex.Message, exception: ex);
+
             }
         }
 
@@ -511,17 +524,26 @@ namespace Snet.Iot.Daq.Core.opc.ua.service
                     tokenSource = null;
                     _statusTask = null;
                 }
-                if (service != null)
+                ReferenceServer? stoppedService;
+                lock (folderGate)
                 {
-                    FolderInfo.Clear();
-                    // 先清理地址空间，再 Dispose（避免 use-after-dispose）
-                    service.NodeManage?.DeleteAddressSpace();
-                    service.NodeManage?.Dispose();
-                    // 停止服务并处理
-                    await service.StopAsync();
-                    service.Dispose();
-                    // 停止状态线程
+                    stoppedService = service;
                     service = null;
+                    FolderInfo.Clear();
+                }
+                if (stoppedService is not null)
+                {
+                    try
+                    {
+                        await stoppedService.StopAsync();
+                    }
+                    finally
+                    {
+                        // 停止监听和请求后才释放地址空间；先撤下引用以阻止新结构操作进入旧服务。
+                        stoppedService.NodeManage?.DeleteAddressSpace();
+                        stoppedService.NodeManage?.Dispose();
+                        stoppedService.Dispose();
+                    }
                 }
                 IsStart = false;
                 return await EndOperateAsync(true, token: token);

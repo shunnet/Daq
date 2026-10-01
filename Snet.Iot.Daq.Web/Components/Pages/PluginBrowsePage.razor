@@ -1,4 +1,4 @@
-@inject MenuCoordinator MenuCoordinator
+﻿@inject MenuCoordinator MenuCoordinator
 @page "/plugins/browse"
 @rendermode InteractiveServer
 @inherits LocalizedComponentBase
@@ -144,6 +144,8 @@
     private bool _downloading;
     private bool _browseActionsOpen;
     private bool IsBrowseActionsOpen => _browseActionsOpen;
+    /// <summary>该组件监听的唯一身份，防止延迟释放误删其他页面的监听。</summary>
+    private readonly string _outsideClickOwner = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<PluginBrowsePage>? _jsRef;
     private CancellationTokenSource? _refreshCts;
 
@@ -175,23 +177,23 @@
         base.Dispose();
         DownloadManager.JobChanged -= OnJobChanged;
         // 注销 document 上的外部点击监听：否则切页后旧 handler 残留会清掉新页面的监听（菜单失去失焦关闭能力）
-        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef, _outsideClickOwner);
         _jsRef = null;
     }
 
     /// <summary>工具栏操作按钮：⋯ 点击展开，区域外点击收起（刷新按钮常显）</summary>
     private async Task ToggleBrowseActions()
     {
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         _browseActionsOpen = !_browseActionsOpen;
         if (_browseActionsOpen)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
@@ -262,9 +264,6 @@
         previousCts?.Cancel();
         _loading = true;
         _pageIndex = 1;
-        // 不用 using：CoreUnify.Dispose 对无 SN 实例（无参构造）会从静态容器
-        // Remove(null) 抛 ArgumentNullException("key")（外部库缺陷），
-        // 在 finally 中安全释放（HttpClient 仍会被 Dispose）
         var handler = new PluginBrowseHandler();
         try
         {
@@ -305,7 +304,7 @@
                 _loading = false;
             }
             refreshCts.Dispose();
-            try { handler.Dispose(); } catch { /* CoreUnify 无 SN Dispose 缺陷，忽略 */ }
+            handler.Dispose();
         }
     }
 

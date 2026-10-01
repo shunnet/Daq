@@ -134,23 +134,20 @@ public class AppStateService
     /// <summary>
     /// 实体变更：地址/插件信息修改后调用 → 刷新项目树全部引用与名称（感知更新）→ 持久化项目树。
     /// 对齐原版 GlobalConfigModel.RefreshAsync + 节点 OnInfoEvent 后的 SetAsync：一处改变，所有用到的地方跟着变，且名称变更落盘。
-    /// 先生成不可变 JSON 快照，再把异步写入加入本服务拥有的串行任务链，避免未托管后台任务和并发序列化集合。
+    /// 任务链拥有全部写入；取得配置写门后再读取最新树，避免排队的旧快照覆盖后来的直接项目编辑。
     /// </summary>
     public void NotifyEntityChanged()
     {
-        string snapshot;
         lock (ProjectTreeLock)
-        {
             RefreshProjectBindings();
-            snapshot = ProjectDict.ToJson(true);
-        }
         lock (_persistenceLock)
-            _pendingPersistence = PersistProjectsAfterEntityChangeAsync(_pendingPersistence, snapshot);
+            _pendingPersistence = PersistProjectsAfterEntityChangeAsync(_pendingPersistence);
         EntityChanged?.Invoke();
     }
 
-    /// <summary>等待上一次实体写入结束后持久化本次不可变快照。</summary>
-    private async Task PersistProjectsAfterEntityChangeAsync(Task previous, string snapshot)
+    /// <summary>等待前次写入，按配置写门→项目结构锁的顺序生成最新快照，再异步落盘。</summary>
+    /// <param name="previous">本服务拥有的上一次实体写入任务。</param>
+    private async Task PersistProjectsAfterEntityChangeAsync(Task previous)
     {
         try
         {
@@ -158,6 +155,8 @@ public class AppStateService
             await ConfigSaveGate.WaitAsync().ConfigureAwait(false);
             try
             {
+                string snapshot;
+                lock (ProjectTreeLock) snapshot = ProjectDict.ToJson(true);
                 if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(WebPaths.ProjectConfigPath, snapshot).ConfigureAwait(false))
                     _logger.Push("[Error] 项目配置感知更新落盘失败: ProjectConfig.json 可能被占用");
             }
@@ -262,12 +261,22 @@ public class AppStateService
     #region 路径工具
     /// <summary>
     /// 绝对化插件配置的 ConfigPath：WPF 存的是相对路径（config/daq），
-    /// 统一解析到数据目录，保证 per-SN 参数文件在 WPF/Web 间读写同一位置。
+    /// 统一解析到数据目录；空白、非法或越界路径回退到当前插件类型的默认目录。
     /// </summary>
     public static void NormalizeConfigPath(PluginConfigModel model)
     {
-        if (!string.IsNullOrWhiteSpace(model.ConfigPath) && !Path.IsPathRooted(model.ConfigPath))
-            model.ConfigPath = Path.GetFullPath(Path.Combine(WebPaths.DataDir, model.ConfigPath));
+        var fallback = Path.GetFullPath(Path.Combine(WebPaths.ConfigPath, model.Type == Snet.Model.@enum.PluginType.Daq ? "daq" : "mq"));
+        try
+        {
+            var path = string.IsNullOrWhiteSpace(model.ConfigPath) ? fallback
+                : Path.GetFullPath(Path.Combine(WebPaths.DataDir, model.ConfigPath));
+            // 导入的相对 ../ 路径与外部绝对路径同样需要约束，避免后续保存写出数据目录。
+            model.ConfigPath = IsPathUnder(path, WebPaths.DataDir) ? path : fallback;
+        }
+        catch (Exception ex) when (ex is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            model.ConfigPath = fallback;
+        }
     }
 
     /// <summary>绝对路径是否位于某根目录之下（用于识别迁移残留的旧环境路径）</summary>
@@ -288,18 +297,23 @@ public class AppStateService
     /// <summary>导入项目树准备：初始化父子关系 + 全展开 + 回灌全局引用（对齐 LoadAllAsync 处理流程，供导入功能复用）。缺失地址同步落库</summary>
     public void PrepareImportedProjects(ObservableCollection<IProjectTreeViewModel> projects)
     {
+        // 事务成功后才回灌字典；冲突不能留下仅存在于内存中的地址副本。
+        var imported = AddressStore.Import<AddressModel>(_dbGate.Db, _dbGate.DbLock,
+            ProjectHandlerCore.GetReferencedAddresses(projects));
+        foreach (var address in imported)
+            AddressDict.TryAdd(address.Guid, address);
         ProjectHandlerCore.InitChildrenParent(projects);
         foreach (var node in projects)
         {
             node.IsExpanded = true;
             foreach (var child in node.Children)
                 ExpandAll(child);
-            RebindProjectNode(node, persistMissingAddresses: true);
+            RebindProjectNode(node);
         }
     }
 
     /// <summary>回灌项目树节点的全局引用（DaqDetails/AddressDetails/MqDetails → 全局字典），防断链</summary>
-    private void RebindProjectNode(IProjectTreeViewModel node, bool persistMissingAddresses = false)
+    private void RebindProjectNode(IProjectTreeViewModel node)
     {
         if (node.DaqDetails is not null)
         {
@@ -319,13 +333,13 @@ public class AppStateService
         if (node.Details is not null)
         {
             foreach (var detail in node.Details)
-                RebindDetailNode(detail, persistMissingAddresses);
+                RebindDetailNode(detail);
         }
         foreach (var child in node.Children)
-            RebindProjectNode(child, persistMissingAddresses);
+            RebindProjectNode(child);
     }
 
-    private void RebindDetailNode(IProjectDetailsTreeViewModel node, bool persistMissingAddresses)
+    private void RebindDetailNode(IProjectDetailsTreeViewModel node)
     {
         if (node.AddressDetails is not null)
         {
@@ -337,27 +351,6 @@ public class AppStateService
             else
             {
                 IAddressModel target = node.AddressDetails;
-                if (persistMissingAddresses)
-                {
-                    // 导入的项目引用本机不存在的地址：转为 AddressModel 实体落库（保留 Guid），避免项目树与 DB 长期分叉
-                    var source = node.AddressDetails;
-                    var entity = new AddressModel
-                    {
-                        Guid = source.Guid,
-                        Address = source.Address,
-                        AnotherName = source.AnotherName,
-                        Type = source.Type,
-                        Length = source.Length,
-                        EncodingType = source.EncodingType,
-                        Describe = source.Describe,
-                        Topic = source.Topic,
-                        SimplifyValue = source.SimplifyValue,
-                        ExpandParam = source.ExpandParam,
-                        Time = source.Time
-                    };
-                    var result = _dbGate.InsertUniqueAddresses(new[] { entity });
-                    target = result.Success > 0 ? entity : target;
-                }
                 node.AddressDetails = target;
                 AddressDict[guid] = target;
             }
@@ -378,7 +371,7 @@ public class AppStateService
             node.UpdateMqName();
         }
         foreach (var child in node.Children)
-            RebindDetailNode(child, persistMissingAddresses);
+            RebindDetailNode(child);
     }
     #endregion
 }

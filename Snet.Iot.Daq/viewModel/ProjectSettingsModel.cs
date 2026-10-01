@@ -202,7 +202,21 @@ namespace Snet.Iot.Daq.viewModel
             string file = GlobalConfigModel.SelectFiles("json");
             if (!string.IsNullOrEmpty(file))
             {
-                ObservableCollection<IProjectTreeViewModel>? models = FileHandler.FileToString(file).ToJsonEntity<ObservableCollection<IProjectTreeViewModel>>();
+                ObservableCollection<IProjectTreeViewModel>? models;
+                try
+                {
+                    const long maxProjectFileSize = 10 * 1024 * 1024;
+                    if (new FileInfo(file).Length > maxProjectFileSize)
+                        throw new InvalidDataException("项目文件超过大小限制");
+                    models = (await File.ReadAllTextAsync(file)).ToJsonEntity<ObservableCollection<IProjectTreeViewModel>>();
+                }
+                catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or SQLite.SQLiteException or ArgumentException)
+                {
+                    Snet.Log.LogHelper.Error($"项目导入失败: {ex.Message}");
+                    await Windows.Controls.message.MessageBox.Show("导入失败".GetLanguageValue(App.LanguageOperate),
+                        "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                    return;
+                }
                 if (models == null)
                 {
                     await Windows.Controls.message.MessageBox.Show("导入失败".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
@@ -217,20 +231,41 @@ namespace Snet.Iot.Daq.viewModel
                         }
                     }
 
+                    try
+                    {
+                        var addresses = AddressStore.Import<AddressModel>(GlobalConfigModel.sqliteOperate, GlobalConfigModel.DbLock,
+                            ProjectHandlerCore.GetReferencedAddresses(models));
+                        foreach (var address in addresses) GlobalConfigModel.AddressDict.TryAdd(address.Guid, address);
+                    }
+                    catch (Exception ex) when (ex is InvalidDataException or SQLite.SQLiteException)
+                    {
+                        Snet.Log.LogHelper.Error($"项目地址导入失败: {ex.Message}");
+                        await Windows.Controls.message.MessageBox.Show("导入失败".GetLanguageValue(App.LanguageOperate),
+                            "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        return;
+                    }
                     //设置父级关系
                     models.InitChildrenParent();
+                    // 先验证持久化成功，再替换现有树；失败时原项目保持不变。
+                    if (!await ProjectHandler.SaveConfigAsync(models, GlobalConfigModel.UI_ProjectConfigPath))
+                    {
+                        await Windows.Controls.message.MessageBox.Show("项目配置写入失败，请检查磁盘和文件占用情况".GetLanguageValue(App.LanguageOperate),
+                            "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        return;
+                    }
                     //回灌全局引用（插件/地址），避免导入的树与全局字典断链
                     models.RebindGlobals();
-                    ProjectNode.Clear();
-                    ProjectNode = models;
+                    // 保持全局集合实例稳定，控制台与项目界面继续使用同一集合。
+                    GlobalConfigModel.ProjectDict.Clear();
+                    foreach (var node in models) GlobalConfigModel.ProjectDict.Add(node);
+                    ProjectNode = GlobalConfigModel.ProjectDict;
                     ProjectNodeSelectedItem = ProjectHandlerCore.GetFirstSelectItem(ProjectNode);
+                    DetailsNode.Clear();
                     if (ProjectNodeSelectedItem?.NodeType == ProjectNodeType.Device)
                     {
-                        DetailsNode.Clear();
-                        _ = AddSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
+                        await AddSelectDeviceNodeAsync(ProjectNodeSelectedItem);
                     }
-                    //保存配置
-                    await ProjectHandler.SaveConfigAsync(ProjectNode, GlobalConfigModel.UI_ProjectConfigPath);
+                    await GlobalConfigModel.RefreshAsync();
                     await Windows.Controls.message.MessageBox.Show("导入成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
             }
@@ -304,7 +339,7 @@ namespace Snet.Iot.Daq.viewModel
                     ProjectNodeSelectedItem?.Children.Add(item);  //选中的节点添加子集
                     ProjectNodeSelectedItem = item; //在把子集设置为选中的节点
                     await ProjectNodeSelectedItem?.SetAsync(ProjectNode);
-                    _ = AddSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
+                    await AddSelectDeviceNodeAsync(ProjectNodeSelectedItem);
                     await GlobalConfigModel.RefreshAsync();
                 }
                 else
@@ -332,7 +367,7 @@ namespace Snet.Iot.Daq.viewModel
                     //更新特殊数据
                     Parent?.UpdateSpecialData();
                     //清理tab
-                    _ = RemoveSelectDeviceNodeAsync(ProjectNodeSelectedItem).ConfigureAwait(false);
+                    await RemoveSelectDeviceNodeAsync(ProjectNodeSelectedItem);
                     // 清空选中项，防止绑定未更新
                     ProjectNodeSelectedItem = null;
                     //保存配置

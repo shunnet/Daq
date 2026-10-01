@@ -33,6 +33,7 @@ namespace Snet.Iot.Daq.effects
             SkinHandler.OnSkinEvent += SkinHandler_OnSkinEvent;
             _canvas = canvas;
             _flakeCount = flakeCount;
+            SkinHandler_OnSkinEvent(null, new EventSkinResult { Skin = SkinHandler.GetSkin() });
             InitSnowFlakes();
 
             if (_canvas.Parent is FrameworkElement parentElement)
@@ -41,12 +42,13 @@ namespace Snet.Iot.Daq.effects
                 parentElement.SizeChanged += OnSizeChanged;
             }
 
-            SkinHandler_OnSkinEvent(null, new EventSkinResult { Skin = SkinHandler.GetSkin() });
+
         }
 
         private void SkinHandler_OnSkinEvent(object? sender, Windows.Core.data.EventSkinResult e)
         {
-            switch (e.Skin.Value)
+            if (e.Skin is not { } skin) return;
+            switch (skin)
             {
                 case Windows.Core.@enum.SkinType.Dark:
                     _color = _white;
@@ -159,7 +161,8 @@ namespace Snet.Iot.Daq.effects
                 double distSq = dx * dx + dy * dy;
                 double minDistSq = minDist * minDist;
 
-                if (distSq < minDistSq)
+                // 鼠标与粒子重合时距离为零，必须避开除零，否则坐标变成 NaN 并永久停止显示。
+                if (distSq > 0 && distSq < minDistSq)
                 {
                     double dist = Math.Sqrt(distSq);
                     double force = minDist / (distSq);

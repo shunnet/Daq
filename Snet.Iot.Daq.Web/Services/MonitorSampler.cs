@@ -19,6 +19,9 @@ public sealed class MonitorSampler : IAsyncDisposable
     private long _prevIdle;
     private bool _firstCpu = true;
     private int _disposed;
+    /// <summary>只保护启动与释放任务发布；等待循环结束在锁外进行。</summary>
+    private readonly object _lifecycleGate = new();
+    private Task? _disposeTask;
 
     /// <summary>每次成功采集系统指标后触发。</summary>
     public event Action<MonitorSample>? Sample;
@@ -70,21 +73,24 @@ public sealed class MonitorSampler : IAsyncDisposable
     /// <summary>启动每秒一次的系统指标采样循环；重复调用不会创建额外循环。</summary>
     public void Start()
     {
-        ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
-        if (_loop is not null) return;
-        if (OperatingSystem.IsWindows())
+        lock (_lifecycleGate)
         {
-            try
+            ObjectDisposedException.ThrowIf(Volatile.Read(ref _disposed) != 0, this);
+            if (_loop is not null) return;
+            if (OperatingSystem.IsWindows())
             {
-                // 本机 CPU 总负载（所有核）
-                _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+                try
+                {
+                    // 本机 CPU 总负载（所有核）
+                    _cpuCounter = new PerformanceCounter("Processor", "% Processor Time", "_Total");
+                }
+                catch
+                {
+                    _cpuCounter = null;
+                }
             }
-            catch
-            {
-                _cpuCounter = null;
-            }
+            _loop ??= LoopAsync();
         }
-        _loop ??= LoopAsync();
     }
 
     #endregion
@@ -212,16 +218,32 @@ public sealed class MonitorSampler : IAsyncDisposable
 
     #region 释放
     /// <summary>取消采样循环，等待其退出后释放计时器和系统性能计数器。</summary>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
-        if (Interlocked.Exchange(ref _disposed, 1) != 0) return;
-        _cts.Cancel();
-        if (_loop is not null)
-            await _loop.ConfigureAwait(false);
-        _timer.Dispose();
-        _cpuCounter?.Dispose();
-        _cts.Dispose();
-        GC.SuppressFinalize(this);
+        lock (_lifecycleGate)
+        {
+            if (_disposeTask is not null) return new(_disposeTask);
+            Volatile.Write(ref _disposed, 1);
+            return new(_disposeTask = DisposeCoreAsync());
+        }
+    }
+
+    /// <summary>锁外取消并等待唯一采样循环，失败时也释放计时器、计数器和取消源。</summary>
+    private async Task DisposeCoreAsync()
+    {
+        await Task.Yield();
+        try
+        {
+            _cts.Cancel();
+            if (_loop is not null) await _loop.ConfigureAwait(false);
+        }
+        finally
+        {
+            _timer.Dispose();
+            _cpuCounter?.Dispose();
+            _cts.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
     #endregion
 }

@@ -15,6 +15,79 @@ namespace Snet.Iot.Daq.Core.handler
     /// </summary>
     public static class ProjectHandlerCore
     {
+        /// <summary>按真实项目结构检查地址引用，供两端删除前使用；不读取文件，也不匹配无关文本。</summary>
+        /// <param name="nodes">项目根节点；调用方负责与项目编辑互斥。</param>
+        /// <param name="guid">地址的完整唯一标识，空标识不视为引用。</param>
+        /// <returns>任意详情节点引用该地址时返回 true；循环和共享节点仅遍历一次。</returns>
+        public static bool IsAddressReferenced(IEnumerable<IProjectTreeViewModel> nodes, string guid)
+        {
+            if (string.IsNullOrWhiteSpace(guid)) return false;
+            var projects = new Stack<IProjectTreeViewModel>(nodes);
+            var details = new Stack<IProjectDetailsTreeViewModel>();
+            var visitedProjects = new HashSet<IProjectTreeViewModel>(ReferenceEqualityComparer.Instance);
+            var visitedDetails = new HashSet<IProjectDetailsTreeViewModel>(ReferenceEqualityComparer.Instance);
+            while (projects.TryPop(out var project))
+            {
+                if (!visitedProjects.Add(project)) continue;
+                if (project.Children is not null)
+                    foreach (var child in project.Children) projects.Push(child);
+                if (project.Details is not null)
+                    foreach (var detail in project.Details) details.Push(detail);
+            }
+            while (details.TryPop(out var detail))
+            {
+                if (!visitedDetails.Add(detail)) continue;
+                if (string.Equals(detail.AddressDetails?.Guid, guid, StringComparison.Ordinal)) return true;
+                if (detail.Children is not null)
+                    foreach (var child in detail.Children) details.Push(child);
+            }
+            return false;
+        }
+
+        /// <summary>取得项目结构中引用的地址快照，供两端导入回灌；循环及共享节点只访问一次。</summary>
+        /// <param name="nodes">项目根集合；调用方负责遍历期间的结构同步。</param>
+        /// <returns>真实节点引用的地址列表，不解析描述文本，也不更改节点状态。</returns>
+        public static List<IAddressModel> GetReferencedAddresses(IEnumerable<IProjectTreeViewModel> nodes)
+        {
+            var result = new List<IAddressModel>();
+            var projects = new Stack<IProjectTreeViewModel>(nodes);
+            var details = new Stack<IProjectDetailsTreeViewModel>();
+            var visitedProjects = new HashSet<IProjectTreeViewModel>(ReferenceEqualityComparer.Instance);
+            var visitedDetails = new HashSet<IProjectDetailsTreeViewModel>(ReferenceEqualityComparer.Instance);
+            while (projects.TryPop(out var project))
+            {
+                if (!visitedProjects.Add(project)) continue;
+                foreach (var child in project.Children) projects.Push(child);
+                foreach (var detail in project.Details) details.Push(detail);
+            }
+            while (details.TryPop(out var detail))
+            {
+                if (!visitedDetails.Add(detail)) continue;
+                if (detail.AddressDetails is not null) result.Add(detail.AddressDetails);
+                foreach (var child in detail.Children) details.Push(child);
+            }
+            return result;
+        }
+
+        /// <summary>统计设备详情树中的全部地址节点，包含尚未配置转发插件的点位。</summary>
+        /// <param name="nodes">设备详情根节点；为空时返回零。调用方负责结构遍历与修改的同步。</param>
+        /// <returns>地址节点数量，不修改选择、展开或父子关系。</returns>
+        public static int CountAddressNodes(IEnumerable<IProjectDetailsTreeViewModel>? nodes)
+        {
+            if (nodes is null) return 0;
+            var count = 0;
+            var pending = new Stack<IProjectDetailsTreeViewModel>(nodes);
+            var visited = new HashSet<IProjectDetailsTreeViewModel>(ReferenceEqualityComparer.Instance);
+            while (pending.TryPop(out var node))
+            {
+                if (!visited.Add(node)) continue;
+                if (node.NodeType == ProjectDetailsNodeType.Address) count++;
+                if (node.Children is not null)
+                    foreach (var child in node.Children) pending.Push(child);
+            }
+            return count;
+        }
+
         #region IProjectDetailsTreeViewModel
         /// <summary>
         /// 确保整棵树中只有一个节点被选中
@@ -625,7 +698,7 @@ namespace Snet.Iot.Daq.Core.handler
 
         /// <summary>
         /// 将 ProjectDetailsTreeViewModel 树转换为
-        /// AddressModel -> List<PluginConfigModel> 的并发字典
+        /// AddressModel -> List<PluginConfigModel> 的并发字典；未绑定 MQ 的地址保留空列表，仍参与采集和 UA 转发。
         /// </summary>
         public static ConcurrentDictionary<IAddressModel, List<PluginConfigModel>> ToAddressMqDictionary(this IEnumerable<IProjectDetailsTreeViewModel> roots)
         {
@@ -634,57 +707,29 @@ namespace Snet.Iot.Daq.Core.handler
             if (roots == null)
                 return dict;
 
-            foreach (var root in roots)
+            var pending = new Stack<(IProjectDetailsTreeViewModel Node, IAddressModel? Address)>();
+            var visited = new HashSet<IProjectDetailsTreeViewModel>(ReferenceEqualityComparer.Instance);
+            foreach (var root in roots) pending.Push((root, null));
+            while (pending.TryPop(out var item))
             {
-                Traverse(root, null, dict);
+                var node = item.Node;
+                if (!visited.Add(node)) continue;
+                var address = item.Address;
+                if (node.NodeType == ProjectDetailsNodeType.Address && node.AddressDetails is not null)
+                {
+                    address = node.AddressDetails;
+                    dict.TryAdd(address, new List<PluginConfigModel>());
+                }
+                if (node.NodeType == ProjectDetailsNodeType.Mq && address is not null && node.MqDetails is not null)
+                {
+                    var list = dict.GetOrAdd(address, static _ => new List<PluginConfigModel>());
+                    if (!list.Any(plugin => plugin.Guid == node.MqDetails.Guid)) list.Add(node.MqDetails);
+                }
+                if (node.Children is not null)
+                    foreach (var child in node.Children) pending.Push((child, address));
             }
-
             return dict;
         }
-
-
-        /// <summary>
-        /// 递归遍历节点
-        /// </summary>
-        private static void Traverse(IProjectDetailsTreeViewModel node, IAddressModel? currentAddress, ConcurrentDictionary<IAddressModel, List<PluginConfigModel>> dict)
-        {
-            if (node == null)
-                return;
-
-            // 当前是 Address 节点
-            if (node.NodeType == ProjectDetailsNodeType.Address &&
-                node.AddressDetails != null)
-            {
-                currentAddress = node.AddressDetails;
-            }
-
-            // 当前是 Mq 节点
-            if (node.NodeType == ProjectDetailsNodeType.Mq &&
-                currentAddress != null &&
-                node.MqDetails != null)
-            {
-                // 获取或创建 List
-                var list = dict.GetOrAdd(currentAddress, _ => new List<PluginConfigModel>());
-
-                // ⚠️ List 本身不是线程安全的，必须加锁
-                lock (list)
-                {
-                    list.Add(node.MqDetails);
-                }
-            }
-
-            // 递归子节点
-            if (node.Children == null || node.Children.Count == 0)
-                return;
-
-            foreach (var child in node.Children)
-            {
-                Traverse(child, currentAddress, dict);
-            }
-        }
-
-
-
 
         /// <summary>
         /// 使用 ToString() 匹配节点，只更新 IsSoftStart，并返回源集合中的对象。<br/>
@@ -778,7 +823,7 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="db">SQLite 连接</param>
         /// <param name="dbLock">数据库访问锁（<see cref="SQLiteConnection"/> 非线程安全，由调用方提供）</param>
         /// <param name="items">待插入的数据集合</param>
-        /// <param name="onInserted">可选回调，每次成功插入后对实体执行（可用于同步缓存）</param>
+        /// <param name="onInserted">提交成功并释放数据库锁后逐项执行的可选回调；回滚不调用。回调异常不会撤销已提交事务。</param>
         /// <param name="keySelectors">查重字段选择器，支持多个</param>
         /// <returns>插入结果统计（成功数、重复数、失败数）</returns>
         public static BatchInsertResult InsertUnique<T, TKey>(
@@ -790,6 +835,8 @@ namespace Snet.Iot.Daq.Core.handler
                 where T : class, new()
         {
             var result = new BatchInsertResult();
+            // 外部通知只能在事务提交且数据库锁释放后执行，回滚时不得暴露未提交实体。
+            var inserted = onInserted is null ? null : new List<T>();
 
             lock (dbLock)
             {
@@ -813,6 +860,12 @@ namespace Snet.Iot.Daq.Core.handler
                 {
                     foreach (var item in items)
                     {
+                        // 泛型工具仍支持其他实体；地址额外遵循两端一致的业务校验。
+                        if (item is IAddressModel address && !AddressStore.IsValid(address))
+                        {
+                            result.Failed++;
+                            continue;
+                        }
                         bool isDuplicate = false;
 
                         for (int i = 0; i < keySelectors.Length; i++)
@@ -834,7 +887,7 @@ namespace Snet.Iot.Daq.Core.handler
                         if (db.Insert(item) > 0)
                         {
                             result.Success++;
-                            onInserted?.Invoke(item);
+                            inserted?.Add(item);
 
                             for (int i = 0; i < keySelectors.Length; i++)
                             {
@@ -851,6 +904,8 @@ namespace Snet.Iot.Daq.Core.handler
                 });
             }
 
+            if (onInserted is not null)
+                foreach (var item in inserted!) onInserted(item);
             return result;
         }
     }

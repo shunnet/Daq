@@ -32,7 +32,8 @@ namespace Snet.Iot.Daq.handler
                 foreach (var item in plugins)
                 {
                     GlobalConfigModel.PluginDict[item.Guid] = item;
-                    GlobalConfigModel.PluginDict[item.Guid].OnInfoEventHandlerAsync(item, EventInfoResult.CreateSuccessResult("set event"));
+                    _ = item.OnInfoEventHandlerAsync(item, EventInfoResult.CreateSuccessResult("set event"))
+                        .ContinueWith(task => Snet.Log.LogHelper.Error(task.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
                 }
             }
             return GlobalConfigModel.PluginDict;
@@ -46,8 +47,10 @@ namespace Snet.Iot.Daq.handler
         public static void SetPlugin(this PluginConfigModel plugin)
         {
             GlobalConfigModel.PluginDict[plugin.Guid] = plugin;
-            GlobalConfigModel.PluginDict[plugin.Guid].OnInfoEventHandlerAsync(plugin, EventInfoResult.CreateSuccessResult("set event"));
-            _ = GlobalConfigModel.RefreshAsync().ConfigureAwait(false);
+            _ = plugin.OnInfoEventHandlerAsync(plugin, EventInfoResult.CreateSuccessResult("set event"))
+                .ContinueWith(task => Snet.Log.LogHelper.Error(task.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
+            _ = GlobalConfigModel.RefreshAsync()
+                .ContinueWith(task => Snet.Log.LogHelper.Error(task.Exception?.Message ?? "异步通知失败"), TaskContinuationOptions.OnlyOnFaulted);
         }
 
         /// <summary>

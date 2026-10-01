@@ -139,6 +139,8 @@ public class AuthService
         try
         {
             var expected = Convert.FromBase64String(user.PasswordHash);
+            // 空摘要与空派生结果会比较为相等；只接受本格式规定的 32 字节摘要。
+            if (expected.Length != 32) return false;
             var actual = Rfc2898DeriveBytes.Pbkdf2(password, salt, Iterations, HashAlgorithmName.SHA256, expected.Length);
             return CryptographicOperations.FixedTimeEquals(actual, expected);
         }

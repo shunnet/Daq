@@ -4,7 +4,6 @@ using Snet.Iot.Daq.Core.data;
 using Snet.Model.data;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.IO.Compression;
 using System.Text;
 
 namespace Snet.Iot.Daq.Core.handler
@@ -40,6 +39,10 @@ namespace Snet.Iot.Daq.Core.handler
             new(@"^[0-9]+(\.[0-9]+){0,3}(-[A-Za-z0-9\.\-]+)?$", System.Text.RegularExpressions.RegexOptions.Compiled);
 
         // ============ 实例字段 ============
+        /// <summary>短同步边界只用于发布任务、令牌和终态，不在锁内等待 I/O。</summary>
+        private readonly object lifecycleGate = new();
+        private readonly List<Task> activeDownloads = new();
+        private Task? disposalTask;
         private bool _disposed;
         private readonly string _pluginStoragePath;
         private CancellationTokenSource _globalCts = new CancellationTokenSource();
@@ -53,7 +56,7 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>
         /// 无参构造（默认使用临时目录作为存储路径）
         /// </summary>
-        public PluginDownloadHandler() : base()
+        public PluginDownloadHandler() : this(Path.Combine(Path.GetTempPath(), "Snet.Iot.Daq", "plugins"))
         {
         }
 
@@ -72,15 +75,15 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         public void Stop()
         {
-            var oldCts = Interlocked.Exchange(ref _globalCts, new CancellationTokenSource());
-            try
+            CancellationTokenSource source;
+            lock (lifecycleGate)
             {
-                oldCts.Cancel();
+                if (_disposed) return;
+                source = _globalCts;
+                _globalCts = new CancellationTokenSource();
             }
-            finally
-            {
-                oldCts.Dispose();
-            }
+            try { source.Cancel(); }
+            finally { source.Dispose(); }
         }
 
         // ============ 公开下载方法 ============
@@ -114,13 +117,32 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         // ============ 内部核心逻辑 ============
-        private async Task<bool> DownloadInternalAsync(IEnumerable<dynamic> packages, bool zip, CancellationToken cancellationToken)
+        /// <summary>在同步边界内创建链接令牌并登记完整作业，保证停止或释放不会与令牌注册交错。</summary>
+        private Task<bool> DownloadInternalAsync(IEnumerable<dynamic> packages, bool zip, CancellationToken cancellationToken)
         {
-            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(_globalCts.Token, cancellationToken);
-            var token = linkedCts.Token;
+            lock (lifecycleGate)
+            {
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                var linked = CancellationTokenSource.CreateLinkedTokenSource(_globalCts.Token, cancellationToken);
+                Task<bool> task;
+                try { task = DownloadCoreAsync(packages.ToList(), zip, linked); }
+                catch { linked.Dispose(); throw; }
+                activeDownloads.RemoveAll(static task => task.IsCompleted);
+                activeDownloads.Add(task);
+                return task;
+            }
+        }
+
+        /// <summary>执行一次批量发布及压缩；拥有链接令牌，并将取消转换为原有的 false 返回契约。</summary>
+        private async Task<bool> DownloadCoreAsync(List<dynamic> packageList, bool zip, CancellationTokenSource source)
+        {
+            // 先登记所有权，再允许外部消息回调或 I/O 执行。
+            await Task.Yield();
+            using var linkedCts = source;
+            var token = source.Token;
 
             var successPackages = new ConcurrentBag<string>();
-            var tasks = packages.Select(async pkg =>
+            var tasks = packageList.Select(async pkg =>
             {
                 await PublishSemaphore.WaitAsync(token);
                 try
@@ -135,7 +157,7 @@ namespace Snet.Iot.Daq.Core.handler
                 catch (Exception ex)
                 {
                     string msg = LanguageHandler.GetLanguage() == Model.@enum.LanguageType.zh ? "下载失败" : "Download failed";
-                    OnInfoEventHandlerAsync(this, EventInfoResult.CreateFailureResult($"{msg} [{pkg.PackName}]: {ex.Message}"));
+                    await OnInfoEventHandlerAsync(this, EventInfoResult.CreateFailureResult($"{msg} [{pkg.PackName}]: {ex.Message}"));
                 }
                 finally
                 {
@@ -146,19 +168,17 @@ namespace Snet.Iot.Daq.Core.handler
             try
             {
                 await Task.WhenAll(tasks);
+                if (zip && !successPackages.IsEmpty && !await ZipPackagesAsync(successPackages.ToList(), token))
+                    return false;
+                return successPackages.Count == packageList.Count;
             }
             catch (OperationCanceledException)
             {
-                OnInfoEventHandlerAsync(this, EventInfoResult.CreateFailureResult(LanguageHandler.GetLanguage() == Model.@enum.LanguageType.zh ? "下载已被取消" : "Download canceled"));
+                await OnInfoEventHandlerAsync(this, EventInfoResult.CreateFailureResult(LanguageHandler.GetLanguage() == Model.@enum.LanguageType.zh ? "下载已被取消" : "Download canceled"));
                 return false;
             }
 
-            if (zip && !successPackages.IsEmpty)
-            {
-                await ZipPackagesAsync(successPackages.ToList(), token);
-            }
 
-            return successPackages.Count == packages.Count();
         }
 
         /// <summary>
@@ -168,7 +188,7 @@ namespace Snet.Iot.Daq.Core.handler
         {
             // 包名/版本白名单校验：杜绝参数注入（如 --source http://evil）与路径穿越（如 ..\..\x）
             if (string.IsNullOrWhiteSpace(packageName) ||
-                !s_packageNameRegex.IsMatch(packageName) ||
+                !s_packageNameRegex.IsMatch(packageName) || packageName == "." ||
                 packageName.Contains("..", StringComparison.Ordinal))
             {
                 throw new ArgumentException($"非法的包名：{packageName}");
@@ -183,8 +203,9 @@ namespace Snet.Iot.Daq.Core.handler
 
             // 路径越界校验：确保输出目录仍在插件存储根目录内
             string fullOutDir = Path.GetFullPath(outDir);
-            string fullStorage = Path.GetFullPath(_pluginStoragePath);
-            if (!fullOutDir.Equals(fullStorage, StringComparison.OrdinalIgnoreCase) &&
+            string fullStorage = Path.GetFullPath(_pluginStoragePath).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            // 输出只能是根目录的子目录，不能等于根目录；否则清理旧输出会删除所有已装插件。
+            if (fullOutDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar).Equals(fullStorage, StringComparison.OrdinalIgnoreCase) ||
                 !fullOutDir.StartsWith(fullStorage + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
             {
                 throw new ArgumentException($"输出目录越界：{packageName}");
@@ -194,7 +215,7 @@ namespace Snet.Iot.Daq.Core.handler
 
             try
             {
-                SafeDelete(outDir, throwOnFailure: true);
+                await SafeDeleteAsync(outDir, throwOnFailure: true);
                 Directory.CreateDirectory(workDir);
 
                 string projectName = $"{packageName}.Runtime";
@@ -213,19 +234,20 @@ namespace Snet.Iot.Daq.Core.handler
                     ["publish", "-c", "Release", "-o", outDir],
                     projectDir, cancellationToken);
 
-                OnInfoEventHandlerAsync(this, EventInfoResult.CreateSuccessResult($"[OK] {packageName} {version ?? "latest"}"));
+                await OnInfoEventHandlerAsync(this, EventInfoResult.CreateSuccessResult($"[OK] {packageName} {version ?? "latest"}"));
             }
             finally
             {
-                SafeDelete(workDir);
+                await SafeDeleteAsync(workDir);
             }
         }
 
         /// <summary>
         /// 将发布成功的包目录压缩为 ZIP（并行且节流，不卡界面）
         /// </summary>
-        private async Task ZipPackagesAsync(List<string> packageNames, CancellationToken cancellationToken)
+        private async Task<bool> ZipPackagesAsync(List<string> packageNames, CancellationToken cancellationToken)
         {
+            int success = 0;
             var tasks = packageNames.Select(async pkg =>
             {
                 await ZipSemaphore.WaitAsync(cancellationToken);
@@ -238,17 +260,11 @@ namespace Snet.Iot.Daq.Core.handler
                     if (!Directory.Exists(dir))
                         throw new DirectoryNotFoundException($"目录不存在: {dir}");
 
-                    if (File.Exists(zip))
-                        File.Delete(zip);
+                    // 分块异步压缩支持中途取消；新包完整写成之前保留已有 ZIP。
+                    await PluginArchive.CreateAsync(dir, zip, cancellationToken);
 
-                    // 在独立线程上执行压缩，避免占用线程池导致界面卡顿
-                    await Task.Factory.StartNew(() =>
-                        ZipFile.CreateFromDirectory(dir, zip, CompressionLevel.Optimal, false),
-                        cancellationToken,
-                        TaskCreationOptions.LongRunning,
-                        TaskScheduler.Default);
-
-                    OnInfoEventHandlerAsync(this,
+                    Interlocked.Increment(ref success);
+                    await OnInfoEventHandlerAsync(this,
                         EventInfoResult.CreateSuccessResult($"[ZIP] {Path.GetFileName(zip)}"));
                 }
                 catch (OperationCanceledException)
@@ -257,7 +273,7 @@ namespace Snet.Iot.Daq.Core.handler
                 }
                 catch (Exception ex)
                 {
-                    OnInfoEventHandlerAsync(this,
+                    await OnInfoEventHandlerAsync(this,
                         EventInfoResult.CreateFailureResult($"[ZIP FAIL] {pkg}: {ex.Message}"));
                 }
                 finally
@@ -267,6 +283,7 @@ namespace Snet.Iot.Daq.Core.handler
             });
 
             await Task.WhenAll(tasks);
+            return success == packageNames.Count;
         }
 
         /// <summary>
@@ -294,34 +311,50 @@ namespace Snet.Iot.Daq.Core.handler
             using var process = new Process { StartInfo = psi };
             process.Start();
 
-            var outputTask = process.StandardOutput.ReadToEndAsync();
-            var errorTask = process.StandardError.ReadToEndAsync();
-
             using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
             cts.CancelAfter(DefaultTimeoutMs);
-
+            var outputTask = ReadOutputAsync(process.StandardOutput, cts.Token);
+            var errorTask = ReadOutputAsync(process.StandardError, cts.Token);
             try
             {
-                await process.WaitForExitAsync(cts.Token);
+                await process.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+                await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
                 if (!process.HasExited)
                 {
-                    try { process.Kill(entireProcessTree: true); } catch { }
+                    try { process.Kill(entireProcessTree: true); } catch (InvalidOperationException) { }
                 }
+                try { await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false); }
+                catch (OperationCanceledException) { }
+                catch (IOException) { }
                 if (cancellationToken.IsCancellationRequested)
                     throw new OperationCanceledException(cancellationToken);
                 throw new TimeoutException($"dotnet 命令超时 ({DefaultTimeoutMs / 1000}s): {string.Join(' ', args)}");
             }
-
-            string stdOut = await outputTask;
-            string stdErr = await errorTask;
+            string stdErr = await errorTask.ConfigureAwait(false);
 
             if (process.ExitCode != 0)
                 throw new Exception($"dotnet {string.Join(' ', args)} 失败 (ExitCode={process.ExitCode}): {stdErr}");
 
-            //OnInfoEventHandlerAsync(this, EventInfoResult.CreateSuccessResult($"[dotnet] {args}: {stdOut.Trim()}"));
+        }
+
+        /// <summary>持续排空进程输出但最多保留 64 KiB 字符，防止长时间发布无限积累字符串或堵塞重定向管道。</summary>
+        /// <param name="reader">由进程持有的标准输出或错误读取器，不在此处释放。</param>
+        /// <param name="token">进程超时和取消共用的令牌。</param>
+        /// <returns>用于错误诊断的有界文本前缀。</returns>
+        private static async Task<string> ReadOutputAsync(StreamReader reader, CancellationToken token)
+        {
+            var text = new StringBuilder();
+            var buffer = new char[4096];
+            int count;
+            while ((count = await reader.ReadAsync(buffer.AsMemory(), token).ConfigureAwait(false)) != 0)
+            {
+                var retained = Math.Min(count, 64 * 1024 - text.Length);
+                if (retained > 0) text.Append(buffer, 0, retained);
+            }
+            return text.ToString();
         }
 
         // ============ 工具方法 ============
@@ -350,14 +383,15 @@ namespace Snet.Iot.Daq.Core.handler
             return "dotnet";
         }
 
-        private void SafeDelete(string path, bool throwOnFailure = false)
+        /// <summary>清理本次作业拥有的目录；消息通知可等待，强制清理失败时中止发布。</summary>
+        private async Task SafeDeleteAsync(string path, bool throwOnFailure = false)
         {
             if (Directory.Exists(path))
             {
                 try { Directory.Delete(path, true); }
                 catch (Exception ex)
                 {
-                    OnInfoEventHandlerAsync(this,
+                    await OnInfoEventHandlerAsync(this,
                         EventInfoResult.CreateFailureResult($"删除目录失败 {path}: {ex.Message}"));
                     if (throwOnFailure)
                         throw new IOException($"无法清理旧插件目录: {path}", ex);
@@ -366,26 +400,47 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         // ============ 资源释放 ============
-        public override void Dispose()
+        /// <summary>同步兼容入口；UI 应使用 DisposeAsync，以免阻塞仍需 UI 线程完成的消息回调。</summary>
+        public override void Dispose() => GetDisposalTask().GetAwaiter().GetResult();
+
+        /// <summary>进入终态、取消所有作业并等待发布及压缩退出后释放令牌和基类注册。</summary>
+        public override ValueTask DisposeAsync() => new(GetDisposalTask());
+
+        /// <summary>先在锁内发布唯一清理任务，再在锁外启动清理。</summary>
+        private Task GetDisposalTask()
         {
-            if (!_disposed)
+            TaskCompletionSource completion;
+            Task[] tasks;
+            lock (lifecycleGate)
             {
-                _globalCts.Cancel();
-                _globalCts.Dispose();
+                if (disposalTask is not null) return disposalTask;
                 _disposed = true;
+                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                disposalTask = completion.Task;
+                tasks = activeDownloads.ToArray();
             }
-            base.Dispose();
+            _ = CompleteDisposalAsync(completion, tasks);
+            return completion.Task;
         }
 
-        public override async ValueTask DisposeAsync()
+        /// <summary>清理流程由完成源共同拥有；即使作业失败也释放所有资源，并向调用方传递异常。</summary>
+        private async Task CompleteDisposalAsync(TaskCompletionSource completion, Task[] tasks)
         {
-            if (!_disposed)
+            try
             {
-                _globalCts.Cancel();
-                _globalCts.Dispose();
-                _disposed = true;
+                try
+                {
+                    _globalCts.Cancel();
+                    await Task.WhenAll(tasks).ConfigureAwait(false);
+                }
+                finally
+                {
+                    _globalCts.Dispose();
+                    base.Dispose();
+                }
+                completion.SetResult();
             }
-            await base.DisposeAsync();
+            catch (Exception ex) { completion.SetException(ex); }
         }
     }
 }

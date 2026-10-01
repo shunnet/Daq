@@ -28,13 +28,15 @@ public sealed class MenuCoordinator
         lock (_lock) _callbacks.Remove(close);
     }
 
-    /// <summary>关闭所有已注册组件的菜单（调用者随后自行设置新状态）</summary>
-    public void CloseAllOthers()
+    /// <summary>关闭其他组件的菜单，保留调用者的原状态，使重复点击能正确收起自己的菜单。</summary>
+    /// <param name="caller">调用组件注册的关闭回调；为空时关闭全部菜单。</param>
+    public void CloseAllOthers(Action? caller = null)
     {
         List<Action> snapshot;
         lock (_lock) snapshot = _callbacks.ToList();
         foreach (var cb in snapshot)
         {
+            if (cb == caller) continue;
             try { cb(); }
             catch { /* 单个组件异常不影响其余菜单关闭 */ }
         }

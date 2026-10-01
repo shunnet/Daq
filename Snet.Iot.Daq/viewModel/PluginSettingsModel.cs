@@ -15,7 +15,6 @@ using Snet.Windows.Controls.message;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;
 using System.IO;
-using System.IO.Compression;
 using System.Reflection;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -249,140 +248,143 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand UploadPlugin => uploadPlugin ??= new AsyncRelayCommand(UploadPluginAsync);
         private IAsyncRelayCommand? uploadPlugin;
+        /// <summary>有界解压并独立探测后安装；目录及清单失败时恢复备份，运行设备在清理结束后按原状态恢复。</summary>
         private async Task UploadPluginAsync()
         {
-            PluginType plugin = ComboBoxSelectedItem.Value.GetSource<PluginType>();
-            string path = Win32Handler.Select(App.LanguageOperate.GetLanguageValue("请选择文件"), false, new Dictionary<string, string> { { $"(*.zip)", $"*.zip" }, });
-            if (!path.IsNullOrWhiteSpace())
+            PluginType type = ComboBoxSelectedItem.Value.GetSource<PluginType>();
+            // 该外部 Win32 API 要求具体 Dictionary 类型；过滤器仅作为本次对话框的局部只读参数使用。
+            string path = Win32Handler.Select(App.LanguageOperate.GetLanguageValue("请选择文件"), false,
+                new Dictionary<string, string> { { "(*.zip)", "*.zip" } });
+            if (string.IsNullOrWhiteSpace(path)) return;
+            var typePath = Path.Combine(GlobalConfigModel.FilePath, type.ToString().ToLowerInvariant());
+            var zipName = Path.GetFileNameWithoutExtension(path);
+            var libPath = Path.Combine(typePath, zipName);
+            var stagingPath = Path.Combine(typePath, ".upload-tmp-" + Guid.NewGuid().ToString("N"));
+            var interfaceName = string.Format(GlobalConfigModel.InterfaceFullName, type);
+            var stopped = new List<ConsoleDeviceModel>();
+            var previousStates = new ConcurrentDictionary<string, (string type, bool status)>();
+            var oldList = PluginList.ToList();
+            List<(PluginModel Model, object? Param)> discovered = new();
+            string? backupPath = null;
+            var entered = false;
+            var replaced = false;
+            var registered = false;
+            var committed = false;
+            string? feedback = null;
+            var feedbackImage = MessageBoxImage.Information;
+            try
             {
-                string typePath = Path.Combine(GlobalConfigModel.FilePath, plugin.ToString().ToLower());
-                string zipName = System.IO.Path.GetFileName(path).Replace(".zip", string.Empty);
-                string libPath = Path.Combine(typePath, zipName);
-                DirectoryInfo directoryInfo = new(typePath);
-                if (!directoryInfo.Exists)
+                if (zipName is "." or ".." || !Path.GetFullPath(libPath).StartsWith(
+                    Path.GetFullPath(typePath).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
+                    throw new InvalidDataException("插件路径不合法");
+                await PluginArchive.ExtractAsync(path, stagingPath);
+                discovered = await PluginHandlerCore.ProbePluginAsync(stagingPath, interfaceName);
+                if (discovered.Count == 0)
                 {
-                    directoryInfo.Create();
+                    await MessageBox.Show("插件上传失败，未检索到对应接口".GetLanguageValue(App.LanguageOperate),
+                        "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
                 }
-                directoryInfo = new(libPath);
-                //先记录插件状态
-                ConcurrentDictionary<string, (string type, bool status)> pluginStatus = new();
-                //是否存在
-                bool exists = directoryInfo.Exists;
-                //检查插件列表内是否已存在同名或同路径的插件
-                PluginListSelectedItem = PluginList.FirstOrDefault(p => p.PluginDetails.Path == libPath || p.Name == zipName);
-                if (PluginListSelectedItem != null || exists)
+                var hotUpdate = Directory.Exists(libPath) || oldList.Any(item => item.PluginDetails.Path == libPath);
+                if (hotUpdate && !await MessageBox.Show("此插件已上传，是否进行热更新？".GetLanguageValue(App.LanguageOperate),
+                    "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question)) return;
+                await PluginHandlerCore.MutationGate.WaitAsync();
+                entered = true;
+                oldList = PluginList.ToList();
+                var oldItems = oldList.Where(item => item.PluginDetails.Path == libPath).ToList();
+                foreach (var device in GlobalConfigModel.TrayDevices.Where(device => type == PluginType.Daq
+                    ? device.DaqPluginPath == libPath : device.MqPluginPath.Contains(libPath)).ToList())
                 {
-                    if (!await MessageBox.Show("此插件已上传，是否进行热更新？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.YesNo, MessageBoxImage.Question))
-                    {
-                        return;
-                    }
-                    switch (plugin)
-                    {
-                        case PluginType.Daq:
-                            //停止所有采集设备（后续恢复采集）
-                            GlobalConfigModel.TrayDevices.Where(d => libPath == d.DaqPluginPath).ToList().ForEach(d =>
-                            {
-                                pluginStatus.AddOrUpdate(d.ToString(), (d.DeviceType, d.IsRun), (k, v) => (d.DeviceType, d.IsRun));
-                            });
-                            break;
-                        case PluginType.Mq:
-                            GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(libPath)).ToList().ForEach(d =>
-                            {
-                                pluginStatus.AddOrUpdate(d.ToString(), (d.DeviceType, d.IsRun), (k, v) => (d.DeviceType, d.IsRun));
-                            });
-                            break;
-                    }
-                    if (PluginListSelectedItem != null)
-                    {
-                        await PrivateRemovalPlugin();
-                    }
+                    previousStates[device.ToString()] = (device.DeviceType, device.IsRun);
+                    stopped.Add(device);
+                    await device.Stop.ExecuteAsync(null);
                 }
-
-                //解压zip到指定路径
-                await ZipFile.ExtractToDirectoryAsync(path, libPath, true);
-
-                //接口名称
-                string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
-
-                //获取插件信息
-                List<(PluginModel Model, object? Param)> result = PluginHandlerCore.PluginOperate.InitPlugin(libPath, iName);
-                if (result.Count > 0)
+                foreach (var name in oldItems.Select(item => item.Name).Concat(discovered.Select(item => item.Model.Name)).Distinct())
+                    await PluginHandlerCore.PluginOperate.RemovePluginAsync(name);
+                if (Directory.Exists(libPath))
                 {
-                    foreach (var item in result)
-                    {
-                        //加入本地，用于下次初始化
-                        PluginModel details = item.Model;
-
-                        //设置插件路径
-                        details.Path = libPath;
-
-                        //添加到列表
-                        PluginList.Add(new PluginListModel(details.Name, plugin, details.Version, DateTime.Now, details));
-                    }
-
-                    SavePluginListConfig();
-
-                    if (pluginStatus.Count > 0 || exists)
-                    {
-                        await MessageBox.Show("插件热更新成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
-
-                        //更新后，恢复之前的运行状态
-                        switch (plugin)
-                        {
-                            case PluginType.Daq:
-                                //停止所有采集设备（后续恢复采集）
-                                GlobalConfigModel.TrayDevices.Where(d => libPath == d.DaqPluginPath).ToList().ForEach(d =>
-                                {
-                                    PrivateInit(d, pluginStatus);
-                                });
-                                break;
-                            case PluginType.Mq:
-                                //停止所有采集设备（后续恢复采集）
-                                GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(libPath)).ToList().ForEach(d =>
-                                {
-                                    PrivateInit(d, pluginStatus);
-                                });
-                                break;
-                        }
-                    }
-                    else
-                    {
-                        await MessageBox.Show("插件上传成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
-                    }
+                    backupPath = libPath + ".backup-" + Guid.NewGuid().ToString("N");
+                    Directory.Move(libPath, backupPath);
                 }
-                else
+                Directory.Move(stagingPath, libPath);
+                replaced = true;
+                // 注册可能在抛出异常前完成部分接口，回滚仍须卸载本次接口。
+                registered = true;
+                var loaded = await PluginHandlerCore.PluginOperate.InitPluginAsync(libPath, interfaceName);
+                if (loaded.Count == 0) throw new InvalidDataException("正式目录未检索到插件接口");
+                var newList = oldList.Where(item => item.PluginDetails.Path != libPath
+                    && !loaded.Any(plugin => plugin.Model.Name == item.Name)).ToList();
+                foreach (var item in loaded)
+                {
+                    item.Model.Path = libPath;
+                    newList.Add(new PluginListModel(item.Model.Name, type, item.Model.Version, DateTime.Now, item.Model));
+                }
+                if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(GlobalConfigModel.UI_PluginListConfigPath, newList.ToJson(true)))
+                    throw new IOException("插件清单写入失败");
+                committed = true;
+                PluginList.Clear();
+                foreach (var item in newList) PluginList.Add(item);
+                feedback = (hotUpdate ? "插件热更新成功" : "插件上传成功").GetLanguageValue(App.LanguageOperate);
+            }
+            catch (Exception ex)
+            {
+                if (!committed && entered)
                 {
                     try
                     {
-                        //移除插件文件夹
-                        Directory.Delete(libPath, true);
+                        if (registered)
+                            foreach (var item in discovered) await PluginHandlerCore.PluginOperate.RemovePluginAsync(item.Model.Name);
+                        if (replaced && Directory.Exists(libPath)) Directory.Delete(libPath, true);
+                        if (backupPath is not null && Directory.Exists(backupPath))
+                        {
+                            Directory.Move(backupPath, libPath);
+                            backupPath = null;
+                        }
+                        if (Directory.Exists(libPath)) await PluginHandlerCore.PluginOperate.InitPluginAsync(libPath, interfaceName);
                     }
-                    catch (Exception) { }
-                    await MessageBox.Show("插件上传失败，未检索到对应接口".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Warning);
-
+                    catch (Exception rollback) { Snet.Log.LogHelper.Error($"插件回滚失败，备份保留在 {backupPath}: {rollback.Message}"); }
                 }
+                feedback = ex.Message;
+                feedbackImage = MessageBoxImage.Error;
             }
-
-            SavePluginListConfig();
+            finally
+            {
+                if (entered) PluginHandlerCore.MutationGate.Release();
+                foreach (var device in stopped)
+                {
+                    try { await PrivateInitAsync(device, previousStates); }
+                    catch (Exception ex) { Snet.Log.LogHelper.Error($"恢复设备失败: {device.DeviceType}, {ex.Message}"); }
+                }
+                foreach (var directory in new[] { stagingPath, committed ? backupPath : null })
+                {
+                    if (directory is null || !Directory.Exists(directory)) continue;
+                    try { Directory.Delete(directory, true); }
+                    catch (Exception ex) { Snet.Log.LogHelper.Error($"插件暂存或备份清理失败: {directory}, {ex.Message}"); }
+                }
+                await GlobalConfigModel.RefreshAsync();
+            }
+            // 提示框等待用户操作之前，已经完成设备恢复并释放变更门闩。
+            if (feedback is not null)
+                await MessageBox.Show(feedback, "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, feedbackImage);
         }
 
         /// <summary>
-        /// 私有初始化
+        /// 按更新前状态异步恢复设备，确保调用方等待恢复结束
         /// </summary>
         /// <param name="d">控制台设备对象</param>
         /// <param name="pluginStatus">插件状态</param>
-        private void PrivateInit(ConsoleDeviceModel d, ConcurrentDictionary<string, (string type, bool status)> pluginStatus)
+        private async Task PrivateInitAsync(ConsoleDeviceModel d, ConcurrentDictionary<string, (string type, bool status)> pluginStatus)
         {
             bool status = pluginStatus.TryGetValue(d.ToString(), out (string type, bool status) plugin) ? plugin.status : false;
             if (status)
             {
                 //采集
-                d.Retry.ExecuteAsync(null);
+                await d.Retry.ExecuteAsync(null);
             }
             else
             {
                 //停止
-                d.Stop.Execute(null);
+                await d.Stop.ExecuteAsync(null);
             }
         }
 
@@ -393,69 +395,46 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? removePlugin;
         private async Task RemovePluginAsync()
         {
-            if (await MessageBox.Show($"确定移除此插件吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question))
+            var selected = PluginListSelectedItem;
+            if (selected is null || !await MessageBox.Show("确定移除此插件吗？".GetLanguageValue(App.LanguageOperate),
+                "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OKCancel, MessageBoxImage.Question)) return;
+            try
             {
-                await PrivateRemovalPlugin();
-                await MessageBox.Show($"插件移除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
+                await PrivateRemovalPlugin(selected);
+                await MessageBox.Show("插件移除成功".GetLanguageValue(App.LanguageOperate),
+                    "温馨提示".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Information);
             }
-            SavePluginListConfig();
+            catch (Exception ex)
+            {
+                await MessageBox.Show(ex.Message, "异常".GetLanguageValue(App.LanguageOperate), MessageBoxButton.OK, MessageBoxImage.Error);
+            }
         }
 
-        /// <summary>
-        /// 私有移除插件
-        /// </summary>
-        /// <returns></returns>
-        private async Task PrivateRemovalPlugin()
+        /// <summary>串行停止相关设备、卸载整个插件包并保存清单；卸载失败时保留原清单，不显示成功。</summary>
+        /// <param name="selected">确认对话框打开前捕获的插件，避免等待过程中选择变化导致误删。</param>
+        /// <returns>完成目录清理、清单落盘与控制台刷新的任务。</returns>
+        private async Task PrivateRemovalPlugin(PluginListModel selected)
         {
-            if (PluginListSelectedItem == null) return;
-            string name = PluginListSelectedItem.Name;
-            PluginModel details = PluginListSelectedItem.PluginDetails;
-
-            switch (PluginListSelectedItem.Type)
+            await PluginHandlerCore.MutationGate.WaitAsync();
+            try
             {
-                case PluginType.Daq:
-                    //停止所有采集设备（后续恢复采集）
-                    GlobalConfigModel.TrayDevices.Where(d => d.DeviceType == PluginListSelectedItem.Name || details.Path == d.DaqPluginPath).ToList().ForEach(d =>
-                    {
-                        d.Stop.Execute(null);
-                    });
-                    break;
-                case PluginType.Mq:
-                    GlobalConfigModel.TrayDevices.Where(d => d.MqPluginPath.Contains(details.Path)).ToList().ForEach(d =>
-                    {
-                        d.Stop.Execute(null);
-                    });
-                    break;
+                var details = selected.PluginDetails;
+                var affected = GlobalConfigModel.TrayDevices.Where(d => selected.Type == PluginType.Daq
+                    ? d.DeviceType == selected.Name || details.Path == d.DaqPluginPath
+                    : d.MqPluginPath.Contains(details.Path)).ToList();
+                foreach (var device in affected) await device.Stop.ExecuteAsync(null);
+                var removed = await PluginHandlerCore.PluginOperate.RemovePluginAsync(details.Name);
+                if (!removed && Directory.Exists(details.Path)) throw new IOException("插件卸载失败，已保留插件清单");
+                if (Directory.Exists(details.Path)) Directory.Delete(details.Path, true);
+                var remaining = PluginList.Where(item => item.PluginDetails.Path != details.Path).ToList();
+                if (!await ProjectHandlerCore.WriteToFileWithRetryAsync(GlobalConfigModel.UI_PluginListConfigPath, remaining.ToJson(true)))
+                    throw new IOException("插件清单写入失败，请刷新后重试");
+                PluginList.Clear();
+                foreach (var item in remaining) PluginList.Add(item);
+                PluginListSelectedItem = null;
             }
-
-            if (await PluginHandlerCore.PluginOperate.RemovePluginAsync(details.Name))
-            {
-                try
-                {
-                    Directory.Delete(details.Path, true);
-                }
-                catch (IOException)
-                {
-                    // 仅在程序集文件仍被占用时执行一次回收，并放在线程池避免阻塞 UI 消息循环。
-                    await Task.Run(() =>
-                    {
-                        GC.Collect();
-                        GC.WaitForPendingFinalizers();
-                    });
-                    Directory.Delete(details.Path, true);
-                }
-            }
-
-            //查询旧路径是否一致的，有的话一并删除
-            for (int i = PluginList.Count - 1; i >= 0; i--)
-            {
-                if (PluginList[i].PluginDetails.Path == details.Path)
-                {
-                    PluginList.RemoveAt(i);
-                }
-            }
-            PluginListSelectedItem = null;  //清空
-            SavePluginListConfig();
+            finally { PluginHandlerCore.MutationGate.Release(); }
+            await GlobalConfigModel.RefreshAsync();
         }
 
         /// <summary>
@@ -514,19 +493,14 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand StatusVerification => statusVerification ??= new AsyncRelayCommand(StatusVerificationAsync);
         private IAsyncRelayCommand? statusVerification;
+        /// <summary>在界面线程捕获配置快照，逐个等待插件验证，再在界面上下文更新状态；不在线程池枚举绑定集合。</summary>
         public async Task StatusVerificationAsync()
         {
-            await Task.Run(async () =>
+            foreach (var item in PluginConfig.ToList())
             {
-                foreach (var item in PluginConfig)
-                {
-                    //插件类型
-                    PluginType plugin = item.Type;
-                    //接口名称
-                    string iName = string.Format(GlobalConfigModel.InterfaceFullName, plugin);
-                    item.Status = (await PluginHandlerCore.PluginOperate.StatusVerifyAsync(iName, item.Name, item.Param)).Status;
-                }
-            });
+                string interfaceName = string.Format(GlobalConfigModel.InterfaceFullName, item.Type);
+                item.Status = (await PluginHandlerCore.PluginOperate.StatusVerifyAsync(interfaceName, item.Name, item.Param)).Status;
+            }
         }
 
         /// <summary>
@@ -647,9 +621,9 @@ namespace Snet.Iot.Daq.viewModel
                 OperateResult result = await address.TestReadAddressAsync(daq);
                 if (result.Status)
                     PluginConfigSelectedItem.Status = result.Status;
-                if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data))
+                if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data)
+                && data is not null && data.TryGetValue(address.Address, out var value))
                 {
-                    AddressValue value = data[address.Address];
                     if (value.Quality == QualityType.Normal)
                     {
                         await Windows.Controls.message.MessageBox.Show($"{"读取成功".GetLanguageValue(App.LanguageOperate)}\r\n{value.AddressName}\r\n{value.ResultValue}", "结果".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);

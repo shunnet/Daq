@@ -13,10 +13,13 @@ namespace Snet.Iot.Daq.Web.Services;
 public static class OutsideClickHelper
 {
     /// <summary>
-    /// 先异步让 JS 调用 snet.outsideClick.unregisterAll 移除 document 监听，待其完成（无论成败）后再释放引用，
+    /// 先异步让 JS 移除该组件拥有的 document 监听，待其完成（无论成败）后再释放引用，
     /// 确保引用存活到监听确实不再被触发，杜绝 EndInvokeDotNet 的 NullReferenceException。
     /// </summary>
-    public static void DisposeAfterUnregister<T>(IJSRuntime js, DotNetObjectReference<T>? jsRef) where T : class
+    /// <param name="js">当前电路的 JS 调用通道。</param>
+    /// <param name="jsRef">待释放的组件引用，为空时无操作。</param>
+    /// <param name="ownerId">注册监听时使用的组件身份；旧组件释放不影响新组件监听。</param>
+    public static void DisposeAfterUnregister<T>(IJSRuntime js, DotNetObjectReference<T>? jsRef, string ownerId) where T : class
     {
         if (jsRef is null) return;
         if (js is null)
@@ -29,7 +32,7 @@ public static class OutsideClickHelper
         {
             // 触发的监听一旦被移除，之后就不会再有 JS → .NET 回调指向该引用。
             // ValueTask.AsTask() 后可用 ContinueWith：任务结束（成功/失败/取消）同步执行释放并吞掉未观察异常。
-            var unregister = js.InvokeVoidAsync("snet.outsideClick.unregisterAll").AsTask();
+            var unregister = js.InvokeVoidAsync("snet.outsideClick.unregister", ownerId).AsTask();
             _ = unregister.ContinueWith(
                 t => { _ = t.Exception; jsRef.Dispose(); },
                 TaskContinuationOptions.ExecuteSynchronously);

@@ -23,11 +23,11 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<Compile Update="Language.Designer.cs">
-			<DesignTime>True</DesignTime>
-			<AutoGen>True</AutoGen>
-			<DependentUpon>Language.resx</DependentUpon>
-		</Compile>
+	  <Compile Update="Language.Designer.cs">
+	    <DesignTime>True</DesignTime>
+	    <AutoGen>True</AutoGen>
+	    <DependentUpon>Language.resx</DependentUpon>
+	  </Compile>
 	</ItemGroup>
 
 	<ItemGroup>

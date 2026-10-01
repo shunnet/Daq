@@ -129,20 +129,8 @@ namespace Snet.Iot.Daq.Core.handler
         /// <summary>用于 HTTP 请求的客户端，生命周期由本类管理</summary>
         private readonly HttpClient _httpClient;
 
-        /// <summary>
-        /// 无参构造函数（建议仅在反射/序列化时使用）
-        /// </summary>
-        public PluginBrowseHandler() : base()
-        {
-            var handler = new HttpClientHandler
-            {
-                AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
-            };
-            _httpClient = new HttpClient(handler)
-            {
-                Timeout = TimeSpan.FromSeconds(30)
-            };
-        }
+        /// <summary>创建独立的浏览处理器，为基类分配非空身份；客户端由本实例释放。</summary>
+        public PluginBrowseHandler() : this(Guid.NewGuid().ToString("N")) { }
 
         /// <summary>
         /// 带序列号的构造函数

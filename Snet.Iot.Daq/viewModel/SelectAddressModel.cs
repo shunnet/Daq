@@ -2,7 +2,6 @@
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
-using Snet.Utility;
 using Snet.Windows.Controls.message;
 using System.Collections.ObjectModel;
 using System.Windows.Controls;
@@ -92,31 +91,14 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand QueryAddress => queryAddress ??= new AsyncRelayCommand(QueryAddressAsync);
         private IAsyncRelayCommand? queryAddress;
+        /// <summary>重置到筛选结果第一页；没有匹配项时清空旧列表，避免继续显示上一次查询的数据。</summary>
         public async Task QueryAddressAsync()
         {
-            if (QueryContent.IsNullOrWhiteSpace())
-            {
-                //查询所有
-                await PageIndexChangedExecuteAsync(1);
-            }
-            else
-            {
-                //模糊查询
-                List<Snet.Iot.Daq.data.AddressModel> models = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>().Where(p =>
-                p.AnotherName.Contains(QueryContent) ||
-                p.Address.Contains(QueryContent) ||
-                p.Describe.Contains(QueryContent)).ToList();
-                if (models.Count > 0)
-                {
-                    await ResetUiAsync(models.Count, 1, models);
-                }
-                else
-                {
-                    await MessageBox.Show("未查询到对应内容".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Asterisk);
-                }
-            }
+            await PageIndexChangedExecuteAsync(1);
+            if (Total == 0 && !string.IsNullOrWhiteSpace(QueryContent))
+                await MessageBox.Show("未查询到对应内容".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate),
+                    Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Asterisk);
         }
-
 
         /// <summary>
         /// 全选地址
@@ -205,15 +187,12 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand PageIndexChanged => pageIndexChanged ??= new AsyncRelayCommand<int>(PageIndexChangedExecuteAsync);
         private IAsyncRelayCommand? pageIndexChanged;
+        /// <summary>在共享连接锁内按当前关键词分页，只读取当前页，翻页后保持查询条件。</summary>
         private Task PageIndexChangedExecuteAsync(int index)
         {
-            var table = GlobalConfigModel.sqliteOperate.Table<Snet.Iot.Daq.data.AddressModel>();
-            int total = table.Count();
-            var page = table.OrderByDescending(x => x.Time)
-                            .Skip((index - 1) * PageSize)
-                            .Take(PageSize)
-                            .ToList();
-            PageIndex = index;
+            var page = Snet.Iot.Daq.Core.handler.AddressStore.Query<AddressModel>(GlobalConfigModel.sqliteOperate,
+                GlobalConfigModel.DbLock, QueryContent, index, PageSize, out var total, out var actualPage);
+            PageIndex = actualPage;
             Total = total;
             AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(page);
             return Task.CompletedTask;
@@ -259,21 +238,6 @@ namespace Snet.Iot.Daq.viewModel
             }
         }
 
-        /// <summary>
-        /// 重置界面
-        /// </summary>
-        /// <param name="total">总数</param>
-        /// <param name="pageIndex">页码</param>
-        /// <param name="models">数据</param>
-        /// <returns></returns>
-        private Task ResetUiAsync(int total, int pageIndex, List<Snet.Iot.Daq.data.AddressModel> models)
-        {
-            PageIndex = pageIndex;
-            Total = total;
-            AddressConfig = new ObservableCollection<Snet.Iot.Daq.data.AddressModel>(
-                models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize));
-            return Task.CompletedTask;
-        }
         #endregion
 
     }

@@ -14,6 +14,8 @@ namespace Snet.Iot.Daq.Web.Services;
 /// </summary>
 public class DaqHostedService : BackgroundService
 {
+    /// <summary>宿主停止为终态，初始化与控制台按钮不得在清理后重新创建服务。</summary>
+    private int _stopping;
     private readonly SemaphoreSlim _serverGate = new(1, 1);
     private readonly AppStateService _appState;
     private readonly DeviceRuntimeManager _runtimeManager;
@@ -53,14 +55,21 @@ public class DaqHostedService : BackgroundService
         try
         {
             await _appState.LoadAllAsync();
+            stoppingToken.ThrowIfCancellationRequested();
             // 服务端先于插件加载初始化：UA/MQTT 服务端只依赖配置与地址数据（LoadAllAsync 已就绪），
             // 不依赖插件程序集。提前就位避免插件加载耗时/失败阻塞服务端；
             // 软启设备在 SyncFromProjects 后立即采集时服务端已可接收数据（对齐 WPF 服务端先行语义）
             await InitServerServicesAsync();
+            stoppingToken.ThrowIfCancellationRequested();
             InitPlugins();
+            stoppingToken.ThrowIfCancellationRequested();
             _runtimeManager.SyncFromProjects(_appState);
             _sampler.Start();
             _loggerBuffer.Push(string.Format(T("[Info] Daq 宿主启动完成，设备 {0} 台"), _runtimeManager.Runtimes.Count()));
+        }
+        catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+        {
+            return;
         }
         catch (Exception ex)
         {
@@ -110,13 +119,15 @@ public class DaqHostedService : BackgroundService
     /// <inheritdoc />
     public override async Task StopAsync(CancellationToken cancellationToken)
     {
+        Interlocked.Exchange(ref _stopping, 1);
         _logger.LogInformation("DaqHostedService 停止");
+        // 先取消并等待初始化/主循环，防止清理后初始化继续启动服务或设备。
+        await base.StopAsync(cancellationToken);
         // 进程停止时逆序释放：先停采集，再关服务端
-        await _runtimeManager.StopAllAsync();
+        await _runtimeManager.DisposeAsync();
         await _appState.FlushPendingChangesAsync();
         await StopServerServicesAsync();
         await _sampler.DisposeAsync();
-        await base.StopAsync(cancellationToken);
     }
 
     #endregion
@@ -129,7 +140,7 @@ public class DaqHostedService : BackgroundService
     public async Task InitServerServicesAsync()
     {
         await _serverGate.WaitAsync();
-        try { await InitServerServicesInternalAsync(); }
+        try { if (Volatile.Read(ref _stopping) == 0) await InitServerServicesInternalAsync(); }
         finally { _serverGate.Release(); }
     }
 
@@ -151,6 +162,7 @@ public class DaqHostedService : BackgroundService
 
     private async Task<(bool Ok, string Message)> StartServerInternalAsync(string kind)
     {
+        if (Volatile.Read(ref _stopping) != 0) return (false, T("服务已停止"));
         if (kind == "mqtt")
         {
             if (_appState.MqttService is not null) return (false, T("服务已启动"));
@@ -181,6 +193,22 @@ public class DaqHostedService : BackgroundService
 
     #endregion
 
+    /// <summary>插件替换前，在服务门闩内捕获并停止当前启动的服务；返回需要恢复的服务种类。</summary>
+    /// <returns>仅包含替换前实际存在的 mqtt/ua 服务，配置文件存在但未启动的服务不会返回。</returns>
+    public async Task<string[]> SuspendServerServicesAsync()
+    {
+        await _serverGate.WaitAsync();
+        try
+        {
+            var running = new List<string>(2);
+            if (_appState.MqttService is not null) running.Add("mqtt");
+            if (_appState.UaService is not null) running.Add("ua");
+            foreach (var kind in running) await StopServerInternalAsync(kind);
+            return running.ToArray();
+        }
+        finally { _serverGate.Release(); }
+    }
+
     #region 服务端停止
     /// <summary>停止单个服务端（对齐 WPF MqttServerStopAsync / OpcUaServerStopAsync）</summary>
     public async Task<(bool Ok, string Message)> StopServerAsync(string kind)
@@ -197,20 +225,22 @@ public class DaqHostedService : BackgroundService
             if (kind == "mqtt")
             {
                 if (_appState.MqttService is null) return (false, T("服务未启动"));
-                await _appState.MqttService.OffAsync();
-                _appState.MqttService.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
-                await _appState.MqttService.DisposeAsync();
+                var service = _appState.MqttService;
                 _appState.MqttService = null;
+                service.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
+                try { await service.OffAsync(); }
+                finally { await service.DisposeAsync(); }
                 _appState.NotifyServerStateChanged();
                 return (true, T("MQTT 服务已停止"));
             }
             if (kind == "ua")
             {
                 if (_appState.UaService is null) return (false, T("服务未启动"));
-                await _appState.UaService.OffAsync();
-                _appState.UaService.OnInfoEventAsync -= UaService_OnInfoEventAsync;
-                await _appState.UaService.DisposeAsync();
+                var service = _appState.UaService;
                 _appState.UaService = null;
+                service.OnInfoEventAsync -= UaService_OnInfoEventAsync;
+                try { await service.OffAsync(); }
+                finally { await service.DisposeAsync(); }
                 _appState.NotifyServerStateChanged();
                 return (true, T("OPC UA 服务已停止"));
             }
@@ -230,21 +260,22 @@ public class DaqHostedService : BackgroundService
     {
         if (_appState.MqttService is not null) return true;
         if (!File.Exists(WebPaths.MqttServerConfigPath)) return false;
+        MqttServiceOperate? pending = null;
         try
         {
             var json = await File.ReadAllTextAsync(WebPaths.MqttServerConfigPath);
             var basics = json.ToJsonEntity<MqttServiceData.Basics>() ?? new MqttServiceData.Basics();
-            var service = MqttServiceOperate.Instance(basics);
+            var service = pending = MqttServiceOperate.Instance(basics);
             service.OnInfoEventAsync += MqttService_OnInfoEventAsync;
             var result = await service.OnAsync();
             if (!result.Status)
             {
-                service.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
-                await service.DisposeAsync();
                 _loggerBuffer.Push(string.Format(T("[Error] MQTT 服务端启动失败: {0}"), result.Message));
                 return false;
             }
+            if (Volatile.Read(ref _stopping) != 0) return false;
             _appState.MqttService = service;
+            pending = null; // 发布成功后由宿主停止流程拥有。
             _loggerBuffer.Push(T("[Info] MQTT 服务端已启动"));
             return true;
         }
@@ -253,27 +284,37 @@ public class DaqHostedService : BackgroundService
             _loggerBuffer.Push(string.Format(T("[Error] MQTT 服务端启动异常: {0}"), ex.Message));
             return false;
         }
+        finally
+        {
+            if (pending is not null)
+            {
+                pending.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
+                try { await pending.DisposeAsync(); }
+                catch (Exception ex) { _logger.LogError(ex, "服务启动失败后的资源清理异常"); }
+            }
+        }
     }
 
     private async Task<bool> InitUaServerAsync()
     {
         if (_appState.UaService is not null) return true;
         if (!File.Exists(WebPaths.UaServerConfigPath)) return false;
+        OpcUaServiceOperate? pending = null;
         try
         {
             var json = await File.ReadAllTextAsync(WebPaths.UaServerConfigPath);
             var basics = json.ToJsonEntity<OpcUaServiceData.Basics>() ?? new OpcUaServiceData.Basics();
-            var service = OpcUaServiceOperate.Instance(basics);
+            var service = pending = OpcUaServiceOperate.Instance(basics);
             service.OnInfoEventAsync += UaService_OnInfoEventAsync;
             var result = await service.OnAsync();
             if (!result.Status)
             {
-                service.OnInfoEventAsync -= UaService_OnInfoEventAsync;
-                await service.DisposeAsync();
                 _loggerBuffer.Push(string.Format(T("[Error] OPC UA 服务端启动失败: {0}"), result.Message));
                 return false;
             }
+            if (Volatile.Read(ref _stopping) != 0) return false;
             _appState.UaService = service;
+            pending = null; // 发布成功后由宿主停止流程拥有。
             _loggerBuffer.Push(T("[Info] OPC UA 服务端已启动"));
             return true;
         }
@@ -281,6 +322,15 @@ public class DaqHostedService : BackgroundService
         {
             _loggerBuffer.Push(string.Format(T("[Error] OPC UA 服务端启动异常: {0}"), ex.Message));
             return false;
+        }
+        finally
+        {
+            if (pending is not null)
+            {
+                pending.OnInfoEventAsync -= UaService_OnInfoEventAsync;
+                try { await pending.DisposeAsync(); }
+                catch (Exception ex) { _logger.LogError(ex, "服务启动失败后的资源清理异常"); }
+            }
         }
     }
 
@@ -295,30 +345,11 @@ public class DaqHostedService : BackgroundService
         finally { _serverGate.Release(); }
     }
 
+    /// <summary>逐个停止已发布服务；复用单服务停止契约，任何一个失败仍继续清理另一个。</summary>
     private async Task StopServerServicesInternalAsync()
     {
-        try
-        {
-            if (_appState.MqttService is not null)
-            {
-                await _appState.MqttService.OffAsync();
-                _appState.MqttService.OnInfoEventAsync -= MqttService_OnInfoEventAsync;
-                await _appState.MqttService.DisposeAsync();
-                _appState.MqttService = null;
-            }
-        }
-        catch (Exception ex) { _loggerBuffer.Push(string.Format(T("[Error] MQTT 服务端停止异常: {0}"), ex.Message)); }
-        try
-        {
-            if (_appState.UaService is not null)
-            {
-                await _appState.UaService.OffAsync();
-                _appState.UaService.OnInfoEventAsync -= UaService_OnInfoEventAsync;
-                await _appState.UaService.DisposeAsync();
-                _appState.UaService = null;
-            }
-        }
-        catch (Exception ex) { _loggerBuffer.Push(string.Format(T("[Error] OPC UA 服务端停止异常: {0}"), ex.Message)); }
+        if (_appState.MqttService is not null) await StopServerInternalAsync("mqtt");
+        if (_appState.UaService is not null) await StopServerInternalAsync("ua");
     }
 
     /// <summary>服务端事件 → 控制台信息区（对齐 WPF ShowAsync 的 ToJson 展示）</summary>

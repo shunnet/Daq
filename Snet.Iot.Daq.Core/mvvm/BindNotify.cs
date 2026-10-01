@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.ComponentModel;
+using System.Collections.Concurrent;
 using System.Linq.Expressions;
 using System.Reflection;
 
@@ -7,20 +8,20 @@ namespace Snet.Iot.Daq.Core.mvvm
     /// <summary>
     /// 绑定通知对象基类，基于 ObservableObject。<br/>
     /// 提供基于表达式的动态属性存储机制，无需手动定义后备字段。<br/>
-    /// 内部使用字典属性包存储属性值，通过 lock 保证读写线程安全。
+    /// 内部使用并发属性包存储属性值；读取无需锁，复合更新使用短锁保持旧值比较一致。
     /// </summary>
     public class BindNotify : ObservableObject
     {
         #region 字典属性包
 
         /// <summary>
-        /// 属性值存储字典（延迟初始化）<br/>
+        /// 实例拥有的并发属性值字典，构造时初始化，支持空值。<br/>
         /// 必须 JsonIgnore：序列化选项 IncludeFields=true 会序列化私有字段，<br/>
         /// 属性包内含 Parent 等对象引用（属性级 JsonIgnore 对字典内值无效），会导致循环引用序列化递归爆炸
         /// </summary>
         [System.Text.Json.Serialization.JsonIgnore]
         [Newtonsoft.Json.JsonIgnore]
-        private Dictionary<string, object>? _propertyBag;
+        private readonly ConcurrentDictionary<string, object?> _propertyBag = new();
 
         /// <summary>
         /// 用于保护属性包读写操作的同步锁对象，避免在 lock 中使用 PropertyBag 自身（防止外部引用干扰）
@@ -30,10 +31,9 @@ namespace Snet.Iot.Daq.Core.mvvm
         private readonly object _propertyBagLock = new();
 
         /// <summary>
-        /// 延迟初始化的属性包，用于动态存储所有属性值。<br/>
-        /// 首次访问时自动创建字典实例。
+        /// 并发属性包，用于动态存储所有属性值；空值同样保留为已设置的属性。
         /// </summary>
-        private Dictionary<string, object> PropertyBag => _propertyBag ??= new Dictionary<string, object>();
+        private ConcurrentDictionary<string, object?> PropertyBag => _propertyBag;
 
         #endregion
 
@@ -42,21 +42,14 @@ namespace Snet.Iot.Daq.Core.mvvm
         /// <summary>
         /// 获取指定属性名称的值。<br/>
         /// 若属性尚未设置，则返回类型 T 的默认值。<br/>
-        /// 通过 lock 保护字典读取操作，确保与 SetPropertyCore 的写入操作线程安全。
+        /// 通过并发字典取得某个时刻的完整值，不与其他属性的读取争用同步锁。
         /// </summary>
         /// <typeparam name="T">属性值类型</typeparam>
         /// <param name="propertyName">属性名称</param>
         /// <returns>属性值，若不存在则返回 default(T)</returns>
         private T GetPropertyCore<T>(string propertyName)
         {
-            lock (_propertyBagLock)
-            {
-                if (PropertyBag.TryGetValue(propertyName, out object? val))
-                {
-                    return (T)val;
-                }
-                return default!;
-            }
+            return PropertyBag.TryGetValue(propertyName, out var value) ? (T)value! : default!;
         }
 
         /// <summary>
@@ -76,7 +69,7 @@ namespace Snet.Iot.Daq.Core.mvvm
             lock (_propertyBagLock)
             {
                 oldValue = default!;
-                if (PropertyBag.TryGetValue(propertyName, out object? val))
+                if (PropertyBag.TryGetValue(propertyName, out object? val) && val is not null)
                 {
                     oldValue = (T)val;
                 }
@@ -84,7 +77,7 @@ namespace Snet.Iot.Daq.Core.mvvm
                 if (EqualityComparer<T>.Default.Equals(oldValue, value))
                     return false;
 
-                PropertyBag[propertyName] = value!;
+                PropertyBag[propertyName] = value;
             }
 
             OnPropertyChanged(propertyName);

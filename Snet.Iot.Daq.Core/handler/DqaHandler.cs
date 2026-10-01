@@ -28,6 +28,11 @@ namespace Snet.Iot.Daq.Core.handler
         /// Key = 设备 guid，Value = 对应的 IDaq 实例
         /// </summary>
         private readonly ConcurrentDictionary<string, IDaq> icoDaq = new();
+        /// <summary>释放为终态；禁止处理器在释放完成后再次创建连接。</summary>
+        private int disposed;
+        /// <summary>仅用于发布唯一释放任务；插件调用与异步等待均在锁外执行。</summary>
+        private readonly object disposalGate = new();
+        private Task? disposalTask;
 
         /// <summary>
         /// 每个 guid 对应的数据事件委托缓存<br/>
@@ -47,45 +52,61 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         private readonly ConcurrentDictionary<string, Address> _packedAdd = new();
 
-        /// <inheritdoc/>
-        /// <summary>
-        /// 同步释放所有已打开的 DAQ 实例并清空事件委托缓存
-        /// </summary>
-        public override void Dispose()
-        {
-            // 快照遍历，避免在迭代期间集合被修改
-            foreach (var item in icoDaq.ToArray())
-            {
-                item.Value?.Dispose();
-            }
-            icoDaq.Clear();
-            _dataHandlers.Clear();
-            _infoHandlers.Clear();
-            _packedAdd.Clear();
+        /// <summary>同步兼容入口，等待同一释放任务结束。UI 线程应使用 DisposeAsync，避免阻塞需要该线程完成的插件操作。</summary>
+        public override void Dispose() => GetDisposalTask().GetAwaiter().GetResult();
 
-            base.Dispose();
+        /// <summary>终止连接创建，等待当前打开操作退出，退订事件并释放全部连接；重复调用等待同一任务。</summary>
+        /// <returns>所有连接和基类缓存清理完成后的任务；插件异常汇总为 AggregateException。</returns>
+        public override ValueTask DisposeAsync() => new(GetDisposalTask());
+
+        /// <summary>先发布唯一任务和终态，再在锁外执行清理，避免同步回调重入时重复释放。</summary>
+        private Task GetDisposalTask()
+        {
+            TaskCompletionSource completion;
+            lock (disposalGate)
+            {
+                if (disposalTask is not null) return disposalTask;
+                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                disposalTask = completion.Task;
+                Volatile.Write(ref disposed, 1);
+            }
+            _ = CompleteDisposalAsync(completion);
+            return completion.Task;
         }
 
-        /// <inheritdoc/>
-        /// <summary>
-        /// 异步释放所有已打开的 DAQ 实例并清空事件委托缓存
-        /// </summary>
-        public override async ValueTask DisposeAsync()
+        /// <summary>由公开释放任务拥有的清理流程；一个插件失败仍继续释放其他连接，并最终报告汇总异常。</summary>
+        /// <param name="completion">将成功或失败传递给全部释放调用方的完成源。</param>
+        private async Task CompleteDisposalAsync(TaskCompletionSource completion)
         {
-            // 快照遍历，避免在迭代期间集合被修改
-            foreach (var item in icoDaq.ToArray())
+            try
             {
-                if (item.Value != null)
+                await _openGate.WaitAsync().ConfigureAwait(false);
+                try
                 {
-                    await item.Value.DisposeAsync();
+                    var errors = new List<Exception>();
+                    foreach (var item in icoDaq.ToArray())
+                    {
+                        if (!icoDaq.TryRemove(item.Key, out var connection)) continue;
+                        try
+                        {
+                            if (_dataHandlers.TryRemove(item.Key, out var dataHandler)) connection.OnDataEventAsync -= dataHandler;
+                            if (_infoHandlers.TryRemove(item.Key, out var infoHandler)) connection.OnInfoEventAsync -= infoHandler;
+                        }
+                        catch (Exception ex) { errors.Add(ex); }
+                        try { await connection.DisposeAsync().ConfigureAwait(false); }
+                        catch (Exception ex) { errors.Add(ex); }
+                    }
+                    _dataHandlers.Clear();
+                    _infoHandlers.Clear();
+                    _packedAdd.Clear();
+                    try { await base.DisposeAsync().ConfigureAwait(false); }
+                    catch (Exception ex) { errors.Add(ex); }
+                    if (errors.Count > 0) throw new AggregateException("插件连接释放失败", errors);
                 }
+                finally { _openGate.Release(); }
+                completion.SetResult();
             }
-            icoDaq.Clear();
-            _dataHandlers.Clear();
-            _infoHandlers.Clear();
-            _packedAdd.Clear();
-
-            await base.DisposeAsync();
+            catch (Exception ex) { completion.SetException(ex); }
         }
 
         /// <summary>
@@ -110,6 +131,9 @@ namespace Snet.Iot.Daq.Core.handler
             await OnInfoEventHandlerAsync(guid, e);
         }
 
+        /// <summary>连接创建与释放共用的异步门，不能在处理器释放后留下迟到的新连接。</summary>
+        private readonly SemaphoreSlim _openGate = new(1, 1);
+
         /// <summary>
         /// 打开或获取指定 guid 的 DAQ 实例<br/>
         /// 1. 若缓存中不存在则通过插件工厂创建新实例<br/>
@@ -118,18 +142,22 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         /// <param name="guid">设备唯一标识符</param>
         /// <returns>DAQ 实例和操作结果的元组</returns>
-        private readonly SemaphoreSlim _openGate = new(1, 1);
-
         private async Task<(IDaq operate, OperateResult result)> OpenAsync(string guid)
         {
             await _openGate.WaitAsync();
             try
             {
+                ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
                 if (!icoDaq.TryGetValue(guid, out IDaq? operate))
                 {
                     IDaq? newOperate = await basics.CreateNewObjectAsync<IDaq>();
                     if (newOperate is null)
                         return (default!, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(Core.LanguageOperate)));
+                    if (Volatile.Read(ref disposed) != 0)
+                    {
+                        await newOperate.DisposeAsync();
+                        throw new ObjectDisposedException(GetType().Name);
+                    }
                     operate = icoDaq.GetOrAdd(guid, newOperate!);
                     // 若竞态导致当前实例未被采用，释放多余实例
                     if (!ReferenceEquals(operate, newOperate) && newOperate != null)
@@ -222,16 +250,10 @@ namespace Snet.Iot.Daq.Core.handler
         /// <returns>操作结果，包含关闭状态信息</returns>
         public async Task<OperateResult> WAOffAsync(string guid)
         {
-            //打开
-            (IDaq operate, OperateResult result) open = await OpenAsync(guid);
-
-            //状态
-            if (!open.result.Status)
-            {
-                return open.result;
-            }
-
-            return await open.operate.WAOffAsync();
+            // 停止只作用于已存在的连接，不能为关闭 WebApi 再创建或重连设备。
+            return icoDaq.TryGetValue(guid, out var operate)
+                ? await operate.WAOffAsync()
+                : OperateResult.CreateSuccessResult(string.Empty);
         }
 
         /// <summary>
@@ -400,16 +422,10 @@ namespace Snet.Iot.Daq.Core.handler
         /// <returns>操作结果，包含取消订阅成功/失败状态</returns>
         public async Task<OperateResult> UnSubscribeAsync(string guid, IAddressModel address)
         {
-            // 打开或获取设备实例
-            (IDaq operate, OperateResult result) open = await OpenAsync(guid);
-
-            if (!open.result.Status)
-            {
-                return open.result;
-            }
-
-            // 取消订阅地址（组包后需用组包结果匹配）
-            return await open.operate.UnSubscribeAsync(GetUnsubscribeAddress(guid, address.AddressConvert()));
+            // 取消订阅仅操作已有驱动；停机流程不能为了取消订阅重新创建或连接设备。
+            return icoDaq.TryGetValue(guid, out var operate)
+                ? await operate.UnSubscribeAsync(GetUnsubscribeAddress(guid, address.AddressConvert()))
+                : OperateResult.CreateSuccessResult(string.Empty);
         }
 
         /// <summary>
@@ -420,16 +436,10 @@ namespace Snet.Iot.Daq.Core.handler
         /// <returns>操作结果，包含批量取消订阅成功/失败状态</returns>
         public async Task<OperateResult> UnSubscribeAsync(string guid, List<IAddressModel> address)
         {
-            // 打开或获取设备实例
-            (IDaq operate, OperateResult result) open = await OpenAsync(guid);
-
-            if (!open.result.Status)
-            {
-                return open.result;
-            }
-
-            // 批量取消订阅地址（组包后需用组包结果匹配）
-            return await open.operate.UnSubscribeAsync(GetUnsubscribeAddress(guid, address.AddressConvert()));
+            // 取消订阅仅操作已有驱动；停机流程不能为了取消订阅重新创建或连接设备。
+            return icoDaq.TryGetValue(guid, out var operate)
+                ? await operate.UnSubscribeAsync(GetUnsubscribeAddress(guid, address.AddressConvert()))
+                : OperateResult.CreateSuccessResult(string.Empty);
         }
 
         /// <summary>

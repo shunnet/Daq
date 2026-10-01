@@ -308,15 +308,14 @@ namespace Snet.Iot.Daq.viewModel
             IAddressModel address = DetailsNodeSelectedItem.AddressDetails;
             PluginConfigModel daq = ProjectTree.DaqDetails;
             OperateResult result = await address.TestReadAddressAsync(daq);
-            if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data))
+            if (result.GetDetails(out string? msg, out ConcurrentDictionary<string, AddressValue>? data)
+                && data is not null && data.TryGetValue(address.Address, out var value))
             {
-                AddressValue value = data[address.Address];
                 if (value.Quality == QualityType.Normal)
                 {
                     if (DetailsNodeSelectedItem.Children.Count > 0)
                     {
                         StringBuilder error_strs = new StringBuilder();
-                        error_strs.AppendLine("存在传输失败数据如下".GetLanguageValue(App.LanguageOperate));
                         foreach (var item in DetailsNodeSelectedItem.Children)
                         {
                             string desName = $"{item.Name}{item.SpecialData}";  //详细名称
@@ -324,13 +323,11 @@ namespace Snet.Iot.Daq.viewModel
                             result = await address.TestTransmitDataAsync(mq, value);
                             if (!result.GetDetails(out msg))
                             {
+                                // 后续成功不能清空此前失败；仅出现第一个失败时添加提示头。
+                                if (error_strs.Length == 0) error_strs.AppendLine("存在传输失败数据如下".GetLanguageValue(App.LanguageOperate));
                                 error_strs.AppendLine();
                                 error_strs.AppendLine($"{desName} - {"传输失败".GetLanguageValue(App.LanguageOperate)}");
                                 error_strs.AppendLine(msg);
-                            }
-                            else
-                            {
-                                error_strs.Remove(0, error_strs.Length);
                             }
                         }
                         if (error_strs.Length > 1)

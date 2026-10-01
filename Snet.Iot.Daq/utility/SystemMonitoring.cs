@@ -18,6 +18,8 @@ namespace Snet.Iot.Daq.utility
         /// </summary>
         /// <returns></returns>
         public static SystemMonitoring Instance() => _instance.Value;
+        /// <summary>底层硬件监控非线程安全；只保护同步驱动访问，WMI 查询不持有此锁。</summary>
+        private readonly object hardwareGate = new();
         private Computer computer;
         private UpdateVisitor updateVisitor = new UpdateVisitor();
 
@@ -123,7 +125,7 @@ namespace Snet.Iot.Daq.utility
         /// </summary>
         public void Init()
         {
-            computer.Open();
+            lock (hardwareGate) computer.Open();
         }
 
         /// <summary>
@@ -131,7 +133,7 @@ namespace Snet.Iot.Daq.utility
         /// </summary>
         public void End()
         {
-            computer.Close();
+            lock (hardwareGate) computer.Close();
         }
 
         /// <summary>
@@ -139,7 +141,7 @@ namespace Snet.Iot.Daq.utility
         /// </summary>
         public void Dispose()
         {
-            computer?.Close();
+            lock (hardwareGate) computer.Close();
             GC.SuppressFinalize(this);
         }
 
@@ -150,7 +152,6 @@ namespace Snet.Iot.Daq.utility
         /// <returns>包含所有硬件传感器数据和可选基本信息的 HardwareData 对象</returns>
         public HardwareData GetInfo(bool baseInfo = false)
         {
-            computer.Accept(updateVisitor);
             HardwareData hardwareData = new HardwareData();
             if (baseInfo)
             {
@@ -165,18 +166,23 @@ namespace Snet.Iot.Daq.utility
                         Task.Run(() => hardwareData.BiosInfo = GetBiosInfo()),
                         Task.Run(() => hardwareData.NetworkInfo = GetNetworkInfo()));
             }
-            foreach (IHardware hardware in computer.Hardware)  //硬件
+            lock (hardwareGate)
             {
-                HardwareDataType hardwareDataType = new HardwareDataType() { Key = GetHardwareNameCn(hardware), Value = hardware.Name };
-                for (int i = 0; i < hardware.Sensors.Length; i++)
+                computer.Accept(updateVisitor);
+                foreach (IHardware hardware in computer.Hardware)  //硬件
                 {
-                    string sensorsNameCn = GetSensorsNameCn(hardware.Sensors[i].SensorType);
-                    if (hardware.Sensors[i].Value.HasValue)
+                    HardwareDataType hardwareDataType = new HardwareDataType() { Key = GetHardwareNameCn(hardware), Value = hardware.Name };
+                    for (int i = 0; i < hardware.Sensors.Length; i++)
                     {
-                        hardwareDataType.Values.Add(new SensorDataType() { Key = $"{sensorsNameCn},{hardware.Sensors[i].Name}", Value = hardware.Sensors[i].Value.ToString()! });
+                        string sensorsNameCn = GetSensorsNameCn(hardware.Sensors[i].SensorType);
+                        var sensor = hardware.Sensors[i];
+                        if (sensor.Value is float reading)
+                        {
+                            hardwareDataType.Values.Add(new SensorDataType() { Key = $"{sensorsNameCn},{sensor.Name}", Value = reading.ToString(System.Globalization.CultureInfo.InvariantCulture) });
+                        }
                     }
+                    hardwareData.Info.Add(hardwareDataType);
                 }
-                hardwareData.Info.Add(hardwareDataType);
             }
             return hardwareData;
         }
@@ -189,9 +195,8 @@ namespace Snet.Iot.Daq.utility
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Caption FROM Win32_OperatingSystem");
-                foreach (var os in searcher.Get().Cast<ManagementObject>())
-                    return os["Caption"]?.ToString() ?? "未知系统";
+                return ReadWmiValues("SELECT Caption FROM Win32_OperatingSystem", os => os["Caption"]?.ToString() ?? "未知系统")
+                    .FirstOrDefault() ?? "未知系统";
             }
             catch { }
             return "未知系统";
@@ -204,9 +209,8 @@ namespace Snet.Iot.Daq.utility
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Name,NumberOfCores,NumberOfLogicalProcessors FROM Win32_Processor");
-                var info = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
-                return info == null ? "未知CPU" : $"{info["Name"]} / {info["NumberOfCores"]}核{info["NumberOfLogicalProcessors"]}线程";
+                return ReadWmiValues("SELECT Name,NumberOfCores,NumberOfLogicalProcessors FROM Win32_Processor",
+                    info => $"{info["Name"]} / {info["NumberOfCores"]}核{info["NumberOfLogicalProcessors"]}线程").FirstOrDefault() ?? "未知CPU";
             }
             catch { return "未知CPU"; }
         }
@@ -219,8 +223,7 @@ namespace Snet.Iot.Daq.utility
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Capacity FROM Win32_PhysicalMemory");
-                var total = searcher.Get().Cast<ManagementObject>().Sum(m => Convert.ToInt64(m["Capacity"]));
+                var total = ReadWmiValues("SELECT Capacity FROM Win32_PhysicalMemory", m => Convert.ToInt64(m["Capacity"])).Sum();
                 return $"{Math.Round(total / 1024.0 / 1024 / 1024, 1)} GB";
             }
             catch { return "未知内存"; }
@@ -234,8 +237,7 @@ namespace Snet.Iot.Daq.utility
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Model,Size FROM Win32_DiskDrive");
-                return string.Join("；", searcher.Get().Cast<ManagementObject>().Select(m =>
+                return string.Join("；", ReadWmiValues("SELECT Model,Size FROM Win32_DiskDrive", m =>
                 {
                     var size = Convert.ToInt64(m["Size"]) / 1024.0 / 1024 / 1024;
                     return $"{m["Model"]} ({Math.Round(size, 1)} GB)";
@@ -252,8 +254,7 @@ namespace Snet.Iot.Daq.utility
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Name,DriverVersion FROM Win32_VideoController");
-                return string.Join("；", searcher.Get().Cast<ManagementObject>().Select(m => $"{m["Name"]} / 驱动 {m["DriverVersion"]}"));
+                return string.Join("；", ReadWmiValues("SELECT Name,DriverVersion FROM Win32_VideoController", m => $"{m["Name"]} / 驱动 {m["DriverVersion"]}"));
             }
             catch { return "未知显卡"; }
         }
@@ -266,12 +267,12 @@ namespace Snet.Iot.Daq.utility
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Manufacturer,SMBIOSBIOSVersion,ReleaseDate FROM Win32_BIOS");
-                var info = searcher.Get().Cast<ManagementObject>().FirstOrDefault();
-                if (info == null) return "未知BIOS";
-                string? releaseDate = info["ReleaseDate"]?.ToString();
-                string datePart = releaseDate?.Length >= 8 ? releaseDate[..8] : releaseDate ?? "";
-                return $"{info["Manufacturer"]} {info["SMBIOSBIOSVersion"]} ({datePart})";
+                return ReadWmiValues("SELECT Manufacturer,SMBIOSBIOSVersion,ReleaseDate FROM Win32_BIOS", info =>
+                {
+                    string? releaseDate = info["ReleaseDate"]?.ToString();
+                    string datePart = releaseDate?.Length >= 8 ? releaseDate[..8] : releaseDate ?? "";
+                    return $"{info["Manufacturer"]} {info["SMBIOSBIOSVersion"]} ({datePart})";
+                }).FirstOrDefault() ?? "未知BIOS";
             }
             catch { return "未知BIOS"; }
         }
@@ -284,10 +285,26 @@ namespace Snet.Iot.Daq.utility
         {
             try
             {
-                using var searcher = new ManagementObjectSearcher("SELECT Name,MACAddress FROM Win32_NetworkAdapter WHERE MACAddress IS NOT NULL");
-                return string.Join("；", searcher.Get().Cast<ManagementObject>().Select(m => $"{m["Name"]} [{m["MACAddress"]}]"));
+                return string.Join("；", ReadWmiValues("SELECT Name,MACAddress FROM Win32_NetworkAdapter WHERE MACAddress IS NOT NULL", m => $"{m["Name"]} [{m["MACAddress"]}]"));
             }
             catch { return "未知网络"; }
+        }
+
+        /// <summary>同步读取 WMI 并立刻投影为独立值，统一释放查询器、结果集合和每个 COM 对象。</summary>
+        /// <typeparam name="T">不持有 WMI 对象的快照值类型。</typeparam>
+        /// <param name="query">内部固定的 WMI 查询语句。</param>
+        /// <param name="project">读取当前对象所需字段的同步投影。</param>
+        /// <returns>完成读取后的独立快照；WMI 失败由调用方处理。</returns>
+        private static List<T> ReadWmiValues<T>(string query, Func<ManagementObject, T> project)
+        {
+            using var searcher = new ManagementObjectSearcher(query);
+            using var objects = searcher.Get();
+            var values = new List<T>();
+            foreach (ManagementObject item in objects)
+            {
+                using (item) values.Add(project(item));
+            }
+            return values;
         }
 
         /// <summary>

@@ -210,13 +210,17 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns>返回文件夹状态</returns>
         public FolderState CreateFolder(string forlderName, FolderState? fs = null, string? des = null)
         {
-            if (fs == null)
+            // 与 SDK 地址空间操作共用同步锁，保证列表、索引和父子关系在同一临界区变更。
+            lock (Lock)
             {
-                fs = folderState;
+                if (fs == null)
+                {
+                    fs = folderState;
+                }
+                FolderState scalarFolder = CreateFolder(fs, forlderName, des);
+                AddPredefinedNode(SystemContext, scalarFolder);
+                return scalarFolder;
             }
-            FolderState scalarFolder = CreateFolder(fs, forlderName, des);
-            AddPredefinedNode(SystemContext, scalarFolder);
-            return scalarFolder;
         }
 
         /// <summary>
@@ -224,32 +228,36 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// </summary>
         public void CreateNode(NodeBody node, FolderState folder)
         {
-            if (string.IsNullOrWhiteSpace(node.DataType))
+            // 与 SDK 地址空间操作共用同步锁，保证列表、索引和父子关系在同一临界区变更。
+            lock (Lock)
             {
-                throw new ArgumentException($"节点 {node.Name} 未配置数据类型（DataType）");
-            }
-            // 通过 DataTypeIds 反射解析数据类型；
-            // 2.0 preview.3 中 DataTypeIds 为静态属性（NodeId 类型），旧版为静态字段（NodeId/uint），两者兼容
-            object? value = typeof(DataTypeIds).GetProperty(node.DataType)?.GetValue(null)
-                ?? typeof(DataTypeIds).GetField(node.DataType)?.GetValue(null);
-            if (value == null)
-            {
-                throw new ArgumentException($"不支持的数据类型：{node.DataType}");
-            }
-            NodeId dataType = value switch
-            {
-                NodeId nodeId => nodeId,
-                uint id => (NodeId)id,
-                _ => throw new NotSupportedException($"DataTypeIds.{node.DataType} 成员类型不受支持：{value.GetType().Name}")
-            };
+                if (string.IsNullOrWhiteSpace(node.DataType))
+                {
+                    throw new ArgumentException($"节点 {node.Name} 未配置数据类型（DataType）");
+                }
+                // 通过 DataTypeIds 反射解析数据类型；
+                // 2.0 preview.3 中 DataTypeIds 为静态属性（NodeId 类型），旧版为静态字段（NodeId/uint），两者兼容
+                object? value = typeof(DataTypeIds).GetProperty(node.DataType)?.GetValue(null)
+                    ?? typeof(DataTypeIds).GetField(node.DataType)?.GetValue(null);
+                if (value == null)
+                {
+                    throw new ArgumentException($"不支持的数据类型：{node.DataType}");
+                }
+                NodeId dataType = value switch
+                {
+                    NodeId nodeId => nodeId,
+                    uint id => (NodeId)id,
+                    _ => throw new NotSupportedException($"DataTypeIds.{node.DataType} 成员类型不受支持：{value.GetType().Name}")
+                };
 
-            if (node.Dynamic)  //创建动态
-            {
-                CreateDynamicVariable(folder, node.Name, node.Description, dataType, ValueRanks.Scalar, node.AccessLevel);
-            }
-            else  //创建静态
-            {
-                CreateVariable(folder, node.Name, node.Description, dataType, ValueRanks.Scalar, accessLevel: node.AccessLevel);
+                if (node.Dynamic)  //创建动态
+                {
+                    CreateDynamicVariable(folder, node.Name, node.Description, dataType, ValueRanks.Scalar, node.AccessLevel);
+                }
+                else  //创建静态
+                {
+                    CreateVariable(folder, node.Name, node.Description, dataType, ValueRanks.Scalar, accessLevel: node.AccessLevel);
+                }
             }
         }
 
@@ -401,24 +409,28 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// </summary>
         public FolderState CreateFolder(NodeBody node, FolderState? folder = null)
         {
-            if (folder == null)
+            // 与 SDK 地址空间操作共用同步锁，保证列表、索引和父子关系在同一临界区变更。
+            lock (Lock)
             {
-                folder = folderState;
-            }
-            if (node.Nodes != null && node.Nodes.Count > 0)
-            {
-                FolderState scalarFolder = CreateFolder(folder, node.Name, node.Description);
-                foreach (var item in node.Nodes)
+                if (folder == null)
                 {
-                    CreateFolder(item, scalarFolder);
+                    folder = folderState;
                 }
-                AddPredefinedNode(SystemContext, scalarFolder);
-                return scalarFolder;
-            }
-            else
-            {
-                CreateNode(node, folder);
-                return folder;
+                if (node.Nodes != null && node.Nodes.Count > 0)
+                {
+                    FolderState scalarFolder = CreateFolder(folder, node.Name, node.Description);
+                    foreach (var item in node.Nodes)
+                    {
+                        CreateFolder(item, scalarFolder);
+                    }
+                    AddPredefinedNode(SystemContext, scalarFolder);
+                    return scalarFolder;
+                }
+                else
+                {
+                    CreateNode(node, folder);
+                    return folder;
+                }
             }
         }
 
@@ -429,36 +441,30 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns>统一出参</returns>
         public OperateResult RemoveFolder(List<NodeId> folderNameArray)
         {
-            try
+            lock (Lock)
             {
-                List<string> FailMessage = new List<string>();
-                foreach (var item in folderNameArray)
+                try
                 {
-                    bool state = DeleteNode(SystemContext, item);
-                    if (!state)
+                    var failures = new List<string>();
+                    foreach (var folderId in folderNameArray)
                     {
-                        FailMessage.Add($"{item} 移除失败");
-                    }
-                    else
-                    {
-                        List<NodeId> nodeIds = GetFolderAddress(folderNameArray);
-                        if (nodeIds.Count > 0)
+                        // 在删除父节点前取得索引快照，删除成功后同步清理静态与动态节点缓存。
+                        var children = GetFolderAddress([folderId]);
+                        if (!DeleteNode(SystemContext, folderId))
                         {
-                            foreach (var nodeid in nodeIds)
-                            {
-                                if (!RemoveNodeId(nodeid, null))
-                                {
-                                    FailMessage.Add($"{nodeid.ToString()} 移除失败");
-                                }
-                            }
+                            failures.Add($"{folderId} 移除失败");
+                            continue;
                         }
+                        foreach (var child in children) RemoveNodeId(child, null);
                     }
+                    return failures.Count == 0
+                        ? OperateResult.CreateSuccessResult("移除成功")
+                        : OperateResult.CreateFailureResult(string.Join(Environment.NewLine, failures));
                 }
-                return new OperateResult(true, "移除成功", new Random().Next(1, 50));
-            }
-            catch (Exception ex)
-            {
-                return new OperateResult(false, $"移除异常：{ex.Message}", new Random().Next(1, 50));
+                catch (Exception ex)
+                {
+                    return OperateResult.CreateFailureResult($"移除异常：{ex.Message}");
+                }
             }
         }
 
@@ -470,53 +476,57 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <param name="fs">文件夹状态</param>
         public OperateResult CreateAddress(List<AddressBody> addressArray, FolderState? fs = null)
         {
-            try
+            // 与 SDK 地址空间操作共用同步锁，保证列表、索引和父子关系在同一临界区变更。
+            lock (Lock)
             {
-                if (fs == null)
+                try
                 {
-                    fs = folderState;
-                }
-                List<string> FailMessage = new List<string>();
-                for (int i = 0; i < addressArray.Count; i++)
-                {
-                    //判断地址是否存在
-                    string name = $"{fs.NodeId}.{addressArray[i].AddressName}";
-                    BaseDataVariableState? bdvs = null;
-                    if (addressArray[i].Dynamic)
+                    if (fs == null)
                     {
-                        bdvs = m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == name);
-                        if (bdvs == null)
+                        fs = folderState;
+                    }
+                    List<string> FailMessage = new List<string>();
+                    for (int i = 0; i < addressArray.Count; i++)
+                    {
+                        //判断地址是否存在
+                        string name = Snet.Iot.Daq.Core.handler.UaForwarding.CreateAddressNodeId(fs.NodeId, addressArray[i].AddressName).ToString();
+                        BaseDataVariableState? bdvs = null;
+                        if (addressArray[i].Dynamic)
                         {
-                            CreateDynamicVariable(fs, addressArray[i].AddressName, addressArray[i].Description, addressArray[i].DataType, ValueRanks.Scalar, addressArray[i].AccessLevel);
+                            m_dynamicIndex.TryGetValue(name, out bdvs);
+                            if (bdvs == null)
+                            {
+                                CreateDynamicVariable(fs, addressArray[i].AddressName, addressArray[i].Description, addressArray[i].DataType, ValueRanks.Scalar, addressArray[i].AccessLevel);
+                            }
+                            else
+                            {
+                                FailMessage.Add($"{addressArray[i].AddressName} 已存在");
+                            }
                         }
                         else
                         {
-                            FailMessage.Add($"{addressArray[i].AddressName} 已存在");
+                            m_staticIndex.TryGetValue(name, out bdvs);
+                            if (bdvs == null)
+                            {
+                                CreateVariable(fs, addressArray[i].AddressName, addressArray[i].Description, addressArray[i].DataType, ValueRanks.Scalar, false, addressArray[i].DefaultValue, addressArray[i].AccessLevel);
+                            }
+                            else
+                            {
+                                FailMessage.Add($"{addressArray[i].AddressName} 已存在");
+                            }
                         }
                     }
-                    else
+                    AddPredefinedNode(SystemContext, fs);
+                    if (FailMessage.Count > 0)
                     {
-                        bdvs = m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == name);
-                        if (bdvs == null)
-                        {
-                            CreateVariable(fs, addressArray[i].AddressName, addressArray[i].Description, addressArray[i].DataType, ValueRanks.Scalar, false, addressArray[i].DefaultValue, addressArray[i].AccessLevel);
-                        }
-                        else
-                        {
-                            FailMessage.Add($"{addressArray[i].AddressName} 已存在");
-                        }
+                        return new OperateResult(false, FailMessage.ToJson(), new Random().Next(1, 50), addressArray);
                     }
+                    return new OperateResult(true, "地址创建成功", new Random().Next(1, 50), addressArray);
                 }
-                AddPredefinedNode(SystemContext, fs);
-                if (FailMessage.Count > 0)
+                catch (Exception ex)
                 {
-                    return new OperateResult(false, FailMessage.ToJson(), new Random().Next(1, 50), addressArray);
+                    return new OperateResult(false, $"地址创建异常：{ex.Message}", new Random().Next(1, 50));
                 }
-                return new OperateResult(true, "地址创建成功", new Random().Next(1, 50), addressArray);
-            }
-            catch (Exception ex)
-            {
-                return new OperateResult(false, $"地址创建异常：{ex.Message}", new Random().Next(1, 50));
             }
         }
 
@@ -675,42 +685,46 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <param name="addressArray">地址集合</param>
         public OperateResult RemoveAddress(List<AddressBody> addressArray)
         {
-            try
+            // 与 SDK 地址空间操作共用同步锁，保证列表、索引和父子关系在同一临界区变更。
+            lock (Lock)
             {
-                List<string> FailMessage = new List<string>();
-                for (int i = 0; i < addressArray.Count; i++)
+                try
                 {
-                    NodeId? nodeId = GetNodeId(addressArray[i].AddressName, addressArray[i].Dynamic);
-                    if (nodeId != null)
+                    List<string> FailMessage = new List<string>();
+                    for (int i = 0; i < addressArray.Count; i++)
                     {
-                        bool state = DeleteNode(SystemContext, nodeId.Value);
-                        if (!state)
+                        NodeId? nodeId = GetNodeId(addressArray[i].AddressName, addressArray[i].Dynamic);
+                        if (nodeId != null)
                         {
-                            FailMessage.Add($"{addressArray[i].AddressName} 移除失败");
-                        }
-                        else
-                        {
-                            state = RemoveNodeId(nodeId.Value);
+                            bool state = DeleteNode(SystemContext, nodeId.Value);
                             if (!state)
                             {
                                 FailMessage.Add($"{addressArray[i].AddressName} 移除失败");
                             }
+                            else
+                            {
+                                state = RemoveNodeId(nodeId.Value);
+                                if (!state)
+                                {
+                                    FailMessage.Add($"{addressArray[i].AddressName} 移除失败");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            FailMessage.Add($"{addressArray[i].AddressName} 移除失败，不存在此地址");
                         }
                     }
-                    else
+                    if (FailMessage.Count > 0)
                     {
-                        FailMessage.Add($"{addressArray[i].AddressName} 移除失败，不存在此地址");
+                        return new OperateResult(false, FailMessage.ToJson(), new Random().Next(1, 50));
                     }
+                    return new OperateResult(true, "移除成功", new Random().Next(1, 50));
                 }
-                if (FailMessage.Count > 0)
+                catch (Exception ex)
                 {
-                    return new OperateResult(false, FailMessage.ToJson(), new Random().Next(1, 50));
+                    return new OperateResult(false, $"移除异常：{ex.Message}", new Random().Next(1, 50));
                 }
-                return new OperateResult(true, "移除成功", new Random().Next(1, 50));
-            }
-            catch (Exception ex)
-            {
-                return new OperateResult(false, $"移除异常：{ex.Message}", new Random().Next(1, 50));
             }
         }
 
@@ -722,51 +736,55 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns></returns>
         public NodeId? GetNodeId(string addressName, bool? dynamic = false)
         {
-            // 优先查索引（O(1)），未命中回退线性扫描（防止索引与列表不同步）
-            if (dynamic == true)
+            // 与 SDK 地址空间操作共用同步锁，保证列表、索引和父子关系在同一临界区变更。
+            lock (Lock)
             {
-                //是动态的
-                if (m_dynamicIndex.TryGetValue(addressName, out BaseDataVariableState? node))
+                // 优先查索引（O(1)），未命中回退线性扫描（防止索引与列表不同步）
+                if (dynamic == true)
                 {
-                    return node.NodeId;
+                    //是动态的
+                    if (m_dynamicIndex.TryGetValue(addressName, out BaseDataVariableState? node))
+                    {
+                        return node.NodeId;
+                    }
+                    if (m_dynamicNodes.Count > 0)
+                    {
+                        return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
+                    }
                 }
-                if (m_dynamicNodes.Count > 0)
+                else if (dynamic == false)
                 {
-                    return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
+                    //不是动态的
+                    if (m_staticIndex.TryGetValue(addressName, out BaseDataVariableState? node))
+                    {
+                        return node.NodeId;
+                    }
+                    if (m_staticNodes.Count > 0)
+                    {
+                        return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
+                    }
                 }
+                else
+                {
+                    if (m_staticIndex.TryGetValue(addressName, out BaseDataVariableState? node))
+                    {
+                        return node.NodeId;
+                    }
+                    if (m_dynamicIndex.TryGetValue(addressName, out node))
+                    {
+                        return node.NodeId;
+                    }
+                    if (m_staticNodes.Count > 0)
+                    {
+                        return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
+                    }
+                    if (m_dynamicNodes.Count > 0)
+                    {
+                        return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
+                    }
+                }
+                return null;
             }
-            else if (dynamic == false)
-            {
-                //不是动态的
-                if (m_staticIndex.TryGetValue(addressName, out BaseDataVariableState? node))
-                {
-                    return node.NodeId;
-                }
-                if (m_staticNodes.Count > 0)
-                {
-                    return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
-                }
-            }
-            else
-            {
-                if (m_staticIndex.TryGetValue(addressName, out BaseDataVariableState? node))
-                {
-                    return node.NodeId;
-                }
-                if (m_dynamicIndex.TryGetValue(addressName, out node))
-                {
-                    return node.NodeId;
-                }
-                if (m_staticNodes.Count > 0)
-                {
-                    return m_staticNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
-                }
-                if (m_dynamicNodes.Count > 0)
-                {
-                    return m_dynamicNodes.FirstOrDefault(c => c.NodeId.ToString() == addressName)?.NodeId;
-                }
-            }
-            return null;
         }
         /// <summary>
         /// 移除nodeid
@@ -776,80 +794,16 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns></returns>
         public bool RemoveNodeId(NodeId nodeId, bool? dynamic = false)
         {
-            string key = nodeId.ToString();
-            bool removed = false;
-            if (dynamic == true)
+            lock (Lock)
             {
-                lock (m_dynamicNodes)
-                {
-                    //是动态的
-                    if (m_dynamicNodes.Count > 0)
-                    {
-                        BaseDataVariableState? baseData = m_dynamicNodes.FirstOrDefault(c => c.NodeId == nodeId);
-                        if (baseData != null)
-                        {
-                            removed = m_dynamicNodes.Remove(baseData);
-                        }
-                    }
-                }
-                if (removed)
-                {
-                    m_dynamicIndex.TryRemove(key, out _);
-                }
+                string key = nodeId.ToString();
+                bool removed = false;
+                if (dynamic != true && m_staticIndex.TryRemove(key, out var staticNode))
+                    removed |= m_staticNodes.Remove(staticNode);
+                if (dynamic != false && m_dynamicIndex.TryRemove(key, out var dynamicNode))
+                    removed |= m_dynamicNodes.Remove(dynamicNode);
+                return removed;
             }
-            else if (dynamic == false)
-            {
-                lock (m_staticNodes)
-                {
-                    //不是动态的
-                    if (m_staticNodes.Count > 0)
-                    {
-                        BaseDataVariableState? baseData = m_staticNodes.FirstOrDefault(c => c.NodeId == nodeId);
-                        if (baseData != null)
-                        {
-                            removed = m_staticNodes.Remove(baseData);
-                        }
-                    }
-                }
-                if (removed)
-                {
-                    m_staticIndex.TryRemove(key, out _);
-                }
-            }
-            else
-            {
-                lock (m_staticNodes)
-                {
-                    if (m_staticNodes.Count > 0)
-                    {
-                        BaseDataVariableState? baseData = m_staticNodes.FirstOrDefault(c => c.NodeId == nodeId);
-                        if (baseData != null)
-                        {
-                            removed = m_staticNodes.Remove(baseData);
-                        }
-                    }
-                }
-                if (removed)
-                {
-                    m_staticIndex.TryRemove(key, out _);
-                }
-                lock (m_dynamicNodes)
-                {
-                    if (m_dynamicNodes.Count > 0)
-                    {
-                        BaseDataVariableState? baseData = m_dynamicNodes.FirstOrDefault(c => c.NodeId == nodeId);
-                        if (baseData != null)
-                        {
-                            removed = m_dynamicNodes.Remove(baseData);
-                        }
-                    }
-                }
-                if (removed)
-                {
-                    m_dynamicIndex.TryRemove(key, out _);
-                }
-            }
-            return removed;
         }
 
         /// <summary>
@@ -858,27 +812,22 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns>返回nodeid集合</returns>
         public List<NodeId> GetFolderAddress(List<NodeId> folderNameArray)
         {
-            List<NodeId> nodeIds = new List<NodeId>();
-            foreach (NodeId folderName in folderNameArray)
+            lock (Lock)
             {
-                if (m_staticNodes.Count > 0)
+                var folders = new HashSet<NodeId>(folderNameArray);
+                var result = new List<NodeId>();
+                foreach (var node in m_staticNodes.Concat(m_dynamicNodes))
                 {
-                    List<BaseDataVariableState> baseDatas = m_staticNodes.Where(s => s.NodeId.ToString().Contains(folderName.ToString())).ToList();
-                    foreach (var item in baseDatas)
+                    // 依据真实父节点归属匹配，避免 A 文件夹误匹配 AB 或名称中带点的其他文件夹。
+                    for (NodeState? parent = node.Parent; parent is not null; parent = (parent as BaseInstanceState)?.Parent)
                     {
-                        nodeIds.Add(item.NodeId);
+                        if (!folders.Contains(parent.NodeId)) continue;
+                        result.Add(node.NodeId);
+                        break;
                     }
                 }
-                if (m_dynamicNodes.Count > 0)
-                {
-                    List<BaseDataVariableState> baseDatas = m_dynamicNodes.Where(s => s.NodeId.ToString().Contains(folderName.ToString())).ToList();
-                    foreach (var item in baseDatas)
-                    {
-                        nodeIds.Add(item.NodeId);
-                    }
-                }
+                return result;
             }
-            return nodeIds;
         }
 
         /// <summary>
@@ -887,16 +836,20 @@ namespace Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer
         /// <returns></returns>
         public List<string> GetAddressArray()
         {
-            List<string> strings = new List<string>();
-            foreach (var item in m_staticNodes)
+            // 与 SDK 地址空间操作共用同步锁，保证列表、索引和父子关系在同一临界区变更。
+            lock (Lock)
             {
-                strings.Add(item.NodeId.ToString());
+                List<string> strings = new List<string>();
+                foreach (var item in m_staticNodes)
+                {
+                    strings.Add(item.NodeId.ToString());
+                }
+                foreach (var item in m_dynamicNodes)
+                {
+                    strings.Add(item.NodeId.ToString());
+                }
+                return strings;
             }
-            foreach (var item in m_dynamicNodes)
-            {
-                strings.Add(item.NodeId.ToString());
-            }
-            return strings;
         }
 
         #endregion 私有写法

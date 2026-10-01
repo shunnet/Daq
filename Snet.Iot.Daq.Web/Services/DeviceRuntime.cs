@@ -6,7 +6,6 @@ using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Model.data;
 using Snet.Utility;
 using System.Collections.Concurrent;
-using System.Collections.Frozen;
 using System.Threading.Channels;
 
 namespace Snet.Iot.Daq.Web.Services;
@@ -23,29 +22,7 @@ public class DeviceRuntime : IAsyncDisposable
     /// <summary>状态推送节流窗口：数据事件高频时避免每条样本都触发整页重渲染（对齐 WPF 状态翻转才通知 + 1s 轮询运行时间）</summary>
     private static readonly TimeSpan StatePushThrottle = TimeSpan.FromMilliseconds(500);
 
-    /// <summary>DataType → OPC UA BuiltInType 映射（对齐 WPF ConsoleDeviceModel._typeMap）</summary>
-    private static readonly FrozenDictionary<DataType, BuiltInType> UaTypeMap = new Dictionary<DataType, BuiltInType>
-    {
-        { DataType.Byte, BuiltInType.Byte },
-        { DataType.Bool, BuiltInType.Boolean },
-        { DataType.Double, BuiltInType.Double },
-        { DataType.Float, BuiltInType.Float },
-        { DataType.Single, BuiltInType.Float },
-        { DataType.Short, BuiltInType.Int16 },
-        { DataType.Int16, BuiltInType.Int16 },
-        { DataType.Ushort, BuiltInType.UInt16 },
-        { DataType.UInt16, BuiltInType.UInt16 },
-        { DataType.Int, BuiltInType.Int32 },
-        { DataType.Int32, BuiltInType.Int32 },
-        { DataType.Uint, BuiltInType.UInt32 },
-        { DataType.UInt32, BuiltInType.UInt32 },
-        { DataType.Long, BuiltInType.Int64 },
-        { DataType.Int64, BuiltInType.Int64 },
-        { DataType.Ulong, BuiltInType.UInt64 },
-        { DataType.UInt64, BuiltInType.UInt64 },
-        { DataType.String, BuiltInType.String },
-        { DataType.Char, BuiltInType.String },
-    }.ToFrozenDictionary();
+
 
     #endregion
 
@@ -69,10 +46,14 @@ public class DeviceRuntime : IAsyncDisposable
     private readonly RuntimeSecondsRecorderHandler _runtime = new();
     private CancellationTokenSource? _cts;
     private bool _disposed;
+    private readonly object _disposalLock = new();
+    private Task? _disposalTask;
+    /// <summary>最近状态：0 未报告，1 成功，-1 失败；并发事件用原子交换避免重复推送。</summary>
+    private int _lastResultStatus;
     private Task? _consumeTask;
     private Task? _uaTask;
     private readonly SemaphoreSlim _collectGate = new(1, 1);
-    private readonly ConcurrentDictionary<string, IAddressModel> _addressIndex = new();
+    private ConcurrentDictionary<string, IAddressModel> _addressIndex = new();
 
     // UA 地址空间转发状态（对齐 WPF ConsoleDeviceModel.UaSyncChannelDataEventAsync）
     private Channel<AddressValue>? _uaSyncChannel;
@@ -104,7 +85,7 @@ public class DeviceRuntime : IAsyncDisposable
     /// <summary>获取设备在项目树中的完整层级路径。</summary>
     public string DeviceHierarchy => _hierarchyPath;
     /// <summary>设备下全部点位（Address 节点）数量：添加/删除点位经 SyncFromProjects → RefreshSettings 感知更新。
-    /// 注意：采集订阅集是 _addressDatas（仅配了 MQ 的地址），地址数量显示全量点位更符合直觉。</summary>
+    /// 采集订阅集包含全部地址；未绑定 MQ 的点位仍可采集并转发至 UA。</summary>
     public int AddressCount { get; private set; }
     /// <summary>获取面向界面显示的采集状态文本。</summary>
     public string CollectStatus { get; private set; } = "未采集";
@@ -139,7 +120,7 @@ public class DeviceRuntime : IAsyncDisposable
                 _addressIndex[address.Address] = address;
             _hierarchyPath = deviceNode.GetHierarchyPath();
             DeviceName = deviceNode.Name;
-            AddressCount = CountAddressNodes(deviceNode.Details);
+            AddressCount = ProjectHandlerCore.CountAddressNodes(deviceNode.Details);
         }
         _uaService = uaService;
         _pushLog = pushLog;
@@ -147,41 +128,18 @@ public class DeviceRuntime : IAsyncDisposable
         _localization = localization;
     }
 
-    /// <summary>统计设备下全部 Address 节点（含层级嵌套），供控制台地址数量展示</summary>
-    private static int CountAddressNodes(IEnumerable<IProjectDetailsTreeViewModel>? nodes)
-    {
-        if (nodes is null) return 0;
-        var count = 0;
-        foreach (var node in nodes)
-        {
-            if (node.NodeType == ProjectDetailsNodeType.Address) count++;
-            count += CountAddressNodes(node.Children);
-        }
-        return count;
-    }
-
-    /// <summary>设备下未配置 MQ 传输设备的地址名列表（全量点位 - 订阅集），供启动采集前主动告知用户</summary>
-    private List<string> GetAddressesWithoutMq()
-    {
-        var all = new List<string>();
-        lock (_projectTreeLock)
-            CollectAddressNames(_deviceNode.Details, all);
-        var bound = new HashSet<string>(_addressDatas.Keys.Select(a => a.Address));
-        return all.Where(name => !bound.Contains(name)).ToList();
-    }
-
-    private static void CollectAddressNames(IEnumerable<IProjectDetailsTreeViewModel>? nodes, List<string> names)
-    {
-        if (nodes is null) return;
-        foreach (var node in nodes)
-        {
-            if (node.NodeType == ProjectDetailsNodeType.Address && node.AddressDetails is not null)
-                names.Add(node.AddressDetails.Address);
-            CollectAddressNames(node.Children, names);
-        }
-    }
-
     private string T(string key) => _localization.T(key);
+
+    /// <summary>按插件类名快照判断设备关联，用于精确停止受热更新影响的采集或 MQ 转发设备。</summary>
+    /// <param name="type">待变更的插件类型。</param>
+    /// <param name="names">调用方拥有的只读类名集合，包含包内全部插件名。</param>
+    /// <returns>本设备使用其中任一插件时返回 true。</returns>
+    internal bool UsesPlugin(Snet.Model.@enum.PluginType type, IReadOnlySet<string> names)
+    {
+        if (type == Snet.Model.@enum.PluginType.Daq) return names.Contains(DeviceType);
+        var addresses = Volatile.Read(ref _addressDatas);
+        return addresses.Values.Any(plugins => plugins.Any(plugin => names.Contains(plugin.Name)));
+    }
 
     /// <summary>
     /// 刷新配置快照（对齐 WPF 每次刷新重读设备配置）：参数/地址集/层级/名称同步到最新项目树。
@@ -194,53 +152,21 @@ public class DeviceRuntime : IAsyncDisposable
             _daqConfig = deviceNode.DaqDetails!;
             _deviceNode = deviceNode;
             var newDict = ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new());
-            var signature = SettingsSignature(deviceNode, newDict);
+            var signature = DeviceSettings.CreateSignature(deviceNode, newDict);
             var changed = signature != _settingsSignature;
             _settingsSignature = signature;
             _addressDatas = newDict;
-            _addressIndex.Clear();
+            var newIndex = new ConcurrentDictionary<string, IAddressModel>(StringComparer.Ordinal);
             foreach (var address in newDict.Keys)
-                _addressIndex[address.Address] = address;
+                newIndex[address.Address] = address;
+            // 一次发布完整快照；未重启的消费者不能看到 Clear/逐条回填之间的空索引。
+            Volatile.Write(ref _addressIndex, newIndex);
             _hierarchyPath = deviceNode.GetHierarchyPath();
             DeviceName = deviceNode.Name;
             DeviceVersion = ResolvePluginVersion(DeviceType);
-            AddressCount = CountAddressNodes(deviceNode.Details);
+            AddressCount = ProjectHandlerCore.CountAddressNodes(deviceNode.Details);
             return changed;
         }
-    }
-
-    private static string SettingsSignature(IProjectTreeViewModel deviceNode,
-        ConcurrentDictionary<IAddressModel, List<PluginConfigModel>> newDict)
-    {
-        var config = deviceNode.DaqDetails!;
-        // 变更签名：参数 + 组包 + WebApi + 地址集（对齐 WPF SettingsAsync 每次刷新都重启运行设备——
-        // 组包/WebApi 不在 Param JSON 里，必须单独纳入签名，否则修改后运行设备不会自动重订阅）
-        var ap = config.AutoPack;
-        var wa = config.WebApi;
-        var autoPackSig = ap is null ? "0" : $"{ap.MaxByteLength}|{ap.Format}|{ap.IsStringReverseByteWord}";
-        var webApiSig = wa is null ? "0" : $"{wa.IpAddress}|{wa.Port}|{wa.CrossDomain}";
-        return System.Text.Json.JsonSerializer.Serialize(new
-        {
-            config.Name,
-            config.SN,
-            config.Param,
-            autoPackSig,
-            webApiSig,
-            Path = deviceNode.GetHierarchyPath(),
-            Addresses = newDict.OrderBy(kv => kv.Key.Guid, StringComparer.Ordinal).Select(kv => new
-            {
-                kv.Key.Guid,
-                kv.Key.Address,
-                kv.Key.Type,
-                kv.Key.Length,
-                kv.Key.EncodingType,
-                kv.Key.ExpandParam,
-                kv.Key.Topic,
-                kv.Key.SimplifyValue,
-                kv.Key.Describe,
-                Mq = kv.Value.OrderBy(m => m.Guid, StringComparer.Ordinal).Select(m => new { m.Guid, m.Name, m.SN, m.Param })
-            })
-        });
     }
 
     /// <summary>配置变更与启停共用同一把门，旧任务退出后才替换索引和配置。</summary>
@@ -258,7 +184,7 @@ public class DeviceRuntime : IAsyncDisposable
                 bool stopBeforeRefresh;
                 lock (_projectTreeLock)
                 {
-                    stopBeforeRefresh = IsRun && SettingsSignature(deviceNode,
+                    stopBeforeRefresh = IsRun && DeviceSettings.CreateSignature(deviceNode,
                         ProjectHandlerCore.ToAddressMqDictionary(deviceNode.Details ?? new())) != _settingsSignature;
                     if (!stopBeforeRefresh)
                     {
@@ -310,36 +236,20 @@ public class DeviceRuntime : IAsyncDisposable
         try
         {
             if (IsRun) return;
-            // 前置检查（启动前主动告知）：订阅集为空直接失败并列出未配置传输设备的点位，
-            // 避免底层报"组包结果为空"这类无法定位的消息
-            if (_addressDatas.Count == 0)
+            // 所有地址均参与采集；只有真正没有地址时才拒绝启动。
+            if (_addressDatas.IsEmpty)
             {
-                var missingMq = GetAddressesWithoutMq();
-                CollectStatus = "启动失败";
+                CollectStatus = T("启动失败");
                 LedGreen = false;
                 LedRed = true;
                 _pushState(this);
-                if (missingMq.Count > 0)
-                {
-                    _pushLog(string.Format(T("[{0}] 启动采集失败: {1}"), DeviceName,
-                        string.Format(T("以下地址未配置传输设备，无法采集：{0}"), string.Join("、", missingMq))));
-                    _pushLog(string.Format(T("[{0}] {1}"), DeviceName, T("请检查项目详情中传输设备是否正确设置给每个地址")));
-                }
-                else
-                {
-                    _pushLog(string.Format(T("[{0}] 启动采集失败: {1}"), DeviceName, T("设备下没有可采集的地址")));
-                }
+                _pushLog(string.Format(T("[{0}] 启动采集失败: {1}"), DeviceName, T("设备下没有可采集的地址")));
                 return;
             }
-            // 部分点位缺传输设备：警告哪些地址不参与采集，其余正常订阅
-            var missingPartial = GetAddressesWithoutMq();
-            if (missingPartial.Count > 0)
-                _pushLog(string.Format(T("[{0}] {1}"), DeviceName,
-                    string.Format(T("警告: {0} 个地址未配置传输设备，不参与采集: {1}"), missingPartial.Count, string.Join("、", missingPartial))));
             // 对齐 WPF CollectAsync：再次采集时先清理旧 UA 层级与地址映射（UA 服务重启/配置变更后旧 FolderState 失效）
             if (_uaFolderStates.Count > 0)
             {
-                var srv = _uaService();
+                var srv = _uaFolderService;
                 if (srv is not null)
                 {
                     try { srv.RemoveFolder([_uaFolderStates[^1].NodeId]); }
@@ -472,11 +382,15 @@ public class DeviceRuntime : IAsyncDisposable
         }
         _uaSyncChannel = null;
         foreach (var mq in _mqHandlers.Values)
-            await mq.DisposeAsync();
+        {
+            try { await mq.DisposeAsync(); }
+            catch (Exception ex) { _pushLog($"[{DeviceName}] MQ 释放异常: {ex.Message}"); }
+        }
         _mqHandlers.Clear();
         if (_bytesHandler is not null)
         {
-            await _bytesHandler.DisposeAsync();
+            try { await _bytesHandler.DisposeAsync(); }
+            catch (Exception ex) { _pushLog($"[{DeviceName}] 字节处理器释放异常: {ex.Message}"); }
             _bytesHandler = null;
         }
         _bytesModels.Clear();
@@ -525,7 +439,6 @@ public class DeviceRuntime : IAsyncDisposable
     {
         try
         {
-            if (!IsRun && _daqHandler is null) return;
             await StopConsumersAsync();
             _runtime.Stop();
 
@@ -559,6 +472,7 @@ public class DeviceRuntime : IAsyncDisposable
             CollectStatus = "未采集";
             LedGreen = false;
             LedRed = false;
+            Interlocked.Exchange(ref _lastResultStatus, 0);
             _pushState(this);
             _pushLog(string.Format(T("[{0}] 停止采集"), DeviceName));
         }
@@ -603,7 +517,10 @@ public class DeviceRuntime : IAsyncDisposable
 
     #region WebApi 操作
     /// <summary>WebApi 启动（对齐 WPF WASatrtAsync：状态预检 → 未设置参数/未运行提示失败 → WAOnAsync）</summary>
-    public async Task<OperateResult> WebApiStartAsync()
+    public Task<OperateResult> WebApiStartAsync() => RunWebApiOperationAsync(WebApiStartCoreAsync);
+
+    /// <summary>操作门内执行 WebApi Start，禁止与采集启停、配置替换并发。</summary>
+    private async Task<OperateResult> WebApiStartCoreAsync()
     {
         var handler = _daqHandler;
         if (handler is null)
@@ -635,7 +552,10 @@ public class DeviceRuntime : IAsyncDisposable
     }
 
     /// <summary>WebApi 停止（对齐 WPF WAStopAsync：未设置参数/未运行提示返回，运行中才停止）</summary>
-    public async Task<OperateResult> WebApiStopAsync()
+    public Task<OperateResult> WebApiStopAsync() => RunWebApiOperationAsync(WebApiStopCoreAsync);
+
+    /// <summary>操作门内执行 WebApi Stop，禁止与采集启停、配置替换并发。</summary>
+    private async Task<OperateResult> WebApiStopCoreAsync()
     {
         var handler = _daqHandler;
         if (handler is null)
@@ -663,7 +583,10 @@ public class DeviceRuntime : IAsyncDisposable
     }
 
     /// <summary>WebApi 请求示例（对齐 WPF WARequestExampleAsync：未设置参数提示返回，请求结果由页面展示）</summary>
-    public async Task<OperateResult> WebApiExampleAsync()
+    public Task<OperateResult> WebApiExampleAsync() => RunWebApiOperationAsync(WebApiExampleCoreAsync);
+
+    /// <summary>操作门内执行 WebApi Example，禁止与采集启停、配置替换并发。</summary>
+    private async Task<OperateResult> WebApiExampleCoreAsync()
     {
         var handler = _daqHandler;
         if (handler is null)
@@ -671,6 +594,20 @@ public class DeviceRuntime : IAsyncDisposable
         if (_daqConfig.WebApi is null)
             return OperateResult.CreateFailureResult(string.Format(T("[{0}] 未设置 WebApi 参数"), DeviceName));
         return await handler.WARequestExampleAsync(_daqConfig.Guid);
+    }
+
+    /// <summary>串行化 WebApi 操作，等待后再次校验终态；停止和释放沿用相同设备操作门。</summary>
+    /// <param name="operation">已取得操作门时执行的 WebApi 操作。</param>
+    /// <returns>驱动操作结果；释放后的请求返回失败，不重建驱动。</returns>
+    private async Task<OperateResult> RunWebApiOperationAsync(Func<Task<OperateResult>> operation)
+    {
+        await _collectGate.WaitAsync();
+        try
+        {
+            if (_disposed) return OperateResult.CreateFailureResult(T("服务未启动"));
+            return await operation();
+        }
+        finally { _collectGate.Release(); }
     }
 
     #endregion
@@ -703,6 +640,7 @@ public class DeviceRuntime : IAsyncDisposable
     /// <summary>信息事件（对齐 WPF DqaHandler_OnInfoEventAsync：驱动错误/连接状态经 ResultMsgAsync 显示到信息栏）</summary>
     private Task OnInfoEvent(object? sender, EventInfoResult e)
     {
+        SetResultStatus(e.Status);
         if (!string.IsNullOrWhiteSpace(e.Message))
             ThrottledLog(e.Message, "info:" + e.Message);
         return Task.CompletedTask;
@@ -721,6 +659,7 @@ public class DeviceRuntime : IAsyncDisposable
                 // 失败数据事件上报信息栏（对齐 WPF DataSyncChannelDataEventAsync 的 ResultMsgAsync 分支）
                 if (!e.Status)
                 {
+                    SetResultStatus(false);
                     if (!string.IsNullOrWhiteSpace(e.Message))
                         ThrottledLog(e.Message, "e:" + e.Message);
                     continue;
@@ -782,11 +721,12 @@ public class DeviceRuntime : IAsyncDisposable
                 // 数据质量异常先上报（不依赖地址是否在索引中）
                 if (kv.Value.Quality != QualityType.Normal)
                 {
+                    SetResultStatus(false);
                     ThrottledLog($"{DeviceHierarchy}, {addressValue.AddressName} - {kv.Value.Message}", "q:" + kv.Key);
                     continue;
                 }
 
-                if (!_addressIndex.TryGetValue(kv.Key, out var addressModel) ||
+                if (!Volatile.Read(ref _addressIndex).TryGetValue(kv.Key, out var addressModel) ||
                     !_addressDatas.TryGetValue(addressModel, out var pluginConfigs))
                     continue;
 
@@ -809,13 +749,14 @@ public class DeviceRuntime : IAsyncDisposable
                     await _uaSyncChannel!.Writer.WriteAsync(addressValue, _cts.Token);
                     foreach (var mqConfig in pluginConfigs)
                     {
-                        // 对齐 WPF MqTransmissionAsync：InstanceAsync 单例 + guid 字典缓存
+                        // 由当前设备独占连接，并按配置 Guid 缓存；其他设备停止不影响本设备。
                         if (!_mqHandlers.TryGetValue(mqConfig.Guid, out var mq))
                         {
-                            mq = await MqHandler.InstanceAsync(mqConfig);
+                            mq = MqHandler.CreateScoped(mqConfig);
                             _mqHandlers[mqConfig.Guid] = mq;
                         }
                         var result = await mq.ProduceAsync(mqConfig.Guid, addressModel, addressValue);
+                        SetResultStatus(result.Status);
                         if (!result.Status)
                             ThrottledLog(string.Format(T("MQ 转发失败 {0}: {1}"), addressModel.Address, result.Message), addressModel.Address);
                     }
@@ -892,6 +833,7 @@ public class DeviceRuntime : IAsyncDisposable
         OperateResult result = await _bytesHandler.TransformAsync(addressValue.ResultValue.GetSource<byte[]>(), addressValue.Time, bm, isStringReverseByteWord: _daqConfig.AutoPack?.IsStringReverseByteWord ?? false);
         if (!result.GetDetails(out ConcurrentDictionary<string, AddressValue>? res) || res is null)
         {
+            SetResultStatus(false);
             ThrottledLog($"{DeviceHierarchy}, {addressValue.AddressName} - {string.Format(T("解包失败：{0}"), result.Message)}", "t:" + addressValue.AddressName);
             return;
         }
@@ -899,7 +841,7 @@ public class DeviceRuntime : IAsyncDisposable
         foreach (var item in res)
         {
             // 以原始地址名重新查索引与 MQ 配置，避免整批数据共用批次首地址的配置
-            _addressIndex.TryGetValue(item.Key, out var sourceModel);
+            Volatile.Read(ref _addressIndex).TryGetValue(item.Key, out var sourceModel);
             _addressDatas.TryGetValue(sourceModel ?? addressModel, out var sourcePlugins);
 
             AddressModelCore newModel = new()
@@ -919,13 +861,14 @@ public class DeviceRuntime : IAsyncDisposable
             await _uaSyncChannel!.Writer.WriteAsync(item.Value, _cts.Token);
             foreach (var mqConfig in sourcePlugins ?? pluginConfigs)
             {
-                // 对齐 WPF MqTransmissionAsync：InstanceAsync 单例 + guid 字典缓存
+                // 由当前设备独占连接，并按配置 Guid 缓存；其他设备停止不影响本设备。
                 if (!_mqHandlers.TryGetValue(mqConfig.Guid, out var mq))
                 {
-                    mq = await MqHandler.InstanceAsync(mqConfig);
+                    mq = MqHandler.CreateScoped(mqConfig);
                     _mqHandlers[mqConfig.Guid] = mq;
                 }
                 var mqResult = await mq.ProduceAsync(mqConfig.Guid, newModel, item.Value);
+                SetResultStatus(mqResult.Status);
                 if (!mqResult.Status)
                     ThrottledLog(string.Format(T("MQ 转发失败 {0}: {1}"), item.Key, mqResult.Message), item.Key);
             }
@@ -956,7 +899,9 @@ public class DeviceRuntime : IAsyncDisposable
                         continue;
                     }
 
-                    FolderState? fs = await UaCreateFolder();
+                    var service = _uaService();
+                    if (service is null) continue;
+                    FolderState? fs = await UaCreateFolder(service);
                     if (fs == null)
                     {
                         continue;
@@ -968,12 +913,7 @@ public class DeviceRuntime : IAsyncDisposable
                     object? value = addressValue.ResultValue;
 
                     //校验
-                    var service = _uaService();
-                    if (service is null)
-                    {
-                        ThrottledLog(T("UA 服务端未启动，跳过转发"), "ua:notstarted");
-                        continue;
-                    }
+                    if (!ReferenceEquals(service, _uaService())) continue;
                     if (!service.GetStatus().Status)
                     {
                         ThrottledLog(T("UA 服务端未运行，跳过转发"), "ua:notrunning");
@@ -982,7 +922,7 @@ public class DeviceRuntime : IAsyncDisposable
 
                     if (!_uaAddressMap.ContainsKey(addressName) && !_uaFailedAddresses.ContainsKey(addressName))
                     {
-                        if (!UaTypeMap.TryGetValue(dataType, out var builtInType))
+                        if (!UaForwarding.TypeMap.TryGetValue(dataType, out var builtInType))
                             continue;
 
                         if (builtInType == BuiltInType.String)
@@ -1011,23 +951,9 @@ public class DeviceRuntime : IAsyncDisposable
                             continue;
                         }
 
-                        // 只在创建成功后刷新一次地址列表
-                        var res = service.GetAddressArray();
-                        string hierarchy;
-                        lock (_projectTreeLock)
-                            hierarchy = _deviceNode.GetHierarchyPath(".");
-                        string format = $"s={_uaAddressSpaceName}.{hierarchy}.{addressName}";
-                        if (res.Status && res.ResultData is List<string> list)
-                        {
-                            foreach (var nodeId in list)
-                            {
-                                if (NodeId.TryParse(nodeId, out var parsedNodeId) && parsedNodeId.TryGetValue(out string identifier) && string.Equals(identifier, format[2..], StringComparison.Ordinal))
-                                {
-                                    _uaAddressMap[addressName] = nodeId;
-                                    break;
-                                }
-                            }
-                        }
+                        // Core 创建地址与映射使用同一规则，无需扫描完整地址空间。
+                        _uaAddressMap[addressName] = UaForwarding.CreateAddressNodeId(fs.NodeId, addressName).ToString();
+
                     }
 
                     // 写入
@@ -1046,7 +972,7 @@ public class DeviceRuntime : IAsyncDisposable
                         continue;
                     _singleWriteDict[realAddress] = new WriteModel(value, dataType);
 
-                    var writeResult = await service.WriteAsync(_singleWriteDict);
+                    var writeResult = await service.WriteAsync(_singleWriteDict, token);
 
                     _singleWriteDict.Clear();
 
@@ -1072,14 +998,10 @@ public class DeviceRuntime : IAsyncDisposable
 
     /// <summary>创建 UA 层级（原样移植 WPF ConsoleDeviceModel.UaCreateFolder）：
     /// folderState 缓存 + AddressSpaceName 取 Basics + GetStatus 门 + 按设备层级逐层 CreateFolder。</summary>
-    private async Task<FolderState?> UaCreateFolder()
+    private async Task<FolderState?> UaCreateFolder(OpcUaServiceOperate service)
     {
         try
         {
-            var service = _uaService();
-            if (service is null)
-                return null;
-
             if (!ReferenceEquals(_uaFolderService, service))
             {
                 _uaFolderService = service;
@@ -1146,8 +1068,16 @@ public class DeviceRuntime : IAsyncDisposable
     }
 
     /// <summary>停止采集并释放运行时拥有的通道、处理器和同步资源。</summary>
-    public async ValueTask DisposeAsync()
+    public ValueTask DisposeAsync()
     {
+        lock (_disposalLock)
+            return new ValueTask(_disposalTask ??= DisposeCoreAsync());
+    }
+
+    /// <summary>退出短同步锁后取得操作门，停止并释放当前代际；重复释放共用该任务。</summary>
+    private async Task DisposeCoreAsync()
+    {
+        await Task.Yield();
         await _collectGate.WaitAsync();
         try
         {
@@ -1156,6 +1086,19 @@ public class DeviceRuntime : IAsyncDisposable
         }
         finally { _collectGate.Release(); }
         GC.SuppressFinalize(this);
+    }
+
+    /// <summary>按事件结果更新与 WPF 相同的正常/异常状态，仅在结果翻转时推送界面。</summary>
+    /// <param name="success">本次驱动或转发结果是否成功。</param>
+    private void SetResultStatus(bool success)
+    {
+        if (_disposed) return;
+        var status = success ? 1 : -1;
+        if (Interlocked.Exchange(ref _lastResultStatus, status) == status) return;
+        LedGreen = success;
+        LedRed = !success;
+        CollectStatus = success ? "正常" : "异常";
+        _pushState(this);
     }
     #endregion
 }

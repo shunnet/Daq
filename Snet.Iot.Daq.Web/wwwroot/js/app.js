@@ -46,27 +46,32 @@ window.snet = {
     },
     /* 外部点击关闭：点击 .tree-actions 区域外任意处 → 回调全部注册方收起（移出不关闭，区域外点击才关闭） */
     outsideClick: {
-        handlers: [],
-        register: function (dotnetRef) {
-            // 打开新菜单前清掉旧菜单残留 handler（菜单互斥已先收起旧菜单，其 handler 必须移除，
-            // 否则旧 handler 在下次区域外点击时 unregisterAll 会把新菜单的 handler 一并清掉，导致新菜单关不掉）
-            snet.outsideClick.unregisterAll();
+        ownerId: null,
+        handler: null,
+        register: function (dotnetRef, ownerId) {
+            // 菜单互斥，只保存当前监听；组件销毁按身份注销，不能清除新页面的监听。
+            this.unregisterAll();
             var fn = function (e) {
                 if (!e.target.closest('.tree-actions, .device-more')) {
-                    snet.outsideClick.unregisterAll();
-                    // 组件可能已随切页释放：吞掉回调失败，避免 Unhandled Promise Rejection 刷屏
+                    snet.outsideClick.unregister(ownerId);
+                    // 电路可能已经断开，回调失败不形成未处理的 Promise。
                     try {
                         var invoke = dotnetRef.invokeMethodAsync('CloseAllActions');
                         if (invoke && invoke.catch) invoke.catch(function () { });
                     } catch (err) { }
                 }
             };
+            this.ownerId = ownerId;
+            this.handler = fn;
             document.addEventListener('click', fn);
-            snet.outsideClick.handlers.push(fn);
+        },
+        unregister: function (ownerId) {
+            if (this.ownerId === ownerId) this.unregisterAll();
         },
         unregisterAll: function () {
-            snet.outsideClick.handlers.forEach(function (fn) { document.removeEventListener('click', fn); });
-            snet.outsideClick.handlers = [];
+            if (this.handler) document.removeEventListener('click', this.handler);
+            this.handler = null;
+            this.ownerId = null;
         }
     },
     /* 设备/用户列表 ⋯ 操作菜单：菜单脱离滚动容器，按视口锚定。

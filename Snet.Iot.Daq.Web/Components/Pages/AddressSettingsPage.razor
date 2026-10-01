@@ -4,6 +4,7 @@
 @inherits LocalizedComponentBase
 @using Microsoft.AspNetCore.Authorization
 @using Snet.Iot.Daq.Core.data
+@using Snet.Iot.Daq.Core.handler
 @using Snet.Iot.Daq.Web.Components.Shared
 @using Snet.Iot.Daq.Web.Data
 @using Snet.Model.data
@@ -136,56 +137,58 @@
 @if (_editing)
 {
     <ModalDialog Title="@T("地址编辑")" TitleIcon="bi-geo-alt" OnClose="@CloseEdit">
-        <div class="form-field">
-            <label>@T("地址")</label>
-            <input @bind="_form.Address" />
-        </div>
-        <div class="form-field">
-            <label>@T("别名")</label>
-            <input @bind="_form.AnotherName" />
-        </div>
-        <div class="form-field">
-            <label>@T("类型")</label>
-            <select @bind="_form.Type">
-                @foreach (var name in Enum.GetNames<DataType>())
-                {
-                    <option value="@name">@name</option>
-                }
-            </select>
-        </div>
-        <div class="form-field">
-            <label>@T("长度")</label>
-            <input type="number" min="1" max="65535" @bind="_form.Length" />
-        </div>
-        <div class="form-field">
-            <label>@T("编码类型")</label>
-            <select @bind="_form.EncodingType">
-                @foreach (var name in Enum.GetNames<EncodingType>())
-                {
-                    <option value="@name">@name</option>
-                }
-            </select>
-        </div>
-        <div class="form-field">
-            <label>@T("描述")</label>
-            <input @bind="_form.Describe" />
-        </div>
-        <div class="form-field">
-            <label>@T("主题")</label>
-            <input @bind="_form.Topic" />
-        </div>
-        <div class="form-field">
-            <label>@T("精简值")</label>
-            <input type="checkbox" @bind="_form.SimplifyValue" />
-        </div>
-        <div class="form-field">
-            <label>@T("扩展参数")</label>
-            <textarea rows="4" @bind="_form.ExpandParam"></textarea>
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("地址")</label>
+                <input @bind="_form.Address" />
+            </div>
+            <div class="form-field">
+                <label>@T("别名")</label>
+                <input @bind="_form.AnotherName" />
+            </div>
+            <div class="form-field">
+                <label>@T("类型")</label>
+                <select @bind="_form.Type">
+                    @foreach (var name in Enum.GetNames<DataType>())
+                    {
+                        <option value="@name">@name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@T("长度")</label>
+                <input type="number" min="1" max="65535" @bind="_form.Length" />
+            </div>
+            <div class="form-field">
+                <label>@T("编码类型")</label>
+                <select @bind="_form.EncodingType">
+                    @foreach (var name in Enum.GetNames<EncodingType>())
+                    {
+                        <option value="@name">@name</option>
+                    }
+                </select>
+            </div>
+            <div class="form-field">
+                <label>@T("描述")</label>
+                <input @bind="_form.Describe" />
+            </div>
+            <div class="form-field">
+                <label>@T("主题")</label>
+                <input @bind="_form.Topic" />
+            </div>
+            <div class="form-field">
+                <label>@T("精简值")</label>
+                <input type="checkbox" @bind="_form.SimplifyValue" />
+            </div>
+            <div class="form-field">
+                <label>@T("扩展参数")</label>
+                <textarea rows="4" @bind="_form.ExpandParam"></textarea>
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="CloseEdit"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-</div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -205,18 +208,20 @@
 @if (_showSourceParamDialog)
 {
     <ModalDialog Title="@T("源数据导入设置")" TitleIcon="bi-gear" OnClose="CancelSourceImport">
-        <div class="form-field">
-            <label>@T("数据传输主题")</label>
-            <input @bind="_sourceTopic" placeholder="Snet" />
-        </div>
-        <div class="form-field">
-            <label>@T("数据传输精简值")</label>
-            <input type="checkbox" @bind="_sourceSimplifyValue" />
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("数据传输主题")</label>
+                <input @bind="_sourceTopic" placeholder="Snet" />
+            </div>
+            <div class="form-field">
+                <label>@T("数据传输精简值")</label>
+                <input type="checkbox" @bind="_sourceSimplifyValue" />
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="CancelSourceImport"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveSourceImportAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -251,20 +256,22 @@
     /// <summary>工具栏操作按钮：⋯ 点击展开，区域外点击收起（查询按钮常显，其余统一 btn-sm）</summary>
     private bool _addressActionsOpen;
     private bool IsAddressActionsOpen => _addressActionsOpen;
+    /// <summary>该组件监听的唯一身份，防止延迟释放误删其他页面的监听。</summary>
+    private readonly string _outsideClickOwner = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<AddressSettingsPage>? _jsRef;
 
     private async Task ToggleAddressActions()
     {
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         _addressActionsOpen = !_addressActionsOpen;
         if (_addressActionsOpen)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
@@ -290,16 +297,18 @@
         base.Dispose();
         MenuCoordinator.Unregister(CloseMenu);
         // 注销 document 上的外部点击监听（切页后防止残留 handler 清掉新页面监听）
-        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef, _outsideClickOwner);
         _jsRef = null;
     }
 
-    private async Task LoadAsync()
+    /// <summary>同步查询本地 SQLite 后返回已完成任务，避免人为延迟造成交错加载和界面闪烁。</summary>
+    private Task LoadAsync()
     {
         _loading = true;
-        await Task.Delay(50);
-        _items = DbGate.QueryAddresses(_keyword, _pageIndex, _pageSize, out _total);
+        _items = AddressStore.Query<Snet.Iot.Daq.Web.Data.AddressModel>(DbGate.Db, DbGate.DbLock,
+            _keyword, _pageIndex, _pageSize, out _total, out _pageIndex);
         _loading = false;
+        return Task.CompletedTask;
     }
 
     private Task OnPageChange(int page)
@@ -364,44 +373,60 @@
 
     private async Task SaveAsync()
     {
-        if (string.IsNullOrWhiteSpace(_form.Address) || string.IsNullOrWhiteSpace(_form.AnotherName))
+        try
         {
-            Toast.Warning(T("地址和别名不能为空"));
-            return;
-        }
-        if (_isNew)
-        {
-            _form.Guid = Guid.NewGuid().ToString();
-            var result = DbGate.InsertUniqueAddresses(new[] { _form });
-            if (result.Duplicate > 0)
+            if (string.IsNullOrWhiteSpace(_form.Address) || string.IsNullOrWhiteSpace(_form.AnotherName))
             {
-                Toast.Error(T("添加失败，地址或别名重复！"));
+                Toast.Warning(T("地址和别名不能为空"));
                 return;
             }
-            AppState.AddressDict[_form.Guid] = _form;
-            Toast.Success(T("添加成功"));
-        }
-        else
-        {
-            _form.Time = DateTime.Now;
-            int updated;
-            lock (DbGate.DbLock)
+            if (_form.Length == 0)
             {
-                updated = DbGate.Db.Update(_form);
-            }
-            if (updated == 0)
-            {
-                // 行已被并发删除：不把幽灵地址回灌字典
-                Toast.Error(T("修改失败，地址已不存在"));
+                Toast.Warning(T("地址长度必须大于零"));
                 return;
             }
-            AppState.AddressDict[_form.Guid] = _form;
-            Toast.Success(T("修改成功"));
+            if (_isNew)
+            {
+                _form.Guid = Guid.NewGuid().ToString();
+                var result = DbGate.InsertUniqueAddresses(new[] { _form });
+                if (result.Duplicate > 0)
+                {
+                    Toast.Error(T("添加失败，地址或别名重复！"));
+                    return;
+                }
+                if (result.Success != 1)
+                {
+                    Toast.Error(T("添加失败"));
+                    return;
+                }
+                AppState.AddressDict[_form.Guid] = _form;
+                Toast.Success(T("添加成功"));
+            }
+            else
+            {
+                _form.Time = DateTime.Now;
+                var updated = AddressStore.Update(DbGate.Db, DbGate.DbLock, _form);
+                if (updated == AddressStore.UpdateResult.Duplicate)
+                {
+                    Toast.Error(T("添加失败，地址或别名重复！"));
+                    return;
+                }
+                if (updated != AddressStore.UpdateResult.Updated)
+                {
+                    // 行已被并发删除：不把幽灵地址回灌字典
+                    Toast.Error(T("修改失败，地址已不存在"));
+                    return;
+                }
+                AppState.AddressDict[_form.Guid] = _form;
+                Toast.Success(T("修改成功"));
+            }
+            // 感知更新：项目树中引用该地址的节点同步刷新名称（对齐原版 RefreshAsync）
+            AppState.NotifyEntityChanged();
+            _editing = false;
+            await LoadAsync();
+
         }
-        // 感知更新：项目树中引用该地址的节点同步刷新名称（对齐原版 RefreshAsync）
-        AppState.NotifyEntityChanged();
-        _editing = false;
-        await LoadAsync();
+        catch (SQLite.SQLiteException ex) { Toast.Error(ex.Message); }
     }
 
     private Task DeleteSelectedAsync()
@@ -419,45 +444,43 @@
         return Task.CompletedTask;
     }
 
+    /// <summary>确认后重新检查项目引用，按稳定身份删除；仅将已提交的删除同步至内存。</summary>
     private async Task DoDeleteAsync()
     {
-        _confirmDelete = false;
-        var selected = _items.Where(x => x.IsSelected).ToList();
-        lock (DbGate.DbLock)
+        try
         {
-            DbGate.Db.RunInTransaction(() =>
+            _confirmDelete = false;
+            var selected = _items.Where(x => x.IsSelected).ToList();
+            bool referenced;
+            lock (AppState.ProjectTreeLock)
             {
-                foreach (var item in selected)
+                referenced = selected.Any(item => ProjectHandlerCore.IsAddressReferenced(AppState.ProjectDict, item.Guid));
+                if (!referenced)
                 {
-                    DbGate.Db.Execute("DELETE FROM AddressModel WHERE [Index] = ?", item.Index);
-                    AppState.AddressDict.Remove(item.Guid, out _);
+                    var deleted = AddressStore.Delete(DbGate.Db, DbGate.DbLock, selected);
+                    foreach (var item in deleted) AppState.AddressDict.TryRemove(item.Guid, out _);
                 }
-            });
+            }
+            if (referenced)
+            {
+                Toast.Warning(T("地址配置在项目设置中有使用"));
+                return;
+            }
+            Toast.Success(T("删除成功"));
+            _pageIndex = 1;
+            await LoadAsync();
+            AppState.NotifyEntityChanged();
+
         }
-        Toast.Success(T("删除成功"));
-        _pageIndex = 1;
-        await LoadAsync();
-        // 感知更新：项目树中引用已删地址的节点同步刷新（引用丢失后名称回退）
-        AppState.NotifyEntityChanged();
+        catch (SQLite.SQLiteException ex) { Toast.Error(ex.Message); }
     }
 
-    /// <summary>检查当前项目树是否按 Guid 引用了指定地址。</summary>
+    /// <summary>按当前项目树的完整 Guid 检查引用；使用与项目编辑相同的结构锁。</summary>
     private bool UseCheck(IAddressModel model)
     {
         lock (AppState.ProjectTreeLock)
-        lock (AppState.ProjectTreeLock)
-            return AppState.ProjectDict.Any(node => ContainsAddress(node, model.Guid));
+            return ProjectHandlerCore.IsAddressReferenced(AppState.ProjectDict, model.Guid);
     }
-
-    /// <summary>按结构检查项目节点及其子节点是否引用指定地址，避免全文子串匹配产生误判。</summary>
-    private static bool ContainsAddress(IProjectTreeViewModel node, string guid) =>
-        (node.Details?.Any(detail => ContainsAddress(detail, guid)) ?? false)
-        || node.Children.Any(child => ContainsAddress(child, guid));
-
-    /// <summary>递归检查项目详情树中的地址引用。</summary>
-    private static bool ContainsAddress(IProjectDetailsTreeViewModel node, string guid) =>
-        string.Equals(node.AddressDetails?.Guid, guid, StringComparison.Ordinal)
-        || node.Children.Any(child => ContainsAddress(child, guid));
 
     /// <summary>导入/导出 JSON 行字段（含 Guid/Time 对齐 WPF 导出格式，保证跨端导入不换身份）</summary>
     private sealed class AddressFileModel
@@ -547,25 +570,17 @@
             Time = m.Time ?? DateTime.Now
         }).ToList();
 
-        // 导入前基线：过滤出真正新增的地址（InsertUnique 只返回计数，无法区分具体行）
-        var before = DbGate.QueryAddresses(null, 1, int.MaxValue, out _);
-        var beforeNames = new HashSet<string>(before.Select(x => x.AnotherName));
-        var beforeAddrs = new HashSet<string>(before.Select(x => x.Address));
-
-        var result = DbGate.InsertUniqueAddresses(cores);
-        if (result.Duplicate > 0)
+        // 仅把已提交的真实新增行回灌内存；批内重复项不应生成幽灵地址。
+        var inserted = new List<AddressModel>();
+        var result = DbGate.InsertUniqueAddresses(cores, inserted.Add);
+        foreach (var row in inserted) AppState.AddressDict[row.Guid] = row;
+        if (result.Failed > 0) Toast.Error(T("导入失败"));
+        else if (result.Duplicate > 0)
             Toast.Warning(string.Format(T("导入完成：新增 {0} 个，重复跳过 {1} 个"), result.Success, result.Duplicate));
         else
             Toast.Success(string.Format(T("导入成功：{0} 个地址"), result.Success));
         _pageIndex = 1;
         await LoadAsync();
-        // 回灌新增地址到内存字典（对齐 SaveAsync 单条添加）：导入只写库漏更新 AddressDict，
-        // 项目设置「选择采集地址」弹窗从 AddressDict 读取，会看不到导入的地址
-        foreach (var c in cores)
-        {
-            if (!beforeNames.Contains(c.AnotherName) && !beforeAddrs.Contains(c.Address))
-                AppState.AddressDict[c.Guid] = c;
-        }
         // 感知更新：导入的新地址同步回灌项目树引用
         AppState.NotifyEntityChanged();
     }

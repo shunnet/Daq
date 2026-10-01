@@ -491,14 +491,13 @@ namespace Snet.Iot.Daq.chart
 
                 if (DataLoggerChartManage.TryRemove(sn, out var data))
                 {
-                    // 先清空数据
-                    if (Clear(sn).GetDetails(out message))
+                    // 已从索引移除，不能再通过 Clear(sn) 查找；使用取得的对象直接清理。
+                    data.plot.Dispatcher.Invoke(() =>
                     {
-                        // 把此线条从控件中移除（UI 线程）
-                        data.plot.Dispatcher.Invoke(() => data.plot.Plot.Remove(data.logger));
-                        return EndOperate(true);
-                    }
-                    return EndOperate(false, message);
+                        data.Clear();
+                        data.plot.Plot.Remove(data.logger);
+                    });
+                    return EndOperate(true);
                 }
                 return EndOperate(false, $"{sn}{LanguageOperate.GetLanguageValue("不存在")}");
             }

@@ -23,11 +23,28 @@ namespace Snet.Iot.Daq.Core.handler
         /// <param name="basics">插件配置基础数据，包含传输设备类型、连接参数等</param>
         public MqHandler(PluginConfigModel basics) : base(basics) { }
 
+        /// <summary>创建设备独占的 MQ 处理器；多个设备使用同一配置时，停止其中一个不能关闭其他设备的连接。</summary>
+        /// <param name="config">消息插件配置；只复制建立连接所需的身份和参数，连接在首次操作时创建。</param>
+        /// <returns>由单个设备运行时拥有并负责释放的处理器，不放入全局实例缓存。</returns>
+        public static MqHandler CreateScoped(PluginConfigModel config) => new(new PluginConfigModel
+        {
+            Guid = config.Guid,
+            SN = config.SN,
+            Name = config.Name,
+            Type = config.Type,
+            Param = config.Param
+        });
+
         /// <summary>
         /// 已打开的 MQ 实例缓存<br/>
         /// Key = 设备 guid，Value = 对应的 IMq 实例
         /// </summary>
         private readonly ConcurrentDictionary<string, IMq> icoMq = new();
+        /// <summary>释放为终态；禁止处理器在释放完成后再次创建连接。</summary>
+        private int disposed;
+        /// <summary>仅用于发布唯一释放任务；插件调用与异步等待均在锁外执行。</summary>
+        private readonly object disposalGate = new();
+        private Task? disposalTask;
 
         /// <summary>
         /// 每个 guid 对应的数据事件委托缓存<br/>
@@ -63,41 +80,65 @@ namespace Snet.Iot.Daq.Core.handler
             await OnInfoEventHandlerAsync(guid, e);
         }
 
-        /// <inheritdoc/>
-        /// <summary>
-        /// 同步释放所有已打开的 MQ 实例并清空事件委托缓存
-        /// </summary>
-        public override void Dispose()
-        {
-            // 快照遍历，避免在迭代期间集合被修改
-            foreach (var item in icoMq.ToArray())
-            {
-                item.Value?.Dispose();
-            }
-            icoMq.Clear();
-            _dataHandlers.Clear();
-            _infoHandlers.Clear();
+        /// <summary>同步兼容入口，等待同一释放任务结束。UI 线程应使用 DisposeAsync，避免阻塞需要该线程完成的插件操作。</summary>
+        public override void Dispose() => GetDisposalTask().GetAwaiter().GetResult();
 
-            base.Dispose();
+        /// <summary>终止连接创建，等待当前打开操作退出，退订事件并释放全部连接；重复调用等待同一任务。</summary>
+        /// <returns>所有连接和基类缓存清理完成后的任务；插件异常汇总为 AggregateException。</returns>
+        public override ValueTask DisposeAsync() => new(GetDisposalTask());
+
+        /// <summary>先发布唯一任务和终态，再在锁外执行清理，避免同步回调重入时重复释放。</summary>
+        private Task GetDisposalTask()
+        {
+            TaskCompletionSource completion;
+            lock (disposalGate)
+            {
+                if (disposalTask is not null) return disposalTask;
+                completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
+                disposalTask = completion.Task;
+                Volatile.Write(ref disposed, 1);
+            }
+            _ = CompleteDisposalAsync(completion);
+            return completion.Task;
         }
 
-        /// <inheritdoc/>
-        /// <summary>
-        /// 异步释放所有已打开的 MQ 实例并清空事件委托缓存
-        /// </summary>
-        public override async ValueTask DisposeAsync()
+        /// <summary>由公开释放任务拥有的清理流程；一个插件失败仍继续释放其他连接，并最终报告汇总异常。</summary>
+        /// <param name="completion">将成功或失败传递给全部释放调用方的完成源。</param>
+        private async Task CompleteDisposalAsync(TaskCompletionSource completion)
         {
-            // 快照遍历，避免在迭代期间集合被修改
-            foreach (var item in icoMq.ToArray())
+            try
             {
-                await item.Value.DisposeAsync();
-            }
-            icoMq.Clear();
-            _dataHandlers.Clear();
-            _infoHandlers.Clear();
+                await _openGate.WaitAsync().ConfigureAwait(false);
+                try
+                {
+                    var errors = new List<Exception>();
+                    foreach (var item in icoMq.ToArray())
+                    {
+                        if (!icoMq.TryRemove(item.Key, out var connection)) continue;
+                        try
+                        {
+                            if (_dataHandlers.TryRemove(item.Key, out var dataHandler)) connection.OnDataEventAsync -= dataHandler;
+                            if (_infoHandlers.TryRemove(item.Key, out var infoHandler)) connection.OnInfoEventAsync -= infoHandler;
+                        }
+                        catch (Exception ex) { errors.Add(ex); }
+                        try { await connection.DisposeAsync().ConfigureAwait(false); }
+                        catch (Exception ex) { errors.Add(ex); }
+                    }
+                    _dataHandlers.Clear();
+                    _infoHandlers.Clear();
 
-            await base.DisposeAsync();
+                    try { await base.DisposeAsync().ConfigureAwait(false); }
+                    catch (Exception ex) { errors.Add(ex); }
+                    if (errors.Count > 0) throw new AggregateException("插件连接释放失败", errors);
+                }
+                finally { _openGate.Release(); }
+                completion.SetResult();
+            }
+            catch (Exception ex) { completion.SetException(ex); }
         }
+
+        /// <summary>连接创建与释放共用的异步门，不能在处理器释放后留下迟到的新连接。</summary>
+        private readonly SemaphoreSlim _openGate = new(1, 1);
 
         /// <summary>
         /// 打开或获取指定 guid 的 MQ 实例<br/>
@@ -107,18 +148,22 @@ namespace Snet.Iot.Daq.Core.handler
         /// </summary>
         /// <param name="guid">设备唯一标识符</param>
         /// <returns>MQ 实例和操作结果的元组</returns>
-        private readonly SemaphoreSlim _openGate = new(1, 1);
-
         private async Task<(IMq operate, OperateResult result)> OpenAsync(string guid)
         {
             await _openGate.WaitAsync();
             try
             {
+                ObjectDisposedException.ThrowIf(Volatile.Read(ref disposed) != 0, this);
                 if (!icoMq.TryGetValue(guid, out IMq? operate))
                 {
                     IMq? newOperate = await basics.CreateNewObjectAsync<IMq>();
                     if (newOperate is null)
                         return (default!, OperateResult.CreateFailureResult("插件尚未加载".GetLanguageValue(Core.LanguageOperate)));
+                    if (Volatile.Read(ref disposed) != 0)
+                    {
+                        await newOperate.DisposeAsync();
+                        throw new ObjectDisposedException(GetType().Name);
+                    }
                     operate = icoMq.GetOrAdd(guid, newOperate!);
                     // 若竞态导致当前实例未被采用，释放多余实例
                     if (!ReferenceEquals(operate, newOperate) && newOperate != null)

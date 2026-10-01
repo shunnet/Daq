@@ -1,4 +1,5 @@
 ﻿using CommunityToolkit.Mvvm.Input;
+using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
@@ -107,33 +108,40 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand Import => import ??= new AsyncRelayCommand(ImportAsync);
         private IAsyncRelayCommand import;
-        private Task ImportAsync()
+        /// <summary>限制文件体积后异步读取字节处理配置，解析成功才替换界面集合；错误保留现有配置。</summary>
+        private async Task ImportAsync()
         {
             string file = GlobalConfigModel.SelectFiles("json");
-            if (!string.IsNullOrEmpty(file))
+            if (string.IsNullOrEmpty(file)) return;
+            try
             {
-                HandlerItemsSource = FileHandler.FileToString(file).ToJsonEntity<ObservableCollection<BytesBindNotifyModel>>();
+                if (new FileInfo(file).Length > 10 * 1024 * 1024) throw new InvalidDataException("配置文件不能超过 10 MiB");
+                var content = await File.ReadAllTextAsync(file);
+                var imported = content.ToJsonEntity<ObservableCollection<BytesBindNotifyModel>>()
+                    ?? throw new InvalidDataException("配置内容为空或格式无效");
+                HandlerItemsSource = imported;
             }
-            return Task.CompletedTask;
+            catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or Newtonsoft.Json.JsonException or ArgumentException)
+            {
+                await Snet.Windows.Controls.message.MessageBox.Show(ex.Message, App.LanguageOperate.GetLanguageValue("导入失败") ?? "导入失败");
+            }
         }
-
 
         /// <summary>
         /// 导出
         /// </summary>
         public IAsyncRelayCommand Export => export ??= new AsyncRelayCommand(ExportAsync);
         private IAsyncRelayCommand export;
-        private Task ExportAsync()
+        private async Task ExportAsync()
         {
             if (HandlerItemsSource.Count > 0)
             {
                 string path = GlobalConfigModel.SelectFolder();
                 if (!string.IsNullOrEmpty(path))
                 {
-                    FileHandler.StringToFile(Path.Combine(path, $"BytesHandler[{DateTime.Now.ToString("yyyyMMddHHmmss")}].json"), HandlerItemsSource.ToJson(true));
+                    await File.WriteAllTextAsync(Path.Combine(path, $"BytesHandler[{DateTime.Now:yyyyMMddHHmmss}].json"), HandlerItemsSource.ToJson(true));
                 }
             }
-            return Task.CompletedTask;
         }
 
         /// <summary>

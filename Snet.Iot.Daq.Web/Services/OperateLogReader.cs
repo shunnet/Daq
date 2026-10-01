@@ -60,40 +60,66 @@ public static class OperateLogReader
 
     #region 日志行读取
     /// <summary>指定日期+用户的操作日志行（合并当天全部 .log 文件，按时间序），行格式 "HH:mm:ss | 级别 | 内容"</summary>
-    public static List<string> GetLines(string date, string user)
+    public static List<string> GetLines(string date, string user) => GetLinesAsync(date, user).GetAwaiter().GetResult();
+
+    /// <summary>异步读取操作日志，最多保留 20000 行，每行 16 KiB 字符；一次读取最多扫描 32 MiB 字符。</summary>
+    /// <param name="date">日志日期目录名，不允许路径片段。</param>
+    /// <param name="user">用户目录名，不允许路径片段。</param>
+    /// <param name="token">取消读取；取消不会转换为空结果。</param>
+    /// <returns>按时间排序的有界显示行快照；不存在或不可读取的目录返回空列表。</returns>
+    public static async Task<List<string>> GetLinesAsync(string date, string user, CancellationToken token = default)
     {
+        token.ThrowIfCancellationRequested();
         try
         {
-            if (!TryResolveDirectory(out var dir, date, "operate", user)) return new();
-            if (!Directory.Exists(dir)) return new();
+            if (!TryResolveDirectory(out var dir, date, "operate", user) || !Directory.Exists(dir)) return new();
             var lines = new List<(DateTime Time, string Line)>();
-            foreach (var file in Directory.GetFiles(dir, "*.log").OrderBy(f => f))
+            var buffer = new char[4096];
+            var scanned = 0;
+            const int maxScanCharacters = 32 * 1024 * 1024;
+            foreach (var file in Directory.EnumerateFiles(dir, "*.log").OrderBy(file => file))
             {
-                // LogHelper 写入后保持文件句柄（FileShare.None），读取必须共享读写访问，否则刚写入的文件读不了
-                using var fs = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
-                using var reader = new StreamReader(fs);
-                string? raw;
-                while ((raw = reader.ReadLine()) is not null)
+                await using var stream = new FileStream(file, FileMode.Open, FileAccess.Read, FileShare.ReadWrite,
+                    bufferSize: 4096, FileOptions.Asynchronous | FileOptions.SequentialScan);
+                using var reader = new StreamReader(stream);
+                var line = new System.Text.StringBuilder();
+                int count;
+                while (scanned < maxScanCharacters && lines.Count < MaxLogLines
+                    && (count = await reader.ReadAsync(buffer.AsMemory(0, Math.Min(buffer.Length, maxScanCharacters - scanned)), token).ConfigureAwait(false)) != 0)
                 {
-                    if (string.IsNullOrWhiteSpace(raw)) continue;
-                    if (raw.Length > MaxLogLineLength) raw = raw[..MaxLogLineLength];
-                    // LogHelper 行格式：yyyy-MM-dd HH:mm:ss.fff | LVL | 内容
-                    var time = raw.Length >= 23 && DateTime.TryParse(raw[..19], out var t) ? t : DateTime.MinValue;
-                    lines.Add((time, raw));
-                    if (lines.Count >= MaxLogLines) break;
+                    scanned += count;
+                    for (var i = 0; i < count; i++)
+                    {
+                        if (buffer[i] == '\n')
+                        {
+                            AddLogLine(lines, line.ToString().TrimEnd('\r'));
+                            line.Clear();
+                            if (lines.Count >= MaxLogLines) break;
+                        }
+                        else if (line.Length < MaxLogLineLength) line.Append(buffer[i]);
+                    }
                 }
-                if (lines.Count >= MaxLogLines) break;
+                if (lines.Count < MaxLogLines && line.Length > 0) AddLogLine(lines, line.ToString().TrimEnd('\r'));
+                if (lines.Count >= MaxLogLines || scanned >= maxScanCharacters) break;
             }
-            return lines.OrderBy(l => l.Time)
-                .Select(l => FormatLine(l.Line))
-                .Where(l => l is not null)
-                .ToList()!;
+            return lines.OrderBy(line => line.Time).Select(line => FormatLine(line.Line)).OfType<string>().ToList();
         }
+        catch (OperationCanceledException) when (token.IsCancellationRequested) { throw; }
         catch (Exception ex)
         {
-            Console.WriteLine($"[OperateLogReader] GetLines({date},{user}) 异常: {ex}");
+            Console.Error.WriteLine($"[OperateLogReader] 日志读取失败: {ex.Message}");
             return new();
         }
+    }
+
+    /// <summary>解析有界日志行的时间戳，不受服务器当前区域设置影响；非空无时间戳行保持原有排序兼容性。</summary>
+    private static void AddLogLine(List<(DateTime Time, string Line)> lines, string line)
+    {
+        if (string.IsNullOrWhiteSpace(line)) return;
+        var time = line.Length >= 19 && DateTime.TryParseExact(line[..19], "yyyy-MM-dd HH:mm:ss",
+            System.Globalization.CultureInfo.InvariantCulture, System.Globalization.DateTimeStyles.None, out var parsed)
+            ? parsed : DateTime.MinValue;
+        lines.Add((time, line));
     }
 
     #endregion

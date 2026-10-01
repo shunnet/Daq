@@ -2,6 +2,7 @@
 using MaterialDesignThemes.Wpf;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
+using Snet.Iot.Daq.Core.handler;
 using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.data;
@@ -14,7 +15,6 @@ using System.Text;
 using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
-using static Snet.Iot.Daq.handler.AddressHandler;
 
 namespace Snet.Iot.Daq.viewModel
 {
@@ -117,29 +117,13 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand QueryAddress => queryAddress ??= new AsyncRelayCommand(QueryAddressAsync);
         private IAsyncRelayCommand? queryAddress;
+        /// <summary>重置到筛选结果第一页；没有匹配项时清空旧列表，避免继续显示上一次查询的数据。</summary>
         private async Task QueryAddressAsync()
         {
-            if (QueryContent.IsNullOrWhiteSpace())
-            {
-                //查询所有
-                await PageIndexChangedExecuteAsync(1);
-            }
-            else
-            {
-                //模糊查询
-                List<AddressModel> models = GlobalConfigModel.sqliteOperate.Table<AddressModel>().Where(p =>
-                p.AnotherName.Contains(QueryContent) ||
-                p.Address.Contains(QueryContent) ||
-                p.Describe.Contains(QueryContent)).ToList();
-                if (models.Count > 0)
-                {
-                    await ResetUiAsync(models.Count, 1, models);
-                }
-                else
-                {
-                    await MessageBox.Show("未查询到对应内容".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Asterisk);
-                }
-            }
+            await PageIndexChangedExecuteAsync(1);
+            if (Total == 0 && !string.IsNullOrWhiteSpace(QueryContent))
+                await MessageBox.Show("未查询到对应内容".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate),
+                    Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Asterisk);
         }
 
         /// <summary>
@@ -167,12 +151,18 @@ namespace Snet.Iot.Daq.viewModel
                         return;
                     }
 
-                    BatchInsertResult result = handler.AddressHandler.InsertUnique(GlobalConfigModel.sqliteOperate, [param], x => x.AnotherName, x => x.Address);
-                    if (result.Duplicate == 0)
+                    if (param.Length == 0)
+                    {
+                        await MessageBox.Show("地址长度必须大于零".GetLanguageValue(App.LanguageOperate) ?? "地址长度必须大于零",
+                            "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        return;
+                    }
+
+                    BatchInsertResult result = handler.AddressHandler.InsertUnique(GlobalConfigModel.sqliteOperate, [param], x => x.AnotherName, x => x.Address, x => x.Guid);
+                    if (result.Success == 1)
                     {
                         await PageIndexChangedExecuteAsync(PageIndex);
-                        //往全局集合中添加
-                        param.SetAddress();
+                        // 批量插入门面已同步全局集合，不重复广播配置刷新。
                     }
                     else
                     {
@@ -193,76 +183,85 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? importAddress;
         private async Task ImportAddressAsync()
         {
-            string file = GlobalConfigModel.SelectFiles("json");
-            if (!string.IsNullOrEmpty(file))
+            try
             {
-                //添加兼容流程，兼容源地址模型
-                string addressInfoStr = FileHandler.FileToString(file);
-                List<Snet.Iot.Daq.data.AddressModel>? models = null;
-                if (addressInfoStr.Contains("SN") && addressInfoStr.Contains("AddressName") && addressInfoStr.Contains("AddressDataType") && addressInfoStr.Contains("AddressType"))
+                string file = GlobalConfigModel.SelectFiles("json");
+                if (!string.IsNullOrEmpty(file))
                 {
-                    bool status = await MessageBox.Show("你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
-                    if (status)
+                    //添加兼容流程，兼容源地址模型
+                    // 与 Web 上传一致，先限制文件体积再读取，避免大文件阻塞或耗尽内存。
+                    if (new FileInfo(file).Length > 10 * 1024 * 1024) throw new InvalidDataException("地址文件不能超过 10 MiB");
+                    string addressInfoStr = await File.ReadAllTextAsync(file);
+                    List<Snet.Iot.Daq.data.AddressModel>? models = null;
+                    if (addressInfoStr.Contains("SN") && addressInfoStr.Contains("AddressName") && addressInfoStr.Contains("AddressDataType") && addressInfoStr.Contains("AddressType"))
                     {
-                        AddressSourceModel sourceModel = new AddressSourceModel();
-                        GlobalConfigModel.param.SetBasics(sourceModel);
-                        if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                        bool status = await MessageBox.Show("你导入的是底层源数据格式，需要设置插件必要参数，确认后开始设置".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        if (status)
                         {
-                            sourceModel = GlobalConfigModel.param.GetBasics().GetSource<AddressSourceModel>();
-                        }
-                        else
-                        {
-                            await MessageBox.Show("导入取消".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
-                            return;
-                        }
-                        //这是源数据
-                        List<AddressDetails>? addresses = null;
-                        if (addressInfoStr.Contains("AddressArray"))
-                        {
-                            Address? address = addressInfoStr.ToJsonEntity<Address>();
-                            addresses = address?.AddressArray;
-                        }
-                        else
-                        {
-                            addresses = addressInfoStr.ToJsonEntity<List<AddressDetails>>();
-                        }
+                            AddressSourceModel sourceModel = new AddressSourceModel();
+                            GlobalConfigModel.param.SetBasics(sourceModel);
+                            if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
+                            {
+                                sourceModel = GlobalConfigModel.param.GetBasics().GetSource<AddressSourceModel>();
+                            }
+                            else
+                            {
+                                await MessageBox.Show("导入取消".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                                return;
+                            }
+                            //这是源数据
+                            List<AddressDetails>? addresses = null;
+                            if (addressInfoStr.Contains("AddressArray"))
+                            {
+                                Address? address = addressInfoStr.ToJsonEntity<Address>();
+                                addresses = address?.AddressArray;
+                            }
+                            else
+                            {
+                                addresses = addressInfoStr.ToJsonEntity<List<AddressDetails>>();
+                            }
 
-                        models = addresses?.Select(a => new AddressModel
-                        {
-                            Guid = a.SN,
-                            Address = a.AddressName,
-                            Type = a.AddressDataType,
-                            Length = a.Length,
-                            EncodingType = a.EncodingType,
-                            Describe = a.AddressDescribe,
-                            AnotherName = a.AddressAnotherName ?? a.AddressName,
-                            ExpandParam = a.AddressExtendParam?.ToString(),
-                            Topic = sourceModel.Topic,
-                            SimplifyValue = sourceModel.SimplifyValue,
-                        }).ToList();
-                    }
-                }
-                else
-                {
-                    models = addressInfoStr.ToJsonEntity<List<Snet.Iot.Daq.data.AddressModel>>();
-                }
-                if (models == null)
-                {
-                    await MessageBox.Show("导入失败".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
-                }
-                else
-                {
-                    BatchInsertResult result = handler.AddressHandler.InsertUnique(GlobalConfigModel.sqliteOperate, models, x => x.AnotherName, x => x.Address);
-                    await PageIndexChangedExecuteAsync(1);
-                    if (result.Failed > 0)
-                    {
-                        await MessageBox.Show($"{"存在".GetLanguageValue(App.LanguageOperate)}“{result.Failed}”{"个点位导入失败".GetLanguageValue(App.LanguageOperate)}", "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                            models = addresses?.Select(a => new AddressModel
+                            {
+                                Guid = a.SN,
+                                Address = a.AddressName,
+                                Type = a.AddressDataType,
+                                Length = a.Length,
+                                EncodingType = a.EncodingType,
+                                Describe = a.AddressDescribe,
+                                AnotherName = a.AddressAnotherName ?? a.AddressName,
+                                ExpandParam = a.AddressExtendParam?.ToString(),
+                                Topic = sourceModel.Topic,
+                                SimplifyValue = sourceModel.SimplifyValue,
+                            }).ToList();
+                        }
                     }
                     else
                     {
-                        await MessageBox.Show($"导入成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        models = addressInfoStr.ToJsonEntity<List<Snet.Iot.Daq.data.AddressModel>>();
+                    }
+                    if (models == null)
+                    {
+                        await MessageBox.Show("导入失败".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                    }
+                    else
+                    {
+                        BatchInsertResult result = handler.AddressHandler.InsertUnique(GlobalConfigModel.sqliteOperate, models, x => x.AnotherName, x => x.Address, x => x.Guid);
+                        await PageIndexChangedExecuteAsync(1);
+                        if (result.Failed > 0)
+                        {
+                            await MessageBox.Show($"{"存在".GetLanguageValue(App.LanguageOperate)}“{result.Failed}”{"个点位导入失败".GetLanguageValue(App.LanguageOperate)}", "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        }
+                        else
+                        {
+                            await MessageBox.Show($"导入成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        }
                     }
                 }
+            }
+            catch (Exception ex) when (ex is IOException or System.Text.Json.JsonException or Newtonsoft.Json.JsonException or SQLite.SQLiteException or ArgumentException)
+            {
+                await MessageBox.Show(ex.Message, "导入失败".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
         }
 
@@ -280,7 +279,8 @@ namespace Snet.Iot.Daq.viewModel
                 if (!string.IsNullOrEmpty(path))
                 {
                     //查询所有点位
-                    List<AddressModel> models = GlobalConfigModel.sqliteOperate.Table<AddressModel>().ToList();
+                    List<AddressModel> models;
+                    lock (GlobalConfigModel.DbLock) models = GlobalConfigModel.sqliteOperate.Table<AddressModel>().ToList();
                     FileHandler.StringToFile(Path.Combine(path, $"Address[{DateTime.Now.ToString("yyyyMMddHHmmss")}].json"), models.ToJson());
                     await MessageBox.Show(App.LanguageOperate.GetLanguageValue("导出成功"), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
                 }
@@ -323,47 +323,56 @@ namespace Snet.Iot.Daq.viewModel
         private IAsyncRelayCommand? deleteAddress;
         private async Task DeleteAddressAsync()
         {
-            List<IAddressModel> models = AddressConfig.Where(x => x.IsSelected).ToList();
-            if (models.Count > 0)
+            try
             {
-                StringBuilder builder = new StringBuilder();
-                foreach (var model in models)
+                List<IAddressModel> models = AddressConfig.Where(x => x.IsSelected).ToList();
+                if (models.Count > 0)
                 {
-                    if (UseCheck(model))
+                    StringBuilder builder = new StringBuilder();
+                    foreach (var model in models)
                     {
-                        builder.AppendLine($"{model.Address} - {"地址配置在项目设置中有使用".GetLanguageValue(App.LanguageOperate)}");
-                    }
-                }
-                if (builder.Length > 0)
-                {
-                    await MessageBox.Show(builder.ToString(), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Warning);
-                    return;
-                }
-
-
-                if ((await MessageBox.Show("确认删除选中的地址项吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Question)).ToBool())
-                {
-                    int failCount = 0;
-                    GlobalConfigModel.sqliteOperate.RunInTransaction(() =>
-                    {
-                        foreach (var item in models)
+                        if (UseCheck(model))
                         {
-                            if (GlobalConfigModel.sqliteOperate.Execute("DELETE FROM AddressModel WHERE [Index] = ?", item.Index) <= 0)
-                                failCount++;
-                            GlobalConfigModel.AddressDict.Remove(item.Guid, out _);
+                            builder.AppendLine($"{model.Address} - {"地址配置在项目设置中有使用".GetLanguageValue(App.LanguageOperate)}");
                         }
-                    });
-                    await PageIndexChangedExecuteAsync(1);
-                    if (failCount > 0)
-                    {
-                        await MessageBox.Show($"{"存在".GetLanguageValue(App.LanguageOperate)}“{failCount}”{"个点位删除失败".GetLanguageValue(App.LanguageOperate)}", "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
                     }
-                    else
+                    if (builder.Length > 0)
                     {
-                        await MessageBox.Show($"删除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        await MessageBox.Show(builder.ToString(), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Warning);
+                        return;
                     }
 
+
+                    if ((await MessageBox.Show("确认删除选中的地址项吗？".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OKCancel, Windows.Controls.@enum.MessageBoxImage.Question)).ToBool())
+                    {
+                        // 对话框等待期间项目配置可能改变，确认后再次按当前结构检查。
+                        if (models.Any(UseCheck))
+                        {
+                            await MessageBox.Show("地址配置在项目设置中有使用".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Warning);
+                            return;
+                        }
+                        var deleted = AddressStore.Delete(GlobalConfigModel.sqliteOperate, GlobalConfigModel.DbLock,
+                            models.Cast<AddressModel>());
+                        foreach (var item in deleted) GlobalConfigModel.AddressDict.TryRemove(item.Guid, out _);
+                        int failCount = models.Count - deleted.Count;
+                        await GlobalConfigModel.RefreshAsync();
+                        await PageIndexChangedExecuteAsync(1);
+                        if (failCount > 0)
+                        {
+                            await MessageBox.Show($"{"存在".GetLanguageValue(App.LanguageOperate)}“{failCount}”{"个点位删除失败".GetLanguageValue(App.LanguageOperate)}", "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
+                        }
+                        else
+                        {
+                            await MessageBox.Show($"删除成功".GetLanguageValue(App.LanguageOperate), "温馨提示".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Information);
+                        }
+
+                    }
                 }
+
+            }
+            catch (SQLite.SQLiteException ex)
+            {
+                await MessageBox.Show(ex.Message, "异常".GetLanguageValue(App.LanguageOperate), Windows.Controls.@enum.MessageBoxButton.OK, Windows.Controls.@enum.MessageBoxImage.Error);
             }
         }
         #endregion
@@ -426,15 +435,12 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         public IAsyncRelayCommand PageIndexChanged => pageIndexChanged ??= new AsyncRelayCommand<int>(PageIndexChangedExecuteAsync);
         private IAsyncRelayCommand? pageIndexChanged;
+        /// <summary>在共享连接锁内按当前关键词分页，只读取当前页，翻页后保持查询条件。</summary>
         private Task PageIndexChangedExecuteAsync(int index)
         {
-            var table = GlobalConfigModel.sqliteOperate.Table<AddressModel>();
-            int total = table.Count();
-            var page = table.OrderByDescending(x => x.Time)
-                            .Skip((index - 1) * PageSize)
-                            .Take(PageSize)
-                            .ToList();
-            PageIndex = index;
+            var page = Snet.Iot.Daq.Core.handler.AddressStore.Query<AddressModel>(GlobalConfigModel.sqliteOperate,
+                GlobalConfigModel.DbLock, QueryContent, index, PageSize, out var total, out var actualPage);
+            PageIndex = actualPage;
             Total = total;
             AddressConfig = new ObservableCollection<IAddressModel>(page);
             return Task.CompletedTask;
@@ -448,33 +454,9 @@ namespace Snet.Iot.Daq.viewModel
         /// <returns>false:没有被使用  true:被使用了</returns>
         private bool UseCheck(IAddressModel model)
         {
-            //检查是否有被使用
-            string checkFile = GlobalConfigModel.UI_ProjectConfigPath;
-            if (File.Exists(checkFile))
-            {
-                string content = FileHandler.FileToString(checkFile);
-                if (content.Contains(model.Guid))
-                {
-                    return true;
-                }
-            }
-            return false;
+            return ProjectHandlerCore.IsAddressReferenced(GlobalConfigModel.ProjectDict, model.Guid);
         }
 
-        /// <summary>
-        /// 重置界面
-        /// </summary>
-        /// <param name="total">总数</param>
-        /// <param name="pageIndex">页码</param>
-        /// <param name="models">数据</param>
-        /// <returns></returns>
-        private Task ResetUiAsync(int total, int pageIndex, List<AddressModel> models)
-        {
-            PageIndex = pageIndex;
-            Total = total;
-            AddressConfig = new ObservableCollection<IAddressModel>(models.OrderByDescending(x => x.Time).Skip((pageIndex - 1) * PageSize).Take(PageSize));
-            return Task.CompletedTask;
-        }
         #endregion
     }
 }

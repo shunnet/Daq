@@ -191,14 +191,16 @@
 @if (_editServerKind is not null)
 {
     <ModalDialog Title="@T("修改服务配置")" TitleIcon="bi-gear" OnClose="CloseServerConfig">
-        <div class="form-field">
-            <label>@T("服务配置")</label>
-            <textarea class="mono param-json config-json-input" @bind="_serverConfigJson"></textarea>
-        </div>
-        <div class="modal-footer">
+        <ChildContent>
+            <div class="form-field">
+                <label>@T("服务配置")</label>
+                <textarea class="mono param-json config-json-input" @bind="_serverConfigJson"></textarea>
+            </div>
+        </ChildContent>
+        <Footer>
             <button class="btn" @onclick="CloseServerConfig"><i class="bi bi-x-lg"></i>@T("取消")</button>
             <button class="btn btn-primary" @onclick="SaveServerConfigAsync"><i class="bi bi-check-lg"></i>@T("保存")</button>
-        </div>
+        </Footer>
     </ModalDialog>
 }
 
@@ -285,23 +287,25 @@
 
     // ================= 设备卡操作菜单（对齐 WPF ConsoleDevice.xaml Row2 的 ⋯ 菜单） =================
     private string? _moreOpen;
+    /// <summary>该组件监听的唯一身份，防止延迟释放误删其他页面的监听。</summary>
+    private readonly string _outsideClickOwner = Guid.NewGuid().ToString("N");
     private DotNetObjectReference<ConsolePage>? _jsRef;
 
     private async Task ToggleMore(DeviceRuntime rt)
     {
         // 全局互斥：先收起其他组件（树/详情树/工具栏/卡片）已打开的菜单
-        MenuCoordinator.CloseAllOthers();
+        MenuCoordinator.CloseAllOthers(CloseMenu);
         var open = _moreOpen != rt.Guid;
         _moreOpen = open ? rt.Guid : null;
         // 展开后注册「区域外点击收起」；收起时注销
         if (open)
         {
             _jsRef ??= DotNetObjectReference.Create(this);
-            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef);
+            await JS.InvokeVoidAsync("snet.outsideClick.register", _jsRef, _outsideClickOwner);
         }
         else
         {
-            await JS.InvokeVoidAsync("snet.outsideClick.unregisterAll");
+            await JS.InvokeVoidAsync("snet.outsideClick.unregister", _outsideClickOwner);
         }
     }
 
@@ -493,7 +497,7 @@
         Sampler.Sample -= OnSample;
         LogBuffer.Changed -= OnLogChanged;
         // 注销 document 上的外部点击监听：先让 JS 移除监听，再释放引用（避免残留回调打到已释放对象 → EndInvokeDotNet NRE）
-        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef);
+        OutsideClickHelper.DisposeAfterUnregister(JS, _jsRef, _outsideClickOwner);
         _jsRef = null;
     }
 }

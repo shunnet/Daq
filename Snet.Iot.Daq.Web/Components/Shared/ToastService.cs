@@ -1,4 +1,4 @@
-namespace Snet.Iot.Daq.Web.Components.Shared;
+﻿namespace Snet.Iot.Daq.Web.Components.Shared;
 
 /// <summary>表示一条可由界面稳定跟踪的 Toast 消息。</summary>
 /// <param name="Message">显示文本。</param>
@@ -14,6 +14,8 @@ public sealed class ToastService : IAsyncDisposable
     private readonly List<Task> _removalTasks = [];
     private readonly CancellationTokenSource _disposeCts = new();
     private bool _disposed;
+    /// <summary>所有释放调用共同等待的清理任务。</summary>
+    private Task? _disposalTask;
 
     /// <summary>在消息集合发生变化后触发。</summary>
     public event Action? OnChanged;
@@ -42,7 +44,7 @@ public sealed class ToastService : IAsyncDisposable
             _removalTasks.RemoveAll(static task => task.IsCompleted);
             _removalTasks.Add(RemoveAfterDelayAsync(item, Math.Max(1, durationMs), _disposeCts.Token));
         }
-        OnChanged?.Invoke();
+        NotifyChanged();
     }
 
     /// <summary>显示普通信息。</summary>
@@ -65,29 +67,52 @@ public sealed class ToastService : IAsyncDisposable
             await Task.Delay(durationMs, cancellationToken).ConfigureAwait(false);
             lock (_itemsLock)
                 _items.Remove(item);
-            OnChanged?.Invoke();
+            NotifyChanged();
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
         }
     }
 
-    /// <summary>取消并等待服务拥有的全部延时移除任务。</summary>
-    public async ValueTask DisposeAsync()
+    /// <summary>在集合锁外逐个通知订阅者；页面销毁或订阅者异常不影响后续订阅者与延时任务。</summary>
+    private void NotifyChanged()
     {
-        Task[] tasks;
+        var handlers = OnChanged;
+        if (handlers is null) return;
+        foreach (Action handler in handlers.GetInvocationList())
+        {
+            try { handler(); }
+            catch (Exception ex) { Console.Error.WriteLine($"[Toast] 通知失败: {ex.Message}"); }
+        }
+    }
+
+    /// <summary>进入终态，取消并等待全部延时任务；并发或重复释放共同等待同一任务。</summary>
+    public ValueTask DisposeAsync()
+    {
         lock (_itemsLock)
         {
-            if (_disposed)
-                return;
+            if (_disposalTask is not null) return new ValueTask(_disposalTask);
             _disposed = true;
-            tasks = _removalTasks.ToArray();
+            var tasks = _removalTasks.ToArray();
             _items.Clear();
+            return new ValueTask(_disposalTask = DisposeCoreAsync(tasks));
         }
+    }
 
-        _disposeCts.Cancel();
-        await Task.WhenAll(tasks).ConfigureAwait(false);
-        _disposeCts.Dispose();
-        GC.SuppressFinalize(this);
+    /// <summary>在锁外取消延时任务，等待退出后释放令牌源，即使任务失败也完成资源清理。</summary>
+    /// <param name="tasks">进入终态前捕获的本服务任务。</param>
+    private async Task DisposeCoreAsync(Task[] tasks)
+    {
+        await Task.Yield();
+        try
+        {
+            _disposeCts.Cancel();
+            await Task.WhenAll(tasks).ConfigureAwait(false);
+        }
+        finally
+        {
+            _disposeCts.Dispose();
+            GC.SuppressFinalize(this);
+        }
     }
 }

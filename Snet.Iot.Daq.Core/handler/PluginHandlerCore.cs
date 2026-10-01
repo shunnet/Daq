@@ -1,4 +1,4 @@
-using Snet.Core.plugin;
+﻿using Snet.Core.plugin;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.@interface;
 using Snet.Model.data;
@@ -21,6 +21,23 @@ namespace Snet.Iot.Daq.Core.handler
         /// 插件操作核心实例
         /// </summary>
         public static readonly PluginOperate PluginOperate = PluginOperate.Instance(typeof(PluginHandlerCore).Name);
+
+        /// <summary>两端安装、热更新和移除共用的进程内异步门；必须在确认后获取并在 finally 中释放，不等待用户对话框。</summary>
+        public static SemaphoreSlim MutationGate { get; } = new(1, 1);
+
+        /// <summary>使用独立加载器探测插件接口，避免覆盖正式运行时的注册；探测完毕卸载临时实例，只返回元数据。</summary>
+        /// <param name="path">已完整验证及解压的独占暂存目录。</param>
+        /// <param name="interfaceName">预期的插件接口完整名称。</param>
+        /// <param name="token">取消加载的令牌。</param>
+        /// <returns>可安装的插件元数据；参数对象不返回，避免保留临时加载上下文。</returns>
+        /// <remarks>探测会构造插件实例，因此压缩包必须来自管理员信任的来源；独立加载器隔离注册，不是代码执行沙箱。</remarks>
+        public static async Task<List<(PluginModel Model, object? Param)>> ProbePluginAsync(
+            string path, string interfaceName, CancellationToken token = default)
+        {
+            await using var probe = new PluginOperate("probe-" + Guid.NewGuid().ToString("N"));
+            var discovered = await probe.InitPluginAsync(path, interfaceName, token).ConfigureAwait(false);
+            return discovered.Select(item => (item.Model, (object?)null)).ToList();
+        }
 
         /// <summary>
         /// 保存插件配置列表到本地 JSON 文件

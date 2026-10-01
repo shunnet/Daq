@@ -15,6 +15,10 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "debug", "debug", "{B39AC3F5
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.Web", "Snet.Iot.Daq.Web\Snet.Iot.Daq.Web.csproj", "{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{0AB3BF05-4346-4AA6-1389-037BE0695223}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Snet.Iot.Daq.Tests", "tests\Snet.Iot.Daq.Tests.csproj", "{E8E12131-CAB3-47E6-98E8-80DB5734A403}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -41,6 +45,10 @@ Global
 		{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{8AC0F6E5-EDDE-6AAE-8A58-5C1B8FF45E4D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E8E12131-CAB3-47E6-98E8-80DB5734A403}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E8E12131-CAB3-47E6-98E8-80DB5734A403}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E8E12131-CAB3-47E6-98E8-80DB5734A403}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E8E12131-CAB3-47E6-98E8-80DB5734A403}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -48,6 +56,7 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{295DC98C-E8FE-400E-959D-C9048771E74F} = {B39AC3F5-1B3B-40EE-8F96-B3C86B3F7FA3}
 		{766A4681-0AC6-4312-960B-E079ADB11EEE} = {B39AC3F5-1B3B-40EE-8F96-B3C86B3F7FA3}
+		{E8E12131-CAB3-47E6-98E8-80DB5734A403} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {BDF0D381-C17D-4004-892A-571F614EC594}
