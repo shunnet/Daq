@@ -1,8 +1,8 @@
 ﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
-using Snet.Iot.Daq.Core.opc.ua.service;
 using Snet.Iot.Daq.Web.Data;
 using Snet.Mqtt.service;
+using Snet.Opc.ua.service;
 using Snet.Utility;
 using System.Collections.Concurrent;
 using System.Collections.ObjectModel;

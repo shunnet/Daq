@@ -453,8 +453,8 @@ public sealed class CodeQualityTests : IDisposable
     [Fact]
     public void UaFolderRemovalUsesActualAncestry()
     {
-        var managerType = typeof(Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer.ReferenceNodeManager);
-        var manager = (Snet.Iot.Daq.Core.opc.ua.service.core.ReferenceServer.ReferenceNodeManager)
+        var managerType = typeof(Snet.Opc.ua.service.core.ReferenceServer.ReferenceNodeManager);
+        var manager = (Snet.Opc.ua.service.core.ReferenceServer.ReferenceNodeManager)
             System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(managerType);
         SetPrivateField(manager, "<Lock>k__BackingField", new object());
         var a = new FolderState(null) { NodeId = new NodeId("A", 7) };

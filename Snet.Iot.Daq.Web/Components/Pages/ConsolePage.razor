@@ -1,4 +1,4 @@
-@inject MenuCoordinator MenuCoordinator
+﻿@inject MenuCoordinator MenuCoordinator
 @page "/console"
 @rendermode @(new InteractiveServerRenderMode(prerender: false))
 @inherits LocalizedComponentBase
@@ -441,7 +441,7 @@
                 _ = _serverConfigJson.ToJsonEntity<Snet.Mqtt.service.MqttServiceData.Basics>()
                     ?? throw new InvalidDataException(T("MQTT 配置无效"));
             else
-                _ = _serverConfigJson.ToJsonEntity<Snet.Iot.Daq.Core.opc.ua.service.OpcUaServiceData.Basics>()
+                _ = _serverConfigJson.ToJsonEntity<Snet.Opc.ua.service.OpcUaServiceData.Basics>()
                     ?? throw new InvalidDataException(T("OPC UA 配置无效"));
 
             var existed = File.Exists(path);

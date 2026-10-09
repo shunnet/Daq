@@ -13,12 +13,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Snet.Mqtt" Version="26.271.1" />
-		<PackageReference Include="OPCFoundation.NetStandard.Opc.Ua" Version="2.0.0-preview.6" />
-		<PackageReference Include="Serilog.Expressions" Version="5.0.0" />
-		<PackageReference Include="Serilog.Extensions.Logging" Version="10.0.0" />
+		<PackageReference Include="Snet.Mqtt" Version="26.282.1" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
 		<PackageReference Include="NuGet.Versioning" Version="7.9.0" />
+		<PackageReference Include="Snet.Opc" Version="26.282.1" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
 	</ItemGroup>
 

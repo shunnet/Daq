@@ -46,6 +46,11 @@ namespace Snet.Iot.Daq.viewModel
             await uiMessage.StartAsync();
             await QueryAsync();
             await uiMessage.ShowAsync("插件默认路径：".GetLanguageValue(App.LanguageOperate) + PluginPath);
+            DirectoryInfo directory = new DirectoryInfo(PluginPath);
+            if (!directory.Exists)
+            {
+                directory.Create();
+            }
         }
 
         /// <summary>页面终止时取消初始化、元数据读取和下载；每个资源由本模型拥有。</summary>
@@ -75,7 +80,7 @@ namespace Snet.Iot.Daq.viewModel
         /// <summary>
         /// 插件存储路径
         /// </summary>
-        private string PluginPath = Path.Combine(AppContext.BaseDirectory, "lib");
+        private string PluginPath = Path.Combine(AppContext.BaseDirectory, "nuget");
 
         /// <summary>
         /// 更新插件
