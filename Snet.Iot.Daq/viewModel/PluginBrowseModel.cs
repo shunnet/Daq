@@ -96,6 +96,8 @@ namespace Snet.Iot.Daq.viewModel
                 await uiMessage.ShowAsync("正在更新插件，请耐心等待".GetLanguageValue(App.LanguageOperate));
                 var data = await pluginBrowseHandler.GetPluginBrowseDataGridModelsAsync(cancellationToken: lifetime.Token);
                 lifetime.Token.ThrowIfCancellationRequested();
+                // 写入前创建缓存目录，首次运行或目录被清理后仍可正常更新。
+                Directory.CreateDirectory(GlobalConfigModel.UiConfigPath);
                 await File.WriteAllTextAsync(GlobalConfigModel.UI_PluginBrowseCachePath, data.ToJson(true), lifetime.Token);
                 allPlugin = data;
                 await PageIndexChangedExecuteAsync(1);
@@ -473,6 +475,8 @@ namespace Snet.Iot.Daq.viewModel
             if (data == null)
             {
                 data = await pluginBrowseHandler.GetPluginBrowseDataGridModelsAsync(cancellationToken: lifetime.Token);
+                // 首次加载同样需要创建目录，不能依赖其他配置页面提前保存。
+                Directory.CreateDirectory(GlobalConfigModel.UiConfigPath);
                 await File.WriteAllTextAsync(GlobalConfigModel.UI_PluginBrowseCachePath, data.ToJson(true), lifetime.Token);
             }
             return data;
