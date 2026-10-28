@@ -22,10 +22,10 @@
 	
 	<ItemGroup>
 		<PackageReference Include="LibreHardwareMonitorLib" Version="0.9.6" />
-		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4258.31" />
+		<PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4314.35" />
 		<PackageReference Include="ScottPlot.WPF" Version="5.1.59" />
-		<PackageReference Include="SkiaSharp.Views.WPF" Version="4.153.1" />
-		<PackageReference Include="Snet.Windows.Controls" Version="26.283.1" />
+		<PackageReference Include="SkiaSharp.Views.WPF" Version="4.154.0" />
+		<PackageReference Include="Snet.Windows.Controls" Version="26.301.1" />
 	</ItemGroup>
 
 	<ItemGroup>
