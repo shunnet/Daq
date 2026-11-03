@@ -205,6 +205,10 @@ body {
     outline: 2px solid var(--focus-ring);
     outline-offset: 2px;
 }
+/* 路由导航会自动聚焦标题并添加 tabindex="-1"；保留焦点供辅助技术定位，只移除标题外框。 */
+h1[tabindex="-1"]:focus {
+    outline: none;
+}
 /* 表单控件除外：选中态仅用边框变色表达（同旧版行为），不画四周辉光环 */
 input:focus-visible, select:focus-visible, textarea:focus-visible { outline: none; }
 
