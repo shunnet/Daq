@@ -113,13 +113,7 @@
 
 > 🔒 **安全**：反写意味着任何通过 OPC UA 认证的客户端都能写入设备点位。Snet.Opc 的默认配置是账号 `snet` / `123456` 并自动信任客户端证书（`AutoAcceptUntrustedCertificates`），生产环境请先在「OPC UA 服务端 → 修改」里改掉账号密码并关闭自动信任证书。
 
-> ⚠️ **依赖说明**：该功能需要新版 **Snet.Opc**（含 `RegisterDaqAsync`、`UnRegisterDaqAsync` 与 `OpcUaServiceData.Basics.CloseDaqOnStop`），新版**尚未发布到 NuGet**。发布之前请用源码引用构建：
->
-> ```bash
-> dotnet build Snet.Iot.Daq.sln -p:SnetOpcProject=<Snet.Opc.csproj 完整路径> -p:AssemblyVersion=26.301.1.0
-> ```
->
-> `AssemblyVersion` 让源码构建的 Snet.* 程序集与其余 NuGet 包的引用版本一致。新版发布后，把 `Snet.Iot.Daq.Core/Snet.Iot.Daq.Core.csproj` 中 `Snet.Opc` 的版本号改为新版本即可，无需其他改动。
+> ⚠️ **依赖说明**：该功能需要 **Snet.Opc 26.316.1 及以上版本**（含 `RegisterDaqAsync`、`UnRegisterDaqAsync` 与 `OpcUaServiceData.Basics.CloseDaqOnStop`；更早的版本没有这些接口）。`Snet.Iot.Daq.Core/Snet.Iot.Daq.Core.csproj` 已引用该版本的 NuGet 包，直接构建即可。
 
 ## 🌐 WEB 跨平台版本（Snet.Iot.Daq.Web）
 
@@ -175,8 +169,6 @@ cd Daq
 ### 🔨 2️⃣ 编译项目
 
 使用 **Visual Studio 2022** 或更高版本打开 `Snet.Iot.Daq.sln`，选择 Debug 或 Release 构建。
-
-> ⚠️ OPC UA 转发依赖尚未发布到 NuGet 的新版 Snet.Opc，构建方法见上文「OPC UA 转发」中的依赖说明。
 
 ### ▶️ 3️⃣ 运行程序
 

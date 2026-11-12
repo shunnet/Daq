@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
 	<PropertyGroup>
-		<TargetFramework>net10.0</TargetFramework>
+		<TargetFramework>net11.0</TargetFramework>
 		<ImplicitUsings>enable</ImplicitUsings>
 		<Nullable>enable</Nullable>
 		<PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -13,12 +13,10 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<!-- OPC UA 转发依赖 Snet.Opc 新版的 RegisterDaqAsync / UnRegisterDaqAsync 与 Basics.CloseDaqOnStop（注入 IDaq）。新版发布到 NuGet 之前，用 -p:SnetOpcProject=<Snet.Opc.csproj 完整路径> 改为源码引用来构建/测试；发布之后把下面的版本号改成新版本，源码引用即自动失效。 -->
-		<PackageReference Include="Snet.Opc" Version="26.301.1" Condition="'$(SnetOpcProject)' == ''" />
-		<ProjectReference Include="$(SnetOpcProject)" Condition="'$(SnetOpcProject)' != ''" />
-		<PackageReference Include="Snet.Mqtt" Version="26.301.1" />
+		<PackageReference Include="Snet.Opc" Version="26.316.1" />
+		<PackageReference Include="Snet.Mqtt" Version="26.316.1" />
 		<PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.2" />
-		<PackageReference Include="NuGet.Versioning" Version="7.9.0" />
+		<PackageReference Include="NuGet.Versioning" Version="8.0.0" />
 		<PackageReference Include="sqlite-net-pcl" Version="1.11.285" />
 	</ItemGroup>
 

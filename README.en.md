@@ -113,13 +113,7 @@ The desktop and web editions share `Snet.Iot.Daq.Core.handler.UaForwarding`. Onc
 
 > 🔒 **Security**: write-back means any client that passes OPC UA authentication can write device points. The Snet.Opc defaults are user `snet` / `123456` and automatic trust of client certificates (`AutoAcceptUntrustedCertificates`); in production change the credentials and turn automatic trust off under "OPC UA server → Modify" first.
 
-> ⚠️ **Dependency**: this feature needs the new **Snet.Opc** (with `RegisterDaqAsync`, `UnRegisterDaqAsync` and `OpcUaServiceData.Basics.CloseDaqOnStop`), which is **not yet published to NuGet**. Until then build against the source:
->
-> ```bash
-> dotnet build Snet.Iot.Daq.sln -p:SnetOpcProject=<full path of Snet.Opc.csproj> -p:AssemblyVersion=26.301.1.0
-> ```
->
-> `AssemblyVersion` keeps the source-built Snet.* assemblies in line with the version the other NuGet packages reference. After the new version is published, change the `Snet.Opc` version in `Snet.Iot.Daq.Core/Snet.Iot.Daq.Core.csproj`; nothing else needs to change.
+> ⚠️ **Dependency**: this feature needs **Snet.Opc 26.316.1 or newer** (it provides `RegisterDaqAsync`, `UnRegisterDaqAsync` and `OpcUaServiceData.Basics.CloseDaqOnStop`; earlier versions do not). `Snet.Iot.Daq.Core/Snet.Iot.Daq.Core.csproj` already references that NuGet package, so a normal build is enough.
 
 ## 🌐 Cross-platform Web Edition (Snet.Iot.Daq.Web)
 
