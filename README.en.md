@@ -52,7 +52,7 @@
 | Module | Description |
 |------|------|
 | 🔌 **Plugin Hot-Plug** | Load / unload DAQ / MQ plugins at runtime without restart; same-name plugins support hot update |
-| 📡 **OPC UA Server** | Built-in OPC UA Server with authentication, certificates, address space management and persistent subscriptions |
+| 📡 **OPC UA Server** | Built-in OPC UA Server with authentication, certificates and persistent subscriptions; each device is injected as a dedicated `IDaq`, so OPC client writes are **written back** to the device |
 | 📨 **MQTT Broker** | Built-in MQTT broker with client management, authentication and max-connection control |
 | 🌐 **WebAPI Service** | Built-in HTTP service (start/stop via WAOn / WAOff) for external system data ingestion |
 | 📊 **Real-time Charts** | ScottPlot multi-curve real-time charts with skin switching and historical data |
@@ -96,12 +96,37 @@ Stop collection → release plugin instance (IAsyncDisposable) → remove IOC re
 
 > 🤖 **AI-assisted development**: try [Snet.SKILLS](https://github.com/shunnet/SKILLS) — an AI skills collection tailored to the SNET architecture that accelerates plugin development.
 
+## 📡 OPC UA Forwarding (injected IDaq, with write-back)
+
+The desktop and web editions share `Snet.Iot.Daq.Core.handler.UaForwarding`. Once a device starts collecting, Core injects **the `IDaq` object the collection pipeline is using** into the OPC UA server (`OpcUaServiceOperate.RegisterDaqAsync`); the server only borrows it. Snet.Opc then owns node creation, subscriptions and reconnection and writes OPC client writes back to the device. This app no longer creates nodes point by point, maps NodeIds or writes values (about 200 lines of forwarding code removed from each edition), and opens no extra device connection for OPC.
+
+| Item | Description |
+|------|-------------|
+| **Write-back** | Writes from OPC UA clients are forwarded by the server straight to the device (`IDaq.WriteAsync`) |
+| **Node layout** | `address space / device SN·protocol / point address` (separator `·`); a point's NodeId name is its protocol address, e.g. `DB1.DBW0` |
+| **Ownership and closing** | The device belongs to the collection pipeline. `OpcUaServiceData.Basics.CloseDaqOnStop` (new in Snet.Opc, `true` by default there) defaults to **false** in the platform: stopping or disposing the OPC UA server only unregisters the devices and never closes or disposes them, so collection is unaffected. Do not set it to true in the platform, or stopping the OPC UA server would close devices that are collecting |
+| **Register / unregister** | Registered after collection starts; right after the OPC UA server starts or restarts for every collecting device (including devices whose values never change); plus a free state check before every data batch; registration runs in a background task and never blocks collection. Before a device stops, retries, restarts with new settings or is disposed, it is unregistered with `UnRegisterDaqAsync` (its OPC nodes disappear) and only then unsubscribed and released. After changing device parameters or points, restarting that device registers it again with the new settings; the OPC UA server does not need a restart |
+| **Point filtering** | Points with an empty or duplicate name, zero length, an unsupported data type, or a byte block with a manual extend parameter (custom byte decoding) are skipped and listed in the log (the decoded sub-points of the latter do not appear in OPC UA); the rest are published normally |
+| **Packing** | With "auto pack" enabled the server packs using the device's own byte order and settings, not the maximum byte length configured in Daq, so the OPC and MQ pipelines may pack at different granularity |
+| **Retry** | After a failed registration the retry delay grows 30 s, 60 s … up to 10 minutes; a restarted device (new IDaq object) retries immediately |
+| **Known limits** | The server subscribes its own point set on the same device object: if a driver rejects subscribing the same address twice, the OPC points stay "not connected"; unregistering does not unsubscribe the addresses the server subscribed (they go away with the device) |
+
+> 🔒 **Security**: write-back means any client that passes OPC UA authentication can write device points. The Snet.Opc defaults are user `snet` / `123456` and automatic trust of client certificates (`AutoAcceptUntrustedCertificates`); in production change the credentials and turn automatic trust off under "OPC UA server → Modify" first.
+
+> ⚠️ **Dependency**: this feature needs the new **Snet.Opc** (with `RegisterDaqAsync`, `UnRegisterDaqAsync` and `OpcUaServiceData.Basics.CloseDaqOnStop`), which is **not yet published to NuGet**. Until then build against the source:
+>
+> ```bash
+> dotnet build Snet.Iot.Daq.sln -p:SnetOpcProject=<full path of Snet.Opc.csproj> -p:AssemblyVersion=26.301.1.0
+> ```
+>
+> `AssemblyVersion` keeps the source-built Snet.* assemblies in line with the version the other NuGet packages reference. After the new version is published, change the `Snet.Opc` version in `Snet.Iot.Daq.Core/Snet.Iot.Daq.Core.csproj`; nothing else needs to change.
+
 ## 🌐 Cross-platform Web Edition (Snet.Iot.Daq.Web)
 
 The **Blazor Server Web edition**, sharing all business capabilities of `Snet.Iot.Daq.Core` with the desktop edition — just open it in a browser, no client installation required.
 
 - **Platforms**: Windows / Linux x64 / Linux ARM64 (Raspberry Pi, Phytium, Kunpeng, etc.)
-- **UI**: cyan glassmorphism design, dark / light themes, Chinese / English switching, responsive layout for phones and tablets
+- **UI**: deep-space blue (dark) / misty blue (light) themes with a cyan-to-indigo brand gradient, consistent status colors, depth and motion, Chinese / English switching, responsive layout for phones and tablets
 - **Feature parity**: plugin hot-plug & hot update, OPC UA server, MQTT broker, WebAPI, auto batching, device soft start
 - **Multi-user & security**: two-tier roles — Administrator / Regular User (read-only), failed-login lockout, operation log audit
 - **Differences**: no ScottPlot charts, system tray or GPU monitoring (desktop-only features)
@@ -150,6 +175,8 @@ cd Daq
 ### 🔨 2️⃣ Build
 
 Open `Snet.Iot.Daq.sln` with **Visual Studio 2022** or later, then build Debug or Release.
+
+> ⚠️ OPC UA forwarding depends on a new Snet.Opc that is not yet on NuGet; see the dependency note in "OPC UA Forwarding" above for how to build.
 
 ### ▶️ 3️⃣ Run
 

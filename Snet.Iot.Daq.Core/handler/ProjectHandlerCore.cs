@@ -232,7 +232,7 @@ namespace Snet.Iot.Daq.Core.handler
             }
 
             // 叶子节点没有子项，直接返回
-            if (isLeaf)
+            if (isLeaf || node.Children is null)
                 return;
 
             foreach (var child in node.Children)
@@ -429,7 +429,7 @@ namespace Snet.Iot.Daq.Core.handler
             }
 
             // 叶子节点没有子项，直接返回
-            if (isLeaf)
+            if (isLeaf || node.Children is null)
                 return;
 
             foreach (var child in node.Children)

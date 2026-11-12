@@ -152,3 +152,58 @@ window.snet = {
         }
     }
 };
+
+/* ============================================================
+   表格自适应（.snet-table）
+   表格列宽由 colgroup 固定（px），窗口放不下时右侧列会被面板裁掉且无法访问。
+   这里把表头表与数据表的最小宽度都设为列宽之和：数据区横向滚动，
+   表头（overflow:hidden）的 scrollLeft 与数据区同步，表头固定、列始终对齐。
+   Blazor 重绘表格后由 MutationObserver 重新应用，窗口够宽时 min-width 小于 100%，不产生滚动。
+   ============================================================ */
+(function () {
+    'use strict';
+    var pending = false;
+
+    /** 一个表格 colgroup 中各列宽度之和（px）；缺少宽度的列按 80px 估算，避免最小宽度为 0。 */
+    function columnsWidth(table) {
+        var cols = table.querySelectorAll('colgroup > col');
+        var sum = 0;
+        for (var i = 0; i < cols.length; i++) {
+            var width = parseFloat(cols[i].style.width);
+            sum += isNaN(width) ? 80 : width;
+        }
+        return Math.ceil(sum);
+    }
+
+    /** 为每个表格面板写入统一的最小宽度，并（只绑定一次）同步表头与数据区的横向滚动位置。 */
+    function adapt() {
+        pending = false;
+        var panels = document.querySelectorAll('.snet-table-panel');
+        for (var i = 0; i < panels.length; i++) {
+            var panel = panels[i];
+            var head = panel.querySelector('.snet-table-head');
+            var wrap = panel.querySelector('.snet-table-wrap');
+            if (!head || !wrap) continue;
+            var tables = panel.querySelectorAll('table.snet-table');
+            var min = 0;
+            for (var j = 0; j < tables.length; j++) min = Math.max(min, columnsWidth(tables[j]));
+            for (var k = 0; k < tables.length; k++) tables[k].style.minWidth = min ? min + 'px' : '';
+            if (!wrap.snetScrollSync) {
+                wrap.snetScrollSync = true;
+                wrap.addEventListener('scroll', (function (h, w) {
+                    return function () { h.scrollLeft = w.scrollLeft; };
+                })(head, wrap), { passive: true });
+            }
+        }
+    }
+
+    /** 合并短时间内的多次 DOM 变化，50ms 后只执行一次（用定时器而非 rAF：页面在后台/不可见时 rAF 不触发，表格仍要能适配）。 */
+    function schedule() {
+        if (pending) return;
+        pending = true;
+        setTimeout(adapt, 50);
+    }
+
+    new MutationObserver(schedule).observe(document.documentElement, { childList: true, subtree: true });
+    document.addEventListener('DOMContentLoaded', schedule);
+})();

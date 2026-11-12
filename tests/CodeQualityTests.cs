@@ -1,10 +1,12 @@
-﻿using Opc.Ua;
-using Snet.Iot.Daq.Core.data;
+﻿using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
+using Snet.Iot.Daq.Core.@interface;
 using Snet.Iot.Daq.Core.mvvm;
 using Snet.Iot.Daq.viewModel;
 using Snet.Iot.Daq.Web.Services;
+using Snet.Opc.ua.service;
 using SQLite;
+using Snet.Model.@enum;
 using System.Reflection;
 using Xunit;
 
@@ -73,18 +75,168 @@ public sealed class CodeQualityTests : IDisposable
         Assert.Empty(buffer.Snapshot());
     }
 
-    /// <summary>UA 映射保留命名空间与原始名称，避免错误切分包含点或 Unicode 的协议地址。</summary>
-    [Theory]
-    [InlineData("DB1.DBW0")]
-    [InlineData("温度;设备=一")]
-    public void UaNodeMappingUsesParentIdentity(string address)
+    /// <summary>OPC UA 注入前筛点：名称为空、重复、类型不支持、长度为 0、手动解包（扩展参数）的点位会被桥接整体拒绝或无法正确发布，必须先剔除并说明原因。</summary>
+    [Fact]
+    public void UaForwardingDropsPointsTheBridgeWouldReject()
     {
-        var parent = new NodeId("DAQ.项目.设备", 7);
-        var actual = UaForwarding.CreateAddressNodeId(parent, address);
-        Assert.Equal((ushort)7, actual.NamespaceIndex);
-        Assert.True(actual.TryGetValue(out string identifier));
-        Assert.Equal("DAQ.项目.设备." + address, identifier);
-        Assert.Throws<ArgumentException>(() => UaForwarding.CreateAddressNodeId(new NodeId(12u, 7), address));
+        var models = new List<IAddressModel>
+        {
+            new AddressModelCore { Address = "DB1.DBW0", Type = DataType.Short, Length = 1 },
+            new AddressModelCore { Address = "DB1.DBW0", Type = DataType.Short, Length = 1 },
+            new AddressModelCore { Address = " ", Type = DataType.Int, Length = 1 },
+            new AddressModelCore { Address = "DB1.DBD4", Type = DataType.Float, Length = 0 },
+            new AddressModelCore { Address = "DB1.DBD8", Type = DataType.Time, Length = 1 },
+            new AddressModelCore { Address = "DB2.0", Type = DataType.ByteArray, Length = 8, ExpandParam = "[{\"Address\":\"A\"}]" },
+            new AddressModelCore { Address = "DB3.0", Type = DataType.ByteArray, Length = 8 },
+            new AddressModelCore { Address = "温度;设备=一", Type = DataType.Double, Length = 1 },
+        };
+
+        var (address, skipped) = UaForwarding.BuildAddress(models);
+
+        Assert.Equal(new[] { "DB1.DBW0", "DB3.0", "温度;设备=一" }, address.AddressArray.Select(p => p.AddressName));
+        Assert.Equal(5, skipped.Count);
+        Assert.Contains(skipped, s => s.StartsWith("DB1.DBD4", StringComparison.Ordinal));
+        Assert.Contains(skipped, s => s.StartsWith("DB2.0", StringComparison.Ordinal));
+    }
+
+    /// <summary>Daq 复制的“桥接支持的数据类型”必须与 Snet.Opc 的 OpcUaDaqTypeMap 逐项一致，Snet.Opc 增删类型时这里会立刻失败。</summary>
+    [Fact]
+    public void UaForwardingSupportedTypesMatchTheBridge()
+    {
+        var mapType = typeof(OpcUaServiceOperate).Assembly.GetType("Snet.Opc.ua.service.core.OpcUaDaqTypeMap");
+        Assert.NotNull(mapType);
+        var get = mapType.GetMethod("Get", BindingFlags.NonPublic | BindingFlags.Static);
+        Assert.NotNull(get);
+        foreach (var type in Enum.GetValues<DataType>())
+        {
+            bool bridgeAccepts;
+            try
+            {
+                get.Invoke(null, new object[] { type });
+                bridgeAccepts = true;
+            }
+            catch (TargetInvocationException ex) when (ex.InnerException is ArgumentException)
+            {
+                bridgeAccepts = false;
+            }
+            Assert.True(bridgeAccepts == UaForwarding.IsSupportedType(type), $"{type}: 桥接 {bridgeAccepts}，Daq {UaForwarding.IsSupportedType(type)}");
+        }
+    }
+
+    /// <summary>登记状态机：同一设备同一时刻只有一个注册流程；同一 IDaq 对象注册成功后一律放行，设备重启换成新对象后立即重新注册；停止前只对确实注册过的对象取消。</summary>
+    [Fact]
+    public void UaRegistryTracksOneAttemptPerDeviceObject()
+    {
+        var registry = new UaDeviceRegistry(() => 0);
+        var first = new object();
+        var second = new object();
+
+        Assert.False(registry.IsSettled("d1", first));
+        Assert.Equal(UaDeviceRegistry.Decision.Attempt, registry.Begin("d1", first));
+        Assert.Equal(UaDeviceRegistry.Decision.Skip, registry.Begin("d1", first));
+        Assert.True(registry.IsSettled("d1", first));
+
+        registry.Succeeded("d1", first);
+        Assert.Equal(UaDeviceRegistry.Decision.Skip, registry.Begin("d1", first));
+        Assert.False(registry.IsSettled("d1", second));
+        Assert.False(registry.Release("d1", second));            // 不是登记的对象：不动登记，也不需要取消
+        Assert.True(registry.Release("d1", first));              // 登记的对象：清掉登记，调用方需向服务端取消
+        Assert.False(registry.Release("d1", first));
+
+        Assert.Equal(UaDeviceRegistry.Decision.Attempt, registry.Begin("d1", second));
+        registry.Succeeded("d1", second);
+        Assert.Equal(UaDeviceRegistry.Decision.Attempt, registry.Begin("d1", first));   // 设备重启换了对象：重新注册
+    }
+
+    /// <summary>失败后按 30 s、60 s…退避；换成新对象立即重试；永久失败只等新对象；取消撤销占位。</summary>
+    [Fact]
+    public void UaRegistryBacksOffExponentiallyAndRetriesWithANewObject()
+    {
+        long now = 0;
+        var registry = new UaDeviceRegistry(() => now);
+        var first = new object();
+        var second = new object();
+
+        Assert.Equal(UaDeviceRegistry.Decision.Attempt, registry.Begin("d1", first));
+        registry.Failed("d1", first, permanent: false);
+        now = 29_999;
+        Assert.Equal(UaDeviceRegistry.Decision.Skip, registry.Begin("d1", first));
+        now = 30_000;
+        Assert.Equal(UaDeviceRegistry.Decision.Attempt, registry.Begin("d1", first));
+        registry.Failed("d1", first, permanent: false);
+        now = 30_000 + 59_999;
+        Assert.Equal(UaDeviceRegistry.Decision.Skip, registry.Begin("d1", first));
+        Assert.Equal(UaDeviceRegistry.Decision.Attempt, registry.Begin("d1", second));
+
+        registry.Failed("d1", second, permanent: true);
+        now += 3_600_000;
+        Assert.Equal(UaDeviceRegistry.Decision.Skip, registry.Begin("d1", second));
+
+        registry.Abandon("d1");
+        Assert.Equal(UaDeviceRegistry.Decision.Attempt, registry.Begin("d1", second));
+    }
+
+    /// <summary>注入采集通道的同一个设备：注册成功后同一对象不再重复注册；取消注册不关闭、不释放设备，之后可以再次注册。</summary>
+    [Fact]
+    public async Task UaForwardingRegistersTheSharedDeviceAndUnregistersWithoutClosingIt()
+    {
+        await using var service = new OpcUaServiceOperate(new OpcUaServiceData.Basics { CloseDaqOnStop = false });
+        var plugin = new PluginConfigModel { Name = "fixture" };
+        var daq = new FakeDaq();
+        IReadOnlyCollection<IAddressModel> Models() =>
+            new List<IAddressModel> { new AddressModelCore { Address = "DB5.DBW0", Type = DataType.Short, Length = 1 } };
+
+        var registered = await UaForwarding.EnsureRegisteredAsync(service, plugin, daq, Models, false);
+        Assert.NotNull(registered);
+        Assert.True(registered.Status, registered.Message);
+        Assert.True(UaForwarding.IsUpToDate(service, plugin.Guid, daq));
+        Assert.Null(await UaForwarding.EnsureRegisteredAsync(service, plugin, daq, Models, false));
+
+        var unregistered = await UaForwarding.UnregisterAsync(service, plugin.Guid, daq);
+        Assert.NotNull(unregistered);
+        Assert.True(unregistered.Status, unregistered.Message);
+        Assert.Equal(0, daq.Closes);
+        Assert.Equal(0, daq.Disposals);
+        Assert.False(UaForwarding.IsUpToDate(service, plugin.Guid, daq));
+        Assert.Null(await UaForwarding.UnregisterAsync(service, plugin.Guid, daq));
+
+        var again = await UaForwarding.EnsureRegisteredAsync(service, plugin, daq, Models, false);
+        Assert.NotNull(again);
+        Assert.True(again.Status, again.Message);
+    }
+
+    /// <summary>注册失败（设备 SN 重复）只上报一次并退避；失败不会关闭或释放调用方的设备，已注册的设备不受影响。</summary>
+    [Fact]
+    public async Task UaForwardingRegistrationFailureLeavesTheCallersDeviceAlone()
+    {
+        await using var service = new OpcUaServiceOperate(new OpcUaServiceData.Basics { CloseDaqOnStop = false });
+        var firstPlugin = new PluginConfigModel { Name = "fixture" };
+        var secondPlugin = new PluginConfigModel { Name = "fixture" };
+        var first = new FakeDaq(new FakeDaqBasics { SN = "duplicate-sn" });
+        var second = new FakeDaq(new FakeDaqBasics { SN = "duplicate-sn" });
+        IReadOnlyCollection<IAddressModel> Models() =>
+            new List<IAddressModel> { new AddressModelCore { Address = "DB5.DBW0", Type = DataType.Short, Length = 1 } };
+
+        Assert.True((await UaForwarding.EnsureRegisteredAsync(service, firstPlugin, first, Models, false))!.Status);
+        var failure = await UaForwarding.EnsureRegisteredAsync(service, secondPlugin, second, Models, false);
+
+        Assert.NotNull(failure);
+        Assert.False(failure.Status);
+        Assert.Equal(0, second.Closes);
+        Assert.Equal(0, second.Disposals);
+        Assert.True(UaForwarding.IsUpToDate(service, secondPlugin.Guid, second));
+        Assert.Null(await UaForwarding.EnsureRegisteredAsync(service, secondPlugin, second, Models, false));
+        Assert.True(UaForwarding.IsUpToDate(service, firstPlugin.Guid, first));
+    }
+
+    /// <summary>平台默认值：配置里没有 CloseDaqOnStop 时设为 false（设备归采集通道，服务端只借用）；用户明确写了的取值保持不变。</summary>
+    [Fact]
+    public void UaForwardingAppliesPlatformDefaultsOnlyWhenTheKeyIsMissing()
+    {
+        Assert.False(UaForwarding.ApplyPlatformDefaults(new OpcUaServiceData.Basics(), null).CloseDaqOnStop);
+        Assert.False(UaForwarding.ApplyPlatformDefaults(new OpcUaServiceData.Basics(), "{\"Port\":6688}").CloseDaqOnStop);
+        var explicitTrue = new OpcUaServiceData.Basics { CloseDaqOnStop = true };
+        Assert.True(UaForwarding.ApplyPlatformDefaults(explicitTrue, "{\"CloseDaqOnStop\":true}").CloseDaqOnStop);
     }
 
     /// <summary>地址数量包含无转发插件的点位，深层结构及错误循环不会导致堆栈溢出。</summary>
@@ -447,43 +599,6 @@ public sealed class CodeQualityTests : IDisposable
             Convert.ToBase64String(new byte[16]), false, 0, null, AuthService.RoleAdmin, false, null });
         var verify = typeof(AuthService).GetMethod("VerifyPassword", BindingFlags.NonPublic | BindingFlags.Static)!;
         Assert.False((bool)verify.Invoke(null, new[] { "arbitrary-password", record })!);
-    }
-
-    /// <summary>UA 文件夹归属使用真实父节点，不把 AB 中的地址误认为 A 的后代；索引与节点列表同步移除。</summary>
-    [Fact]
-    public void UaFolderRemovalUsesActualAncestry()
-    {
-        var managerType = typeof(Snet.Opc.ua.service.core.ReferenceServer.ReferenceNodeManager);
-        var manager = (Snet.Opc.ua.service.core.ReferenceServer.ReferenceNodeManager)
-            System.Runtime.CompilerServices.RuntimeHelpers.GetUninitializedObject(managerType);
-        SetPrivateField(manager, "<Lock>k__BackingField", new object());
-        var a = new FolderState(null) { NodeId = new NodeId("A", 7) };
-        var ab = new FolderState(null) { NodeId = new NodeId("AB", 7) };
-        var first = new BaseDataVariableState(a) { NodeId = new NodeId("A.D0", 7) };
-        var second = new BaseDataVariableState(ab) { NodeId = new NodeId("AB.D0", 7) };
-        SetPrivateField(manager, "m_staticNodes", new List<BaseDataVariableState> { first, second });
-        SetPrivateField(manager, "m_dynamicNodes", new List<BaseDataVariableState>());
-        SetPrivateField(manager, "m_staticIndex", new System.Collections.Concurrent.ConcurrentDictionary<string, BaseDataVariableState>
-        { [first.NodeId.ToString()] = first, [second.NodeId.ToString()] = second });
-        SetPrivateField(manager, "m_dynamicIndex", new System.Collections.Concurrent.ConcurrentDictionary<string, BaseDataVariableState>());
-        Assert.Equal(first.NodeId, Assert.Single(manager.GetFolderAddress(new List<NodeId> { a.NodeId })));
-        Assert.True(manager.RemoveNodeId(first.NodeId, null));
-        Assert.Equal(second.NodeId.ToString(), Assert.Single(manager.GetAddressArray()));
-        Assert.Null(manager.GetNodeId(first.NodeId.ToString()));
-        Assert.Equal(second.NodeId, manager.GetNodeId(second.NodeId.ToString()));
-    }
-
-    /// <summary>测试在不启动网络服务的情况下设置 SDK 内部节点索引，保留真实节点、父子关系及公开管理方法。</summary>
-    private static void SetPrivateField(object target, string name, object value)
-    {
-        for (Type? type = target.GetType(); type is not null; type = type.BaseType)
-        {
-            var field = type.GetField(name, BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.DeclaredOnly);
-            if (field is null) continue;
-            field.SetValue(target, value);
-            return;
-        }
-        throw new MissingFieldException(target.GetType().Name, name);
     }
 
     /// <summary>多个启动请求只产生一个采样任务，释放调用共同等待清理，终态不能再次启动。</summary>

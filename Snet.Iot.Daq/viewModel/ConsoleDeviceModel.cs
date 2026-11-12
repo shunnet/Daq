@@ -1,5 +1,4 @@
 ﻿using CommunityToolkit.Mvvm.Input;
-using Opc.Ua;
 using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
@@ -9,6 +8,7 @@ using Snet.Iot.Daq.data;
 using Snet.Log;
 using Snet.Model.data;
 using Snet.Model.@enum;
+using Snet.Model.@interface;
 using Snet.Opc.ua.service;
 using Snet.Utility;
 using System.Collections.Concurrent;
@@ -18,7 +18,7 @@ using System.Threading.Channels;
 namespace Snet.Iot.Daq.viewModel
 {
     /// <summary>
-    /// 控制台设备视图模型，负责单个采集设备的运行控制、数据读写、字节处理、OPC UA 地址空间同步以及 MQ 消息转发。
+    /// 控制台设备视图模型，负责单个采集设备的运行控制、数据读写、字节处理、OPC UA 专用实例注入以及 MQ 消息转发。
     /// </summary>
     public class ConsoleDeviceModel : BindNotify, IDisposable, IAsyncDisposable
     {
@@ -77,40 +77,16 @@ namespace Snet.Iot.Daq.viewModel
         /// </summary>
         private RuntimeSecondsRecorderHandler runtime = new();
 
-        /// <summary>
-        /// 原始地址 -> OPCUA 真实地址映射
-        /// </summary>
-        private readonly ConcurrentDictionary<string, string> _addressMap = new();
-
-        /// <summary>
-        /// 创建或映射失败的地址集合<br/>
-        /// 避免每个数据事件对同一地址重复调用 CreateAddress 并刷屏消息
-        /// </summary>
-        private readonly ConcurrentDictionary<string, byte> _failedAddress = new();
-
-        /// <summary>
-        /// UA 写入复用字典（单线程路径，无需并发容器）
-        /// </summary>
-        private readonly ConcurrentDictionary<string, WriteModel> _singleWriteDict = new();
-
-        /// <summary>
-        /// 地址空间名称
-        /// </summary>
-        private string uaServerAddressSpaceName;
-
-        /// <summary>
-        /// opcua 父级层级
-        /// </summary>
-        private FolderState? folderState;
-        /// <summary>文件夹所属的 UA 实例，服务重启后必须丢弃旧地址空间缓存。</summary>
-        private OpcUaServiceOperate? folderService;
         /// <summary>运行配置快照签名，避免其他设备编辑或无关 UI 刷新导致重复停止和订阅。</summary>
         private string settingsSignature = string.Empty;
-
-        /// <summary>
-        /// 层级集合
-        /// </summary>
-        private List<FolderState> folderStates = new();
+        /// <summary>OPC UA 后台注册任务的占位标志（0 空闲 / 1 进行中），保证同一设备同一时刻只有一个注册流程。</summary>
+        private int _uaBusy;
+        /// <summary>最近一次后台注册任务；停止设备时要等它结束，才能确定该对象是否已注册、需要取消注册。</summary>
+        private Task _uaTask = Task.CompletedTask;
+        /// <summary>停止设备时等待 OPC UA 注册/取消注册完成的上限；服务端正在启动或停止时这些操作要排队等生命周期门。</summary>
+        private static readonly TimeSpan UaStopTimeout = TimeSpan.FromSeconds(15);
+        /// <summary>设备模型生命周期内的取消源，释放时取消尚未完成的后台注册（不持有计时器，无需额外释放）。</summary>
+        private readonly CancellationTokenSource _uaLifetime = new();
 
         /// <summary>
         /// 地址索引缓存（单线程路径，每次重建）
@@ -144,16 +120,10 @@ namespace Snet.Iot.Daq.viewModel
         private BoundedChannelOptions? p_Channel;
 
         /// <summary>
-        /// Ua 地址同步通道
-        /// </summary>
-        private Channel<AddressValue> UaSyncChannel;
-
-        /// <summary>
         /// 数据事件通道
         /// </summary>
         private Channel<EventDataResult> DataSyncChannel;
         private Task? _dataConsumerTask;
-        private Task? _uaConsumerTask;
 
         /// <summary>
         /// 全局消息取消通知
@@ -458,15 +428,6 @@ namespace Snet.Iot.Daq.viewModel
 
                 if (result.Status)
                 {
-                    if (folderStates.Count > 0)
-                    {
-                        folderService?.RemoveFolder([folderStates[^1].NodeId]);
-                        folderStates.Clear();
-                        folderState = null;
-                    }
-
-                    _addressMap.Clear();
-                    _failedAddress.Clear();
                     _failedBytesModels.Clear();
 
                     if (ShowAsync != null) await ShowAsync(DeviceHierarchyToolTip + ", " + "启动采集".GetLanguageValue(App.LanguageOperate));
@@ -486,13 +447,6 @@ namespace Snet.Iot.Daq.viewModel
                         TokenSource = new CancellationTokenSource();
                     }
 
-                    if (UaSyncChannel == null)
-                    {
-                        UaSyncChannel = Channel.CreateBounded<AddressValue>(channel);
-                        var token = TokenSource.Token;
-                        _uaConsumerTask = Task.Run(() => UaSyncChannelDataEventAsync(token));
-                    }
-
                     if (DataSyncChannel == null)
                     {
                         DataSyncChannel = Channel.CreateBounded<EventDataResult>(channel);
@@ -501,6 +455,8 @@ namespace Snet.Iot.Daq.viewModel
                     }
 
                     IsRun = true;
+                    // 采集启动后触发把本设备注入 OPC UA 服务端（不等待；服务端未运行时无操作，服务启动后由 ConsoleModel 再次触发）
+                    TriggerUaForwarding();
                 }
                 else
                 {
@@ -534,9 +490,10 @@ namespace Snet.Iot.Daq.viewModel
                 try { await action(); }
                 catch (Exception ex) { await LogHelper.ErrorAsync($"设备停止清理异常：{ex.Message}"); }
             }
+            // 先取消 OPC UA 注册（服务端不会关闭设备），再取消订阅、释放设备
+            await ReleaseAsync(UnregisterUaAsync);
             daqHandler?.OnDataEventAsync -= DqaHandler_OnDataEventAsync;
             DataSyncChannel?.Writer.TryComplete();
-            UaSyncChannel?.Writer.TryComplete();
 
             // 取消
             if (TokenSource != null)
@@ -545,9 +502,8 @@ namespace Snet.Iot.Daq.viewModel
 
             }
 
-            await ReleaseAsync(() => Task.WhenAll(_dataConsumerTask ?? Task.CompletedTask, _uaConsumerTask ?? Task.CompletedTask));
+            await ReleaseAsync(() => _dataConsumerTask ?? Task.CompletedTask);
             _dataConsumerTask = null;
-            _uaConsumerTask = null;
             // 先撤下可见引用，再释放取消源；迟到事件不能取到已释放的 Token。
             var stoppedSource = TokenSource;
             TokenSource = null;
@@ -579,16 +535,6 @@ namespace Snet.Iot.Daq.viewModel
             IsRun = false;
             runtime.Stop();
             _lastResultStatus = null;
-
-            if (UaSyncChannel != null)
-            {
-                //停止
-                UaSyncChannel.Writer.TryComplete();
-                //清空队列
-                while (UaSyncChannel.Reader.TryRead(out AddressValue? item)) { }
-                //置空
-                UaSyncChannel = null;
-            }
 
             if (DataSyncChannel != null)
             {
@@ -648,142 +594,70 @@ namespace Snet.Iot.Daq.viewModel
 
         #region 功能方法
         /// <summary>
-        /// 通道地址事件消费
+        /// 触发本设备注入 OPC UA 服务端（不等待）<br/>
+        /// 把采集通道正在使用的 IDaq 对象直接交给 Snet.Opc 服务端借用：服务端自行建节点、采集，
+        /// 并把 OPC 客户端的写入反写到设备；本类不再逐点创建节点或写值，也不额外建立连接。<br/>
+        /// 触发时机：采集启动后、每个数据批次前（已注册时只是一次无分配的状态检查）、OPC UA 服务启动后（由 ConsoleModel 调用）。
+        /// 注册要等服务端的生命周期门，服务启动/停止期间可能耗时数秒，所以放在后台任务里，不阻塞采集循环和设备操作门。
         /// </summary>
-        private async Task UaSyncChannelDataEventAsync(CancellationToken token)
+        public void TriggerUaForwarding()
+        {
+            var service = GlobalConfigModel.uaService;
+            var handler = daqHandler;
+            if (service is null || handler is null || !IsRun || disposed) return;
+            var plugin = DaqData;
+            var daq = handler.GetOpenedDaq(plugin.Guid);
+            if (daq is null) return;
+            // 热路径：同一对象已注册、注册进行中、或失败退避中，都无需动作。
+            if (UaForwarding.IsUpToDate(service, plugin.Guid, daq)) return;
+            // 同一设备同一时刻只保留一个后台任务。
+            if (Interlocked.CompareExchange(ref _uaBusy, 1, 0) != 0) return;
+            // 快照：后台任务不读取之后可能被配置同步替换的字段。
+            var addresses = AddressDatas.Keys.ToList();
+            _uaTask = RegisterUaAsync(service, plugin, daq, addresses, plugin.AutoPack is not null);
+        }
+
+        /// <summary>
+        /// 后台执行一次注册并把结果写入信息栏；任何异常都在这里消化。<br/>
+        /// 注册结果不能走 ResultMsgAsync：它会按成败翻转设备的采集状态灯和状态文字，UA 注册失败不应让正常采集的设备变红。
+        /// </summary>
+        private async Task RegisterUaAsync(OpcUaServiceOperate service, PluginConfigModel plugin, IDaq daq,
+            IReadOnlyCollection<IAddressModel> addresses, bool usePacker)
         {
             try
             {
-                while (await UaSyncChannel.Reader.WaitToReadAsync(token))
-                {
-                    while (UaSyncChannel.Reader.TryRead(out AddressValue? addressValue))
-                    {
-                        if (token.IsCancellationRequested)
-                            break;
-
-                        if (addressValue.Quality != QualityType.Normal)
-                        {
-                            await LogHelper.ErrorAsync($"{addressValue.AddressName} - {addressValue.Message}", foldername: Path.Combine("UaService", "Transmit", "Failure"), token: token);
-                            continue;
-                        }
-
-                        var service = GlobalConfigModel.uaService;
-                        if (service is null) continue;
-                        FolderState? fs = await UaCreateFolder(service);
-                        if (fs == null)
-                        {
-                            continue;
-                        }
-
-                        //数据源
-                        string addressName = addressValue.AddressName;
-                        DataType dataType = addressValue.AddressDataType;
-                        object? value = addressValue.ResultValue;
-
-                        //校验
-                        if (!ReferenceEquals(service, GlobalConfigModel.uaService) || !service.GetStatus().Status)
-                            continue;
-
-                        if (!_addressMap.ContainsKey(addressName) && !_failedAddress.ContainsKey(addressName))
-                        {
-                            if (!UaForwarding.TypeMap.TryGetValue(dataType, out var builtInType))
-                                continue;
-
-                            if (builtInType == BuiltInType.String)
-                                value ??= string.Empty;
-
-                            //创建地址
-                            var createResult = service.CreateAddress(new()
-                            {
-                                new()
-                                {
-                                    AddressName = addressName,
-                                    Dynamic = false,
-                                    DefaultValue = value,
-                                    DataType = builtInType,
-                                    AccessLevel = 3
-                                }
-                            }, fs);
-
-                            if (!createResult.Status)
-                            {
-                                // 标记失败，避免每个数据事件重复创建并刷屏消息
-                                _failedAddress[addressName] = 0;
-                                if (ShowAsync is not null) await ShowAsync(createResult.Message);
-                                continue;
-                            }
-
-                            // CreateAddress 与此映射共用父节点标识，保留命名空间且不做全量地址扫描。
-                            _addressMap[addressName] = UaForwarding.CreateAddressNodeId(fs.NodeId, addressName).ToString();
-
-                        }
-
-                        // 写入
-                        if (!_addressMap.TryGetValue(addressName, out var realAddress))
-                        {
-                            // 创建成功但未能映射到真实地址，标记避免重复创建
-                            if (!_failedAddress.ContainsKey(addressName))
-                                _failedAddress[addressName] = 0;
-                            continue;
-                        }
-
-                        _singleWriteDict[realAddress] = new WriteModel(value, dataType);
-
-                        var writeResult = await service.WriteAsync(_singleWriteDict, token);
-
-                        _singleWriteDict.Clear();
-
-                        if (!writeResult.Status && ShowAsync != null)
-                            await ShowAsync.Invoke(writeResult.Message);
-                    }
-                }
+                OperateResult? result = await UaForwarding.EnsureRegisteredAsync(service, plugin, daq, () => addresses, usePacker, _uaLifetime.Token);
+                if (result is not null && ShowAsync is not null) await ShowAsync(DeviceHierarchyToolTip + ", " + result.Message);
             }
-            catch (TaskCanceledException)
+            catch (OperationCanceledException)
             {
+                // 设备模型正在释放，注册留待下次启动。
             }
-            catch (ChannelClosedException ex2)
+            catch (Exception ex)
             {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 通道已关闭：" + ex2.Message));
+                await LogHelper.ErrorAsync($"OPC UA 注册异常：{ex.Message}");
             }
-            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            finally
             {
-                // 正常停止消费，不将取消显示为采集故障。
-            }
-            catch (Exception ex4)
-            {
-                await ResultMsgAsync(DaqData, EventInfoResult.CreateFailureResult("[ UaSyncChannelDataEventAsync ] 异常：" + ex4.Message));
+                Volatile.Write(ref _uaBusy, 0);
             }
         }
-        /// <summary>在捕获的 UA 服务上创建或复用设备层级；服务实例变化时重建缓存，避免向旧地址空间写入。</summary>
-        /// <param name="service">本次消费捕获的服务，文件夹和后续写入必须使用同一实例。</param>
-        /// <returns>成功创建的设备文件夹；服务未运行或创建失败时返回 null。</returns>
-        private async Task<FolderState?> UaCreateFolder(OpcUaServiceOperate service)
+
+        /// <summary>
+        /// 设备停止或销毁前取消注册：先等进行中的后台注册结束，再通知服务端移除该设备（服务端不会关闭设备），
+        /// 这样随后的取消订阅和释放不会撞上仍在使用设备的桥接。服务已停止时没有登记，直接返回；异常由调用方的清理流程记录。
+        /// </summary>
+        private async Task UnregisterUaAsync()
         {
-            if (!ReferenceEquals(folderService, service))
-            {
-                folderService = service;
-                folderState = null;
-                folderStates.Clear();
-                _addressMap.Clear();
-                _failedAddress.Clear();
-                uaServerAddressSpaceName = string.Empty;
-            }
-            if (!service.GetStatus().Status) return null;
-            if (folderState is not null) return folderState;
-            FolderState? folder = null;
-            foreach (var name in DeviceHierarchyToolTip.TrimAll().Split('>'))
-            {
-                var result = service.CreateFolder(name, folder);
-                if (!result.Status || result.ResultData is not FolderState created)
-                {
-                    if (ShowAsync is not null) await ShowAsync(result.Message);
-                    return null;
-                }
-                folder = created;
-                folderStates.Add(created);
-            }
-            folderState = folder;
-            return folder;
+            var service = GlobalConfigModel.uaService;
+            var handler = daqHandler;
+            if (service is null || handler is null) return;
+            var plugin = DaqData;
+            var daq = handler.GetOpenedDaq(plugin.Guid);
+            if (daq is null) return;
+            await _uaTask.WaitAsync(UaStopTimeout);
+            var result = await UaForwarding.UnregisterAsync(service, plugin.Guid, daq).WaitAsync(UaStopTimeout);
+            if (result is { Status: true } && ShowAsync is not null) await ShowAsync(DeviceHierarchyToolTip + ", " + result.Message);
         }
 
         /// <summary>
@@ -807,6 +681,9 @@ namespace Snet.Iot.Daq.viewModel
                             await ResultMsgAsync(DaqData, e);
                             continue;
                         }
+
+                        // 数据批次前做一次廉价检查：UA 服务换了新实例、或上次注册失败已过退避期时，在后台重新注入
+                        TriggerUaForwarding();
 
                         // 支持字典与列表两种数据形态（列表为多批次解包结果）
                         switch (e.ResultData)
@@ -883,7 +760,6 @@ namespace Snet.Iot.Daq.viewModel
                     {
                         if (TokenSource is null)
                             return;
-                        await UaSyncChannel.Writer.WriteAsync(addressValue, TokenSource.Token);
                         await MqTransmissionAsync(new() { [addressModel] = addressValue }, pluginConfigs);
                         continue;
                     }
@@ -948,7 +824,7 @@ namespace Snet.Iot.Daq.viewModel
         };
 
         /// <summary>
-        /// 字节转换并转发到 UA 通道与 MQ
+        /// 字节转换并转发到 MQ（UA 由注入的 IDaq 独立采集，不再经本类转发）
         /// </summary>
         private async Task TransformAndForwardAsync(AddressValue addressValue, List<BytesModel> bm, IAddressModel addressModel, List<PluginConfigModel> pluginConfigs)
         {
@@ -982,7 +858,6 @@ namespace Snet.Iot.Daq.viewModel
                 };
                 if (TokenSource is null)
                     return;
-                await UaSyncChannel.Writer.WriteAsync(item.Value, TokenSource.Token);
                 await MqTransmissionAsync(new() { [newModel] = item.Value }, sourcePlugins ?? pluginConfigs);
             }
         }
@@ -1206,6 +1081,7 @@ namespace Snet.Iot.Daq.viewModel
             try
             {
                 disposed = true;
+                _uaLifetime.Cancel();
                 LanguageHandler.OnLanguageEventAsync -= LanguageHandler_OnLanguageEventAsync;
                 try { await StopCoreAsync(); }
                 finally

@@ -182,7 +182,7 @@ public class DaqHostedService : BackgroundService
             if (!File.Exists(WebPaths.UaServerConfigPath))
             {
                 Directory.CreateDirectory(WebPaths.ServerConfigPath);
-                await File.WriteAllTextAsync(WebPaths.UaServerConfigPath, new OpcUaServiceData.Basics().ToJson(true));
+                await File.WriteAllTextAsync(WebPaths.UaServerConfigPath, Snet.Iot.Daq.Core.handler.UaForwarding.ApplyPlatformDefaults(new OpcUaServiceData.Basics(), null).ToJson(true));
             }
             var ok = await InitUaServerAsync();
             _appState.NotifyServerStateChanged();
@@ -303,7 +303,8 @@ public class DaqHostedService : BackgroundService
         try
         {
             var json = await File.ReadAllTextAsync(WebPaths.UaServerConfigPath);
-            var basics = json.ToJsonEntity<OpcUaServiceData.Basics>() ?? new OpcUaServiceData.Basics();
+            var basics = Snet.Iot.Daq.Core.handler.UaForwarding.ApplyPlatformDefaults(
+                json.ToJsonEntity<OpcUaServiceData.Basics>() ?? new OpcUaServiceData.Basics(), json);
             var service = pending = OpcUaServiceOperate.Instance(basics);
             service.OnInfoEventAsync += UaService_OnInfoEventAsync;
             var result = await service.OnAsync();

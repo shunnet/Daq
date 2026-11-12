@@ -52,7 +52,7 @@
 | 模块 | 说明 |
 |------|------|
 | 🔌 **插件热插拔** | 运行时加载 / 卸载 DAQ / MQ 插件，无需重启；同名插件支持热更新 |
-| 📡 **OPC UA 服务端** | 内置 OPC UA Server，支持认证、证书、地址空间管理、持久订阅 |
+| 📡 **OPC UA 服务端** | 内置 OPC UA Server，支持认证、证书、持久订阅；采集设备以专用 `IDaq` 注入服务端，OPC 客户端写入可**反写**到设备 |
 | 📨 **MQTT Broker** | 内置 MQTT 消息代理，支持客户端管理、认证、最大连接数控制 |
 | 🌐 **WebAPI 服务** | 内置 HTTP 服务（WAOn / WAOff 启停），支持外部系统数据接入 |
 | 📊 **实时图表** | ScottPlot 多曲线实时图表，皮肤切换、历史数据 |
@@ -96,12 +96,37 @@
 
 > 🤖 **AI 辅助开发**：推荐使用 [Snet.SKILLS](https://github.com/shunnet/SKILLS) —— 针对 SNET 架构的 AI 技能集合，加速插件开发。
 
+## 📡 OPC UA 转发（注入 IDaq，支持反写）
+
+桌面版与 Web 版共用 `Snet.Iot.Daq.Core.handler.UaForwarding`：设备开始采集后，Core 把**采集通道正在使用的 `IDaq` 对象**直接注入 OPC UA 服务端（`OpcUaServiceOperate.RegisterDaqAsync`），服务端只“借用”：由 Snet.Opc 接管建节点、采集订阅与断线重连，并把 OPC 客户端的写入反写到设备。本应用不再逐点创建节点、映射 NodeId、写值（两端各删除约 200 行转发代码），也不再为 OPC 额外建立设备连接。
+
+| 项目 | 说明 |
+|------|------|
+| **反写** | OPC UA 客户端对点位的写入由服务端直接转发给设备（`IDaq.WriteAsync`），无需额外代码 |
+| **节点结构** | `地址空间名 / 设备SN·协议名 / 点位地址`（分隔符为 `·`），点位的 NodeId 名称即协议地址，如 `DB1.DBW0` |
+| **所有权与关闭** | 设备归采集通道所有。`OpcUaServiceData.Basics.CloseDaqOnStop`（Snet.Opc 新增，自身默认 true）在平台里默认为 **false**：OPC UA 服务端停止或释放时只对设备取消注册，不会关闭或释放设备，采集不受影响。请勿在平台里改成 true，否则停止 OPC UA 服务端会把正在采集的设备一起关掉 |
+| **注册与取消注册** | 采集启动后注册；OPC UA 服务端启动 / 重启后立即为正在采集的设备（包括数据不变的设备）重新注册；每个数据批次前再做一次无开销的状态检查；注册在后台任务里进行，不阻塞采集。设备停止、重试、改配置重启或销毁前，先 `UnRegisterDaqAsync` 取消注册（OPC 节点随之移除），再取消订阅、释放设备。修改设备参数或点位后重启该设备即按新配置重新注册，无需重启 OPC UA 服务端 |
+| **点位筛选** | 名称为空、重复、长度为 0、数据类型不被桥接支持的点位，以及手动设置了扩展参数（自定义字节解包）的字节块点位会被跳过并在日志里列出（后者在 OPC UA 里不会出现拆包后的子点位），其余点位照常发布 |
+| **组包** | 设备开启「自动组包」时，服务端用设备自身的字节序等参数组包，不使用 Daq 里设置的最大字节数，OPC 与 MQ 两条链路的组包粒度可能不同 |
+| **失败重试** | 注册失败后按 30 s、60 s…最长 10 分钟退避重试；设备重启（换成新的 IDaq 对象）后立即重试 |
+| **已知限制** | 服务端会在同一个设备对象上订阅自己的点位集合：驱动若不允许重复订阅同一地址，OPC 点位会一直显示未连接；取消注册不会取消服务端曾经订阅的地址（它们随设备一起释放） |
+
+> 🔒 **安全**：反写意味着任何通过 OPC UA 认证的客户端都能写入设备点位。Snet.Opc 的默认配置是账号 `snet` / `123456` 并自动信任客户端证书（`AutoAcceptUntrustedCertificates`），生产环境请先在「OPC UA 服务端 → 修改」里改掉账号密码并关闭自动信任证书。
+
+> ⚠️ **依赖说明**：该功能需要新版 **Snet.Opc**（含 `RegisterDaqAsync`、`UnRegisterDaqAsync` 与 `OpcUaServiceData.Basics.CloseDaqOnStop`），新版**尚未发布到 NuGet**。发布之前请用源码引用构建：
+>
+> ```bash
+> dotnet build Snet.Iot.Daq.sln -p:SnetOpcProject=<Snet.Opc.csproj 完整路径> -p:AssemblyVersion=26.301.1.0
+> ```
+>
+> `AssemblyVersion` 让源码构建的 Snet.* 程序集与其余 NuGet 包的引用版本一致。新版发布后，把 `Snet.Iot.Daq.Core/Snet.Iot.Daq.Core.csproj` 中 `Snet.Opc` 的版本号改为新版本即可，无需其他改动。
+
 ## 🌐 WEB 跨平台版本（Snet.Iot.Daq.Web）
 
 **Blazor Server Web 版**，与桌面版共用 `Snet.Iot.Daq.Core` 全部业务能力，浏览器访问即可使用，无需安装客户端。
 
 - **平台支持**：Windows / Linux x64 / Linux ARM64（树莓派、飞腾、鲲鹏等）
-- **界面**：青蓝玻璃拟态 UI，暗 / 亮双主题，中英文切换，手机 / 平板自适应布局
+- **界面**：深空蓝（暗）/ 晨雾蓝（亮）双主题，青蓝→靛紫品牌渐变，状态色、层次与动效统一，中英文切换，手机 / 平板自适应布局
 - **功能对齐**：插件热插拔与热更新、OPC UA 服务端、MQTT Broker、WebAPI、自动组包、设备软启动
 - **多用户与安全**：管理员 / 普通用户两级权限（普通用户只读），登录失败锁定，操作日志审计
 - **差异项**：无桌面版专属的 ScottPlot 图表、系统托盘与 GPU 监控
@@ -150,6 +175,8 @@ cd Daq
 ### 🔨 2️⃣ 编译项目
 
 使用 **Visual Studio 2022** 或更高版本打开 `Snet.Iot.Daq.sln`，选择 Debug 或 Release 构建。
+
+> ⚠️ OPC UA 转发依赖尚未发布到 NuGet 的新版 Snet.Opc，构建方法见上文「OPC UA 转发」中的依赖说明。
 
 ### ▶️ 3️⃣ 运行程序
 

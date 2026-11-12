@@ -1714,4 +1714,31 @@
   <data name="添加失败" xml:space="preserve">
     <value>添加失败</value>
   </data>
+  <data name="OPC UA 注册成功：设备目录 {0}，点位 {1} 个" xml:space="preserve">
+    <value>OPC UA 注册成功：设备目录 {0}，点位 {1} 个</value>
+  </data>
+  <data name="OPC UA 注册失败：{0}" xml:space="preserve">
+    <value>OPC UA 注册失败：{0}</value>
+  </data>
+  <data name="已跳过 {0} 个无法注册到 OPC UA 的点位：{1}" xml:space="preserve">
+    <value>已跳过 {0} 个无法注册到 OPC UA 的点位：{1}</value>
+  </data>
+  <data name="没有可注册到 OPC UA 的点位" xml:space="preserve">
+    <value>没有可注册到 OPC UA 的点位</value>
+  </data>
+  <data name="名称为空" xml:space="preserve">
+    <value>名称为空</value>
+  </data>
+  <data name="名称重复" xml:space="preserve">
+    <value>名称重复</value>
+  </data>
+  <data name="类型不支持" xml:space="preserve">
+    <value>类型不支持</value>
+  </data>
+  <data name="长度为 0" xml:space="preserve">
+    <value>长度为 0</value>
+  </data>
+  <data name="扩展参数解包点位未转发" xml:space="preserve">
+    <value>扩展参数解包点位未转发</value>
+  </data>
 </root>

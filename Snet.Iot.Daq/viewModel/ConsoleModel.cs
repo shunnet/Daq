@@ -419,7 +419,9 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (File.Exists(GlobalConfigModel.UaServerConfigPath))
             {
-                OpcUaServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.UaServerConfigPath).ToJsonEntity<OpcUaServiceData.Basics>();
+                string uaJson = FileHandler.FileToString(GlobalConfigModel.UaServerConfigPath);
+                OpcUaServiceData.Basics? basics = uaJson.ToJsonEntity<OpcUaServiceData.Basics>();
+                if (basics is not null) Snet.Iot.Daq.Core.handler.UaForwarding.ApplyPlatformDefaults(basics, uaJson);
                 GlobalConfigModel.param.SetBasics(basics);
                 if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
                 {
@@ -451,7 +453,7 @@ namespace Snet.Iot.Daq.viewModel
         {
             if (GlobalConfigModel.uaService is null)
             {
-                GlobalConfigModel.param.SetBasics(new OpcUaServiceData.Basics());
+                GlobalConfigModel.param.SetBasics(Snet.Iot.Daq.Core.handler.UaForwarding.ApplyPlatformDefaults(new OpcUaServiceData.Basics(), null));
                 if ((await DialogHost.Show(GlobalConfigModel.param, GlobalConfigModel.DialogHostTag)).ToBool())
                 {
                     OpcUaServiceData.Basics basics = GlobalConfigModel.param.GetBasics().GetSource<OpcUaServiceData.Basics>();
@@ -495,9 +497,11 @@ namespace Snet.Iot.Daq.viewModel
             if (File.Exists(GlobalConfigModel.UaServerConfigPath))
             {
                 //实例化参数
-                OpcUaServiceData.Basics? basics = FileHandler.FileToString(GlobalConfigModel.UaServerConfigPath).ToJsonEntity<OpcUaServiceData.Basics>();
+                string uaJson = FileHandler.FileToString(GlobalConfigModel.UaServerConfigPath);
+                OpcUaServiceData.Basics? basics = uaJson.ToJsonEntity<OpcUaServiceData.Basics>();
+                if (basics is not null) Snet.Iot.Daq.Core.handler.UaForwarding.ApplyPlatformDefaults(basics, uaJson);
                 //实例化
-                GlobalConfigModel.uaService = OpcUaServiceOperate.Instance(basics ??= new());
+                GlobalConfigModel.uaService = OpcUaServiceOperate.Instance(basics ??= Snet.Iot.Daq.Core.handler.UaForwarding.ApplyPlatformDefaults(new(), null));
             }
 
             if (GlobalConfigModel.uaService is not null)
@@ -510,6 +514,11 @@ namespace Snet.Iot.Daq.viewModel
                     GlobalConfigModel.uaService.OnInfoEventAsync -= UaService_OnInfoEventAsync;
                     await GlobalConfigModel.uaService.DisposeAsync();
                     GlobalConfigModel.uaService = null;
+                }
+                else
+                {
+                    // 服务端已启动：让已在采集的设备立即注入（数据不变的设备不会再产生数据批次，不能等数据触发）。
+                    foreach (var device in Devices) device.DataContext.GetSource<ConsoleDeviceModel>()?.TriggerUaForwarding();
                 }
             }
         }

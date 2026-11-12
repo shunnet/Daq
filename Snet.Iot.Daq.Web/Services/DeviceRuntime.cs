@@ -1,5 +1,4 @@
-﻿using Opc.Ua;
-using Snet.Core.handler;
+﻿using Snet.Core.handler;
 using Snet.Iot.Daq.Core.data;
 using Snet.Iot.Daq.Core.handler;
 using Snet.Model.data;
@@ -21,6 +20,8 @@ public class DeviceRuntime : IAsyncDisposable
     private static readonly TimeSpan FailLogThrottleWindow = TimeSpan.FromSeconds(5);
     /// <summary>状态推送节流窗口：数据事件高频时避免每条样本都触发整页重渲染（对齐 WPF 状态翻转才通知 + 1s 轮询运行时间）</summary>
     private static readonly TimeSpan StatePushThrottle = TimeSpan.FromMilliseconds(500);
+    /// <summary>停止设备时等待 OPC UA 注册/取消注册完成的上限；服务端正在启动或停止时这些操作要排队等生命周期门。</summary>
+    private static readonly TimeSpan UaStopTimeout = TimeSpan.FromSeconds(15);
 
 
 
@@ -51,19 +52,15 @@ public class DeviceRuntime : IAsyncDisposable
     /// <summary>最近状态：0 未报告，1 成功，-1 失败；并发事件用原子交换避免重复推送。</summary>
     private int _lastResultStatus;
     private Task? _consumeTask;
-    private Task? _uaTask;
     private readonly SemaphoreSlim _collectGate = new(1, 1);
+    /// <summary>OPC UA 后台注册任务的占位标志（0 空闲 / 1 进行中），保证同一设备同一时刻只有一个注册流程。</summary>
+    private int _uaBusy;
+    /// <summary>最近一次后台注册任务；停止设备时要等它结束，才能确定该对象是否已注册、需要取消注册。</summary>
+    private Task _uaTask = Task.CompletedTask;
+    /// <summary>运行时生命周期内的取消源，释放时取消尚未完成的后台注册（不持有计时器，无需额外释放）。</summary>
+    private readonly CancellationTokenSource _uaLifetime = new();
     private ConcurrentDictionary<string, IAddressModel> _addressIndex = new();
 
-    // UA 地址空间转发状态（对齐 WPF ConsoleDeviceModel.UaSyncChannelDataEventAsync）
-    private Channel<AddressValue>? _uaSyncChannel;
-    private FolderState? _uaFolder;
-    private OpcUaServiceOperate? _uaFolderService;
-    private readonly List<FolderState> _uaFolderStates = new();
-    private string _uaAddressSpaceName = "";
-    private readonly ConcurrentDictionary<string, string> _uaAddressMap = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, byte> _uaFailedAddresses = new(StringComparer.Ordinal);
-    private readonly ConcurrentDictionary<string, WriteModel> _singleWriteDict = new();
     // 字节解包链（对齐 WPF ConsoleDeviceModel：GetBytesModels 缓存 + TransformAndForwardAsync）
     private readonly ConcurrentDictionary<string, (object Source, List<BytesModel> Models)> _bytesModels = new();
     private readonly ConcurrentDictionary<string, int> _failedBytesModels = new();
@@ -246,23 +243,6 @@ public class DeviceRuntime : IAsyncDisposable
                 _pushLog(string.Format(T("[{0}] 启动采集失败: {1}"), DeviceName, T("设备下没有可采集的地址")));
                 return;
             }
-            // 对齐 WPF CollectAsync：再次采集时先清理旧 UA 层级与地址映射（UA 服务重启/配置变更后旧 FolderState 失效）
-            if (_uaFolderStates.Count > 0)
-            {
-                var srv = _uaFolderService;
-                if (srv is not null)
-                {
-                    try { srv.RemoveFolder([_uaFolderStates[^1].NodeId]); }
-                    catch (Exception ex)
-                    {
-                        _pushLog(string.Format(T("[{0}] UA 层级清理异常: {1}"), DeviceName, ex.Message));
-                    }
-                }
-                _uaFolderStates.Clear();
-                _uaFolder = null;
-            }
-            _uaAddressMap.Clear();
-            _uaFailedAddresses.Clear();
             _failedBytesModels.Clear();
 
             if (_daqHandler is null)
@@ -277,8 +257,6 @@ public class DeviceRuntime : IAsyncDisposable
                 // 消费循环整体脱离电路同步上下文（Task.Run 入口 + 内部 await 沿用线程池）：
                 // 插件失败风暴/阻塞调用不会占住 Blazor 电路线程，停止按钮始终可响应
                 var token = _cts.Token;
-                _uaSyncChannel = Channel.CreateBounded<AddressValue>(ChannelCapacity);
-                _uaTask = Task.Run(() => UaSyncChannelDataEventAsync(token));
                 _consumeTask = Task.Run(() => ConsumeAsync(token));
             }
             var result = await _daqHandler.SubscribeAsync(_daqConfig.Guid, _addressDatas.Keys.ToList(), _daqConfig.AutoPack);
@@ -309,13 +287,8 @@ public class DeviceRuntime : IAsyncDisposable
             // 日志显示实际订阅数（配了 MQ 的地址）；AddressCount 是全量点位，语义不同
             _pushLog(string.Format(T("[{0}] 启动采集成功，地址数 {1}"), DeviceName, _addressDatas.Count));
 
-            // 启动 UA 转发消费任务（对齐 WPF：UaSyncChannel 独立通道 + 独立消费循环，与 MQ 转发解耦）
-            if (_uaSyncChannel is null)
-            {
-                _uaSyncChannel = Channel.CreateBounded<AddressValue>(ChannelCapacity);
-                var token = _cts!.Token;
-                _uaTask = Task.Run(() => UaSyncChannelDataEventAsync(token));
-            }
+            // 采集启动后触发把本设备注入 OPC UA 服务端（不等待；服务端未运行时无操作，服务启动后由管理器再次触发）
+            TriggerUaForwarding();
 
             if (_daqConfig.WebApi is not null)
             {
@@ -355,6 +328,8 @@ public class DeviceRuntime : IAsyncDisposable
     /// 插件实例缓存创建时的参数快照（IP/端口等），配置变更或采集失败后必须置空，下次采集用最新配置重建</summary>
     private async Task ReleaseHandlerInternalAsync()
     {
+        // 先取消 OPC UA 注册（服务端不会关闭设备），再取消订阅、释放设备
+        await UnregisterUaAsync();
         await StopConsumersAsync();
         if (_daqHandler is not null)
         {
@@ -374,13 +349,6 @@ public class DeviceRuntime : IAsyncDisposable
             while (_dataChannel.Reader.TryRead(out _)) { }
         }
         _dataChannel = null;
-        if (_uaSyncChannel is not null)
-        {
-            _uaSyncChannel.Writer.TryComplete();
-            // 对齐 WPF StopAsync：消费循环退出后清空队列滞留元素
-            while (_uaSyncChannel.Reader.TryRead(out _)) { }
-        }
-        _uaSyncChannel = null;
         foreach (var mq in _mqHandlers.Values)
         {
             try { await mq.DisposeAsync(); }
@@ -401,13 +369,11 @@ public class DeviceRuntime : IAsyncDisposable
     {
         _cts?.Cancel();
         _dataChannel?.Writer.TryComplete();
-        _uaSyncChannel?.Writer.TryComplete();
         if (_daqHandler is not null)
             _daqHandler.OnDataEventAsync -= OnDataEvent;
         // 旧消费任务完全退出后才允许释放 handler 或创建下一代通道。
-        await Task.WhenAll(_consumeTask ?? Task.CompletedTask, _uaTask ?? Task.CompletedTask);
+        await (_consumeTask ?? Task.CompletedTask);
         _consumeTask = null;
-        _uaTask = null;
         _cts?.Dispose();
         _cts = null;
     }
@@ -439,6 +405,8 @@ public class DeviceRuntime : IAsyncDisposable
     {
         try
         {
+            // 先取消 OPC UA 注册（服务端不会关闭设备），再取消订阅、释放设备
+            await UnregisterUaAsync();
             await StopConsumersAsync();
             _runtime.Stop();
 
@@ -664,6 +632,9 @@ public class DeviceRuntime : IAsyncDisposable
                         ThrottledLog(e.Message, "e:" + e.Message);
                     continue;
                 }
+                // 数据批次前做一次廉价检查：UA 服务换了新实例、或上次注册失败已过退避期时，在后台重新注入
+                TriggerUaForwarding();
+
                 // 支持字典与列表两种数据形态（列表为多批次解包结果），对齐 WPF DataSyncChannelDataEventAsync
                 switch (e.ResultData)
                 {
@@ -705,7 +676,7 @@ public class DeviceRuntime : IAsyncDisposable
 
     #region 数据处理与转发
     /// <summary>处理一组地址值（原样移植 WPF ConsoleDeviceModel.ProcessKeysAsync）：
-    /// 质量校验 → 字节解包（GetBytesModels）→ UA 通道 + MQ 转发，单地址异常不影响整组消费。</summary>
+    /// 质量校验 → 字节解包（GetBytesModels）→ MQ 转发，单地址异常不影响整组消费。</summary>
     private async Task ProcessKeysAsync(ConcurrentDictionary<string, AddressValue> keys, CancellationToken token)
     {
         if (keys.Count == 0)
@@ -746,7 +717,6 @@ public class DeviceRuntime : IAsyncDisposable
                 {
                     if (_cts is null)
                         return;
-                    await _uaSyncChannel!.Writer.WriteAsync(addressValue, _cts.Token);
                     foreach (var mqConfig in pluginConfigs)
                     {
                         // 由当前设备独占连接，并按配置 Guid 缓存；其他设备停止不影响本设备。
@@ -819,7 +789,7 @@ public class DeviceRuntime : IAsyncDisposable
         _ => null
     };
 
-    /// <summary>字节转换并转发到 UA 通道与 MQ（原样移植 WPF ConsoleDeviceModel.TransformAndForwardAsync）</summary>
+    /// <summary>字节转换并转发到 MQ（原样移植 WPF ConsoleDeviceModel.TransformAndForwardAsync）</summary>
     private async Task TransformAndForwardAsync(AddressValue addressValue, List<BytesModel> bm, IAddressModel addressModel, List<PluginConfigModel> pluginConfigs)
     {
         _bytesHandler ??= await BytesHandler.InstanceAsync(DeviceName);
@@ -858,7 +828,6 @@ public class DeviceRuntime : IAsyncDisposable
             };
             if (_cts is null)
                 return;
-            await _uaSyncChannel!.Writer.WriteAsync(item.Value, _cts.Token);
             foreach (var mqConfig in sourcePlugins ?? pluginConfigs)
             {
                 // 由当前设备独占连接，并按配置 Guid 缓存；其他设备停止不影响本设备。
@@ -877,181 +846,77 @@ public class DeviceRuntime : IAsyncDisposable
 
     #endregion
 
-    #region UA 转发
-    /// <summary>UA 通道数据事件消费（原样移植 WPF ConsoleDeviceModel.UaSyncChannelDataEventAsync）：
-    /// 质量校验 → 层级文件夹 → 首次地址创建 + NodeId 映射 → 写入 UA 地址空间。</summary>
-    private async Task UaSyncChannelDataEventAsync(CancellationToken token)
+    #region UA 转发（注入采集通道的 IDaq）
+    /// <summary>
+    /// 触发本设备注入 OPC UA 服务端（不等待）。
+    /// 做法：把采集通道正在使用的 IDaq 对象直接交给 Snet.Opc 服务端借用，服务端自行建节点、采集，
+    /// 并把 OPC 客户端的写入反写到设备；本类不再逐点创建节点或写值，也不额外建立连接。
+    /// 触发时机：采集启动后、每个数据批次前（已注册时只是一次无分配的状态检查）、OPC UA 服务启停时（由管理器调用）。
+    /// 注册要等服务端的生命周期门，启动/停止服务期间可能耗时数秒，所以放在后台任务里，不阻塞采集循环和启停门。
+    /// </summary>
+    public void TriggerUaForwarding()
+    {
+        var service = _uaService();
+        var handler = _daqHandler;
+        if (service is null || handler is null || !IsRun || _disposed) return;
+        var plugin = _daqConfig;
+        var daq = handler.GetOpenedDaq(plugin.Guid);
+        if (daq is null) return;
+        // 热路径：同一对象已注册、注册进行中、或失败退避中，都无需动作。
+        if (UaForwarding.IsUpToDate(service, plugin.Guid, daq)) return;
+        // 同一设备同一时刻只保留一个后台任务。
+        if (Interlocked.CompareExchange(ref _uaBusy, 1, 0) != 0) return;
+        // 快照：后台任务不读取之后可能被配置同步替换的字段。
+        var addresses = _addressDatas.Keys.ToList();
+        _uaTask = RegisterUaAsync(service, plugin, daq, addresses, plugin.AutoPack is not null);
+    }
+
+    /// <summary>后台执行一次注册并把结果写入日志；任何异常都在这里消化，结束时放开 <see cref="_uaBusy"/>。</summary>
+    private async Task RegisterUaAsync(OpcUaServiceOperate service, PluginConfigModel plugin, IDaq daq,
+        IReadOnlyCollection<IAddressModel> addresses, bool usePacker)
     {
         try
         {
-            var channel = _uaSyncChannel;
-            if (channel is null) return;
-            while (await channel.Reader.WaitToReadAsync(token))
-            {
-                while (channel.Reader.TryRead(out AddressValue? addressValue))
-                {
-                    if (token.IsCancellationRequested)
-                        break;
-
-                    if (addressValue.Quality != QualityType.Normal)
-                    {
-                        ThrottledLog($"{addressValue.AddressName} - {addressValue.Message}", "uaq:" + addressValue.AddressName);
-                        continue;
-                    }
-
-                    var service = _uaService();
-                    if (service is null) continue;
-                    FolderState? fs = await UaCreateFolder(service);
-                    if (fs == null)
-                    {
-                        continue;
-                    }
-
-                    //数据源
-                    string addressName = addressValue.AddressName;
-                    DataType dataType = addressValue.AddressDataType;
-                    object? value = addressValue.ResultValue;
-
-                    //校验
-                    if (!ReferenceEquals(service, _uaService())) continue;
-                    if (!service.GetStatus().Status)
-                    {
-                        ThrottledLog(T("UA 服务端未运行，跳过转发"), "ua:notrunning");
-                        continue;
-                    }
-
-                    if (!_uaAddressMap.ContainsKey(addressName) && !_uaFailedAddresses.ContainsKey(addressName))
-                    {
-                        if (!UaForwarding.TypeMap.TryGetValue(dataType, out var builtInType))
-                            continue;
-
-                        if (builtInType == BuiltInType.String)
-                            value ??= string.Empty;
-                        else if (value is null)
-                            continue;
-
-                        //创建地址
-                        var createResult = service.CreateAddress(new()
-                        {
-                            new()
-                            {
-                                AddressName = addressName,
-                                Dynamic = false,
-                                DefaultValue = value,
-                                DataType = builtInType,
-                                AccessLevel = 3
-                            }
-                        }, fs);
-
-                        if (!createResult.Status)
-                        {
-                            // 标记失败，避免每个数据事件重复创建并刷屏消息
-                            _uaFailedAddresses.TryAdd(addressName, 0);
-                            ThrottledLog(string.Format(T("UA 地址创建失败 {0}: {1}"), addressName, createResult.Message), "ua:" + addressName);
-                            continue;
-                        }
-
-                        // Core 创建地址与映射使用同一规则，无需扫描完整地址空间。
-                        _uaAddressMap[addressName] = UaForwarding.CreateAddressNodeId(fs.NodeId, addressName).ToString();
-
-                    }
-
-                    // 写入
-                    if (!_uaAddressMap.TryGetValue(addressName, out var realAddress))
-                    {
-                        // 创建成功但未能映射到真实地址，标记避免重复创建
-                        if (!_uaFailedAddresses.ContainsKey(addressName))
-                        {
-                            _uaFailedAddresses.TryAdd(addressName, 0);
-                            ThrottledLog(string.Format(T("UA 地址映射失败 {0}（AddressSpaceName={1}）"), addressName, _uaAddressSpaceName), "uamap:" + addressName);
-                        }
-                        continue;
-                    }
-
-                    if (value is null)
-                        continue;
-                    _singleWriteDict[realAddress] = new WriteModel(value, dataType);
-
-                    var writeResult = await service.WriteAsync(_singleWriteDict, token);
-
-                    _singleWriteDict.Clear();
-
-                    if (!writeResult.Status)
-                        ThrottledLog(string.Format(T("UA 写入失败 {0}: {1}"), addressName, writeResult.Message), "ua:" + addressName);
-                }
-            }
-        }
-        catch (TaskCanceledException)
-        {
-        }
-        catch (ChannelClosedException)
-        {
+            var result = await UaForwarding.EnsureRegisteredAsync(service, plugin, daq, () => addresses, usePacker, _uaLifetime.Token);
+            if (result is null) return;
+            if (result.Status) _pushLog($"[{DeviceName}] {result.Message}");
+            else ThrottledLog(result.Message ?? string.Empty, "ua:register");
         }
         catch (OperationCanceledException)
         {
+            // 运行时正在释放，注册留待下次启动。
         }
         catch (Exception ex)
         {
-            ThrottledLog(string.Format(T("UA 转发异常: {0}"), ex.Message), "ua:loop");
+            ThrottledLog($"OPC UA 注册异常: {ex.Message}", "ua:register");
+        }
+        finally
+        {
+            Volatile.Write(ref _uaBusy, 0);
         }
     }
 
-    /// <summary>创建 UA 层级（原样移植 WPF ConsoleDeviceModel.UaCreateFolder）：
-    /// folderState 缓存 + AddressSpaceName 取 Basics + GetStatus 门 + 按设备层级逐层 CreateFolder。</summary>
-    private async Task<FolderState?> UaCreateFolder(OpcUaServiceOperate service)
+    /// <summary>
+    /// 设备停止或销毁前取消注册：先等进行中的后台注册结束，再通知服务端移除该设备（服务端不会关闭设备），
+    /// 这样随后的取消订阅和释放不会撞上仍在使用设备的桥接。服务已停止时没有登记，直接返回；任何异常都在这里消化。
+    /// </summary>
+    private async Task UnregisterUaAsync()
     {
+        var service = _uaService();
+        var handler = _daqHandler;
+        if (service is null || handler is null) return;
+        var plugin = _daqConfig;
+        var daq = handler.GetOpenedDaq(plugin.Guid);
+        if (daq is null) return;
         try
         {
-            if (!ReferenceEquals(_uaFolderService, service))
-            {
-                _uaFolderService = service;
-                _uaFolder = null;
-                _uaFolderStates.Clear();
-                _uaAddressMap.Clear();
-                _uaFailedAddresses.Clear();
-                _uaAddressSpaceName = "";
-            }
-            if (_uaFolder != null)
-            {
-                return _uaFolder;
-            }
-
-            //比对层级
-            if (string.IsNullOrWhiteSpace(_uaAddressSpaceName))
-            {
-                var basics = service.GetBasicsArgs();
-                if (basics.Status && basics.ResultData is OpcUaServiceData.Basics b)
-                    _uaAddressSpaceName = b.AddressSpaceName ?? string.Empty;
-            }
-
-            if (service.GetStatus().Status)
-            {
-                FolderState? folder = null;
-                //创建层级
-                foreach (var item in _hierarchyPath.TrimAll().Split('>'))
-                {
-                    var operateResult = service.CreateFolder(item, folder);
-                    if (operateResult.Status && operateResult.ResultData is FolderState fs)
-                    {
-                        folder = fs;
-                        _uaFolderStates.Add(fs);
-                    }
-                    else
-                    {
-                        ThrottledLog(string.Format(T("UA 层级创建失败 {0}: {1}"), item, operateResult.Message), "uafolder:" + item);
-                    }
-                }
-                _uaFolder = folder;
-            }
-            else
-            {
-                return null;
-            }
-            return _uaFolder;
+            await _uaTask.WaitAsync(UaStopTimeout);
+            var result = await UaForwarding.UnregisterAsync(service, plugin.Guid, daq).WaitAsync(UaStopTimeout);
+            if (result is { Status: true }) _pushLog($"[{DeviceName}] {result.Message}");
         }
-        catch (Exception)
+        catch (Exception ex)
         {
-            return null;
+            ThrottledLog($"OPC UA 取消注册异常: {ex.Message}", "ua:unregister");
         }
     }
 
@@ -1082,6 +947,7 @@ public class DeviceRuntime : IAsyncDisposable
         try
         {
             _disposed = true;
+            _uaLifetime.Cancel();
             await StopInternalAsync();
         }
         finally { _collectGate.Release(); }

@@ -1,60 +1,64 @@
 /* ============================================================
-   Snet.Iot.Daq.Web - 玻璃拟态主题 token 体系（石墨中性灰 + 青蓝）
-   中性基座：zinc 系灰（无蓝调），tint/border 用纯白/纯黑混合
-   主色青蓝 #0EA5E9（交互）与警告橙 #FB923C 靠色相区分
+   Snet.Iot.Daq.Web - 主题 token 体系 v3（深空蓝 / 晨雾蓝）
+   设计目标：背景 / 卡片 / 控件三层明度拉开，层级靠明度递进；
+   主色青蓝 #38BDF8 + 辅色靛紫 #818CF8 只用于渐变点缀，状态色（绿/橙/红）靠色相区分。
+   所有颜色对比度沿用 AA 约束：正文 ≥ 7:1，说明文字 ≥ 4.5:1，tertiary 仅用于非关键提示。
    ============================================================ */
 :root,
 :root[data-theme="dark"] {
-    /* 不透明面（zinc 中性灰，无蓝调） */
-    --bg: #171718;
-    --surface: #212124;
-    --surface-2: #2A2A2E;
-    --surface-hover: #333338;
+    /* 不透明面：深空蓝黑，层级靠明度递进（bg < surface < surface-2 < hover） */
+    --bg: #090E1A;
+    --surface: #0F172A;
+    --surface-2: #162036;
+    --surface-hover: #1D2A45;
     /* 玻璃面 */
-    --glass-card: rgba(33, 33, 36, .62);
-    --glass-bar: rgba(23, 23, 24, .78);
-    --glass-pop: rgba(26, 26, 30, .94);
-    --glass-well: rgba(0, 0, 0, .50);
-    --control: rgba(0, 0, 0, .50);
-    /* 中性 tint：纯白混合（不引入任何色相） */
-    --tint: rgba(255, 255, 255, .06);
-    --tint-strong: rgba(255, 255, 255, .10);
-    /* 文字三级：tertiary 仅用于说明性文字（对比度 3.7:1，非正文） */
-    --text: #E4E4E7;
-    --text-secondary: #A1A1AA;
-    --text-tertiary: #71717A;
-    /* 边框（纯白混合，中性） */
-    --border: rgba(255, 255, 255, .12);
-    --border-strong: rgba(255, 255, 255, .26);
-    --border-solid: #3F3F46;
-    /* 主色（青蓝，交互元素） */
-    --primary: #0EA5E9;
-    --primary-hover: #38BDF8;
-    --primary-soft: rgba(14, 165, 233, .14);
+    --glass-card: rgba(15, 23, 42, .80);
+    --glass-bar: rgba(9, 14, 26, .80);
+    --glass-pop: rgba(13, 21, 38, .97);
+    --glass-well: rgba(2, 6, 17, .55);
+    --control: rgba(2, 6, 17, .55);
+    /* 中性 tint：石板灰混合，比纯白混合更贴合蓝黑基底 */
+    --tint: rgba(148, 163, 184, .08);
+    --tint-strong: rgba(148, 163, 184, .14);
+    /* 文字三级：tertiary 仅用于说明性文字 */
+    --text: #E8EEF9;
+    --text-secondary: #A8B3CA;
+    --text-tertiary: #7F8BA6;
+    /* 边框（石板灰混合） */
+    --border: rgba(148, 163, 184, .17);
+    --border-strong: rgba(148, 163, 184, .34);
+    --border-solid: #2A3652;
+    /* 主色（青蓝，交互元素）与辅色（靛紫，仅渐变点缀） */
+    --primary: #38BDF8;
+    --primary-hover: #7DD3FC;
+    --primary-soft: rgba(56, 189, 248, .15);
+    --accent-2: #818CF8;
+    --grad-brand: linear-gradient(112deg, #7DD3FC 0%, #38BDF8 42%, #A5B4FC 100%);
+    --grad-primary: linear-gradient(135deg, #38BDF8 0%, #818CF8 100%);
     --focus-ring: var(--primary); /* 键盘焦点外框统一颜色（随明暗主色） */
-    /* 状态色：运行绿 / 警告深橙（比主色更红一档）/ 报警红 / 信息中性灰 */
-    --success: #4ADE80;
-    --success-strong: #86EFAC;
-    --success-soft: rgba(74, 222, 128, .12);
-    --warning: #FB923C;
-    --warning-strong: #FDBA74;
-    --warning-soft: rgba(251, 146, 60, .12);
-    --danger: #F87171;
-    --danger-strong: #FCA5A5;
-    --danger-soft: rgba(248, 113, 113, .12);
-    --info: #A1A1AA;
-    --info-soft: rgba(255, 255, 255, .08);
+    /* 状态色：运行绿 / 警告琥珀 / 报警玫红 / 信息石板灰 */
+    --success: #34D399;
+    --success-strong: #6EE7B7;
+    --success-soft: rgba(52, 211, 153, .14);
+    --warning: #FBBF24;
+    --warning-strong: #FCD34D;
+    --warning-soft: rgba(251, 191, 36, .14);
+    --danger: #FB7185;
+    --danger-strong: #FDA4AF;
+    --danger-soft: rgba(251, 113, 133, .14);
+    --info: #94A3B8;
+    --info-soft: rgba(148, 163, 184, .12);
     /* LED */
-    --led-on: #4ADE80;
-    --led-off: #71717A;
-    --led-error: #F87171;
-    /* 阴影与光晕（纯黑混合，中性） */
-    --shadow-sm: 0 1px 3px rgba(0, 0, 0, .4);
-    --shadow: 0 4px 20px rgba(0, 0, 0, .5);
-    --shadow-lg: 0 24px 64px rgba(0, 0, 0, .65);
-    --glow-primary: 0 0 0 3px rgba(14, 165, 233, .30);
+    --led-on: #34D399;
+    --led-off: #64748B;
+    --led-error: #FB7185;
+    /* 阴影与光晕（蓝黑混合，比纯黑更通透） */
+    --shadow-sm: 0 1px 3px rgba(2, 6, 23, .5);
+    --shadow: 0 6px 24px rgba(2, 6, 23, .55);
+    --shadow-lg: 0 24px 64px rgba(2, 6, 23, .72);
+    --glow-primary: 0 0 0 3px rgba(56, 189, 248, .30);
     --glow-led: 0 0 8px var(--led-on);
-    --overlay: rgba(0, 0, 0, .60);
+    --overlay: rgba(2, 6, 17, .66);
     /* 圆角 / 模糊 / 动效 / 层级 */
     --radius-xs: 6px;
     --radius-sm: 8px;
@@ -66,6 +70,7 @@
     --blur-md: 14px;
     --blur-lg: 16px;
     --ease: cubic-bezier(.16, 1, .3, 1);
+    --ease-spring: cubic-bezier(.34, 1.56, .64, 1);
     --dur-fast: .15s;
     --dur-med: .22s;
     --z-base: 1;
@@ -79,8 +84,8 @@
     /* 字体（无外部依赖，工业现场可离线） */
     --font-ui: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
     --mono: "Cascadia Mono", Consolas, "Courier New", monospace;
-    --scrollbar-thumb: rgba(255, 255, 255, .22);
-    --selection: rgba(14, 165, 233, .30);
+    --scrollbar-thumb: rgba(148, 163, 184, .28);
+    --selection: rgba(56, 189, 248, .32);
     color-scheme: dark;
     /* Legacy 别名：未迁移规则安全降级到新 token */
     --bg-card: var(--surface);
@@ -92,48 +97,51 @@
     /* Bootstrap 5 变量映射：Bootstrap 组件显式用 --bs-body-color 等变量，
        不映射时暗色下回落到默认深灰黑 #212529，与暗背景重合看不清 */
     --bs-body-color: var(--text);
-    --bs-body-color-rgb: 228, 228, 231;
+    --bs-body-color-rgb: 232, 238, 249;
     --bs-body-bg: var(--bg);
-    --bs-body-bg-rgb: 23, 23, 24;
+    --bs-body-bg-rgb: 9, 14, 26;
     --bs-emphasis-color: var(--text);
-    --bs-emphasis-color-rgb: 228, 228, 231;
+    --bs-emphasis-color-rgb: 232, 238, 249;
     --bs-secondary-color: var(--text-secondary);
-    --bs-secondary-color-rgb: 161, 161, 170;
+    --bs-secondary-color-rgb: 168, 179, 202;
     --bs-tertiary-color: var(--text-secondary);
-    --bs-tertiary-color-rgb: 161, 161, 170;
+    --bs-tertiary-color-rgb: 168, 179, 202;
     --bs-border-color: var(--border);
-    --bs-border-color-rgb: 161, 161, 170;
+    --bs-border-color-rgb: 148, 163, 184;
     --bs-link-color: var(--primary);
-    --bs-link-color-rgb: 14, 165, 233;
+    --bs-link-color-rgb: 56, 189, 248;
     --bs-link-hover-color: var(--primary-hover);
-    --bs-link-hover-color-rgb: 56, 189, 248;
+    --bs-link-hover-color-rgb: 125, 211, 252;
     --bs-code-color: var(--text);
     --bs-highlight-color: var(--text);
     --bs-highlight-bg: var(--primary-soft);
 }
 
 :root[data-theme="light"] {
-    --bg: #FAFAFA;
+    --bg: #EEF2F9;
     --surface: #FFFFFF;
-    --surface-2: #F4F4F5;
-    --surface-hover: #ECECEE;
-    --glass-card: rgba(255, 255, 255, .66);
-    --glass-bar: rgba(255, 255, 255, .80);
-    --glass-pop: rgba(255, 255, 255, .95);
-    --glass-well: rgba(24, 24, 27, .05);
-    --control: rgba(255, 255, 255, .9);
-    --tint: rgba(24, 24, 27, .05);
-    --tint-strong: rgba(24, 24, 27, .09);
-    --text: #18181B;
-    --text-secondary: #52525B;
-    --text-tertiary: #71717A;
-    --border: rgba(24, 24, 27, .12);
-    --border-strong: rgba(24, 24, 27, .24);
-    --border-solid: #D4D4D8;
+    --surface-2: #F3F6FC;
+    --surface-hover: #E7EDF8;
+    --glass-card: rgba(255, 255, 255, .86);
+    --glass-bar: rgba(255, 255, 255, .86);
+    --glass-pop: rgba(255, 255, 255, .97);
+    --glass-well: rgba(15, 23, 42, .05);
+    --control: rgba(255, 255, 255, .96);
+    --tint: rgba(15, 23, 42, .05);
+    --tint-strong: rgba(15, 23, 42, .09);
+    --text: #0F172A;
+    --text-secondary: #475569;
+    --text-tertiary: #64748B;
+    --border: rgba(15, 23, 42, .10);
+    --border-strong: rgba(15, 23, 42, .22);
+    --border-solid: #CBD5E1;
     /* 亮色主色需够深才过对比度（青蓝 5.4:1） */
     --primary: #0369A1;
     --primary-hover: #0C4A6E;
     --primary-soft: rgba(3, 105, 161, .10);
+    --accent-2: #4F46E5;
+    --grad-brand: linear-gradient(112deg, #0369A1 0%, #0C5BA8 46%, #4F46E5 100%);
+    --grad-primary: linear-gradient(135deg, #0369A1 0%, #4F46E5 100%);
     --success: #15803D;
     --success-strong: #166534;
     --success-soft: rgba(21, 128, 61, .10);
@@ -143,27 +151,27 @@
     --danger: #BE123C;
     --danger-strong: #881337;
     --danger-soft: rgba(190, 18, 60, .10);
-    --info: #52525B;
-    --info-soft: rgba(82, 82, 91, .10);
+    --info: #475569;
+    --info-soft: rgba(71, 85, 105, .10);
     --led-on: #15803D;
-    --led-off: #A1A1AA;
+    --led-off: #94A3B8;
     --led-error: #BE123C;
-    --shadow-sm: 0 1px 2px rgba(24, 24, 27, .06);
-    --shadow: 0 6px 24px rgba(24, 24, 27, .08);
-    --shadow-lg: 0 20px 48px rgba(24, 24, 27, .16);
+    --shadow-sm: 0 1px 2px rgba(15, 23, 42, .06);
+    --shadow: 0 8px 28px rgba(15, 23, 42, .09);
+    --shadow-lg: 0 20px 48px rgba(15, 23, 42, .16);
     --glow-primary: 0 0 0 3px rgba(3, 105, 161, .20);
     --glow-led: 0 0 8px rgba(21, 128, 61, .35);
-    --overlay: rgba(24, 24, 27, .35);
-    --scrollbar-thumb: rgba(82, 82, 91, .30);
+    --overlay: rgba(15, 23, 42, .38);
+    --scrollbar-thumb: rgba(71, 85, 105, .30);
     --selection: rgba(3, 105, 161, .20);
     color-scheme: light;
     /* Bootstrap 变量映射：非 rgb 项已在 :root 用 var() 惰性映射，这里只覆盖数值不同的 rgb 项 */
-    --bs-body-color-rgb: 24, 24, 27;
-    --bs-body-bg-rgb: 250, 250, 250;
-    --bs-emphasis-color-rgb: 24, 24, 27;
-    --bs-secondary-color-rgb: 82, 82, 91;
-    --bs-tertiary-color-rgb: 113, 113, 122;
-    --bs-border-color-rgb: 228, 228, 231;
+    --bs-body-color-rgb: 15, 23, 42;
+    --bs-body-bg-rgb: 238, 242, 249;
+    --bs-emphasis-color-rgb: 15, 23, 42;
+    --bs-secondary-color-rgb: 71, 85, 105;
+    --bs-tertiary-color-rgb: 100, 116, 139;
+    --bs-border-color-rgb: 226, 232, 240;
     --bs-link-color-rgb: 3, 105, 161;
     --bs-link-hover-color-rgb: 7, 89, 152;
 }
@@ -2125,7 +2133,7 @@ html[lang^="zh"] .param-label::after { content: "\FF1A"; }
 
 /* ---- 新增 token：焦点辉光 / 卡片表面高光 ---- */
 :root, :root[data-theme="dark"] {
-    --ring-primary: 0 0 0 3px rgba(14, 165, 233, .22);
+    --ring-primary: 0 0 0 3px rgba(56, 189, 248, .24);
     --sheen: linear-gradient(180deg, rgba(255, 255, 255, .05), transparent 38%);
 }
 :root[data-theme="light"] {
@@ -2145,9 +2153,9 @@ html[lang^="zh"] .param-label::after { content: "\FF1A"; }
     z-index: 0;
     pointer-events: none;
     background:
-        radial-gradient(38% 42% at 22% 18%, rgba(14, 165, 233, .16), transparent 70%),
-        radial-gradient(30% 36% at 82% 78%, rgba(255, 255, 255, .05), transparent 70%),
-        radial-gradient(24% 30% at 68% 12%, rgba(14, 165, 233, .07), transparent 70%);
+        radial-gradient(38% 42% at 22% 18%, rgba(56, 189, 248, .17), transparent 70%),
+        radial-gradient(34% 40% at 82% 78%, rgba(129, 140, 248, .14), transparent 70%),
+        radial-gradient(24% 30% at 68% 12%, rgba(56, 189, 248, .07), transparent 70%);
     animation: aurora-drift 42s ease-in-out infinite alternate;
 }
 :root[data-theme="light"] .app-shell::before {
@@ -2643,3 +2651,229 @@ textarea:focus,
     border-color: var(--primary);
     box-shadow: none;
 }
+
+/* ============================================================
+   深空蓝 3.0 —— 配色与层次重塑（追加在全部既有规则之后，只做增量覆盖）
+   目标：拉开 背景 / 卡片 / 控件 三层明度；品牌渐变统一；状态色一眼可辨；
+        导航、标题、表格、控制台卡片的信息层级更清晰。
+   约束（沿用前序打磨层）：不新增 backdrop-filter、不在卡片上用 transform、
+        所有新增动效仅用 transform / opacity，并在 prefers-reduced-motion 下关闭。
+   ============================================================ */
+
+/* ---- 顶栏：渐变品牌字 + Logo 光晕 + 底部发丝高光 ---- */
+.app-bar .brand,
+.login-title,
+:root[data-theme="light"] .app-bar .brand,
+:root[data-theme="light"] .login-title {
+    background: var(--grad-brand);
+    -webkit-background-clip: text;
+    background-clip: text;
+    letter-spacing: .01em;
+}
+.app-bar .brand img { filter: drop-shadow(0 2px 10px rgba(56, 189, 248, .35)); }
+:root[data-theme="light"] .app-bar .brand img { filter: drop-shadow(0 2px 8px rgba(3, 105, 161, .25)); }
+.app-bar::after {
+    content: "";
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: -1px;
+    height: 1px;
+    pointer-events: none;
+    background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--primary) 60%, transparent) 30%,
+        color-mix(in srgb, var(--accent-2) 55%, transparent) 70%, transparent);
+    opacity: .55;
+}
+
+/* ---- 桌面布局：导航略宽、字号 14、内容区留白加大 ---- */
+@media (min-width: 768px) {
+    .app-main { padding: 14px; }
+    .card + .card { margin-top: 12px; }
+    .app-nav { width: 192px; }
+    .app-nav .nav-item {
+        padding: 11px 14px;
+        gap: 12px;
+        font-size: 14px;
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+    .app-nav .nav-item svg {
+        width: 20px;
+        height: 20px;
+        flex: none;
+        transition: transform var(--dur-med) var(--ease-spring), color var(--dur-fast);
+    }
+    .app-nav .nav-item:hover { background: var(--tint-strong); color: var(--text); }
+    .app-nav .nav-item:hover svg { transform: scale(1.1); }
+    .app-nav .nav-item.active {
+        color: var(--primary);
+        font-weight: 600;
+        background: linear-gradient(90deg, var(--primary-soft), transparent 100%);
+        box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--primary) 24%, transparent);
+    }
+    .app-nav .nav-item.active svg {
+        color: var(--primary);
+        filter: drop-shadow(0 0 6px color-mix(in srgb, var(--primary) 55%, transparent));
+    }
+}
+
+/* ---- 页面标题：图标放进品牌色圆角底座，标题加粗放大，形成清晰的第一视觉 ---- */
+.card-title > i.bi {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    border-radius: var(--radius-sm);
+    background: var(--primary-soft);
+    color: var(--primary);
+    font-size: 14px;
+    margin-right: 10px !important; /* 覆盖 Bootstrap me-2 的 !important */
+}
+.card-title { font-weight: 650; }
+h1.card-title { font-size: 1.1rem; }
+
+/* ---- 按钮：默认描边加强，主按钮用青蓝→靛紫渐变软底 ---- */
+.btn {
+    border-color: color-mix(in srgb, var(--border-strong) 80%, transparent);
+    font-weight: 500;
+}
+.btn:hover { background: var(--tint-strong); border-color: var(--border-strong); }
+.btn-primary {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--primary) 22%, transparent),
+        color-mix(in srgb, var(--accent-2) 16%, transparent));
+    border-color: color-mix(in srgb, var(--primary) 65%, transparent);
+    color: var(--primary);
+}
+.btn-primary:hover {
+    background: linear-gradient(135deg,
+        color-mix(in srgb, var(--primary) 34%, transparent),
+        color-mix(in srgb, var(--accent-2) 26%, transparent));
+    border-color: var(--primary);
+}
+.btn-danger { border-color: color-mix(in srgb, var(--danger) 65%, transparent); }
+
+/* ---- 表格：表头抬一级明度，斑马纹 + 主色 hover，行距更舒展 ---- */
+.snet-table-panel { box-shadow: var(--shadow-sm); }
+.snet-table-head,
+table.snet-table th { background: var(--surface-2); }
+table.snet-table th {
+    font-size: 12px;
+    letter-spacing: .04em;
+    color: var(--text-secondary);
+}
+table.snet-table td { padding-top: 11px; padding-bottom: 11px; }
+table.snet-table tr:nth-child(even):not(:hover) td { background: color-mix(in srgb, var(--tint) 55%, transparent); }
+table.snet-table tr:hover td { background: color-mix(in srgb, var(--primary) 9%, transparent); }
+
+/* ---- 标签：状态标签前加发光圆点，不靠颜色一种线索表达状态 ---- */
+.tag { font-weight: 500; }
+.tag-success::before,
+.tag-warning::before,
+.tag-danger::before {
+    content: "";
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    margin-right: 6px;
+    border-radius: 50%;
+    vertical-align: 1px;
+    background: currentColor;
+    box-shadow: 0 0 6px currentColor;
+}
+
+/* ---- 控制台：监控条渐变 + 数值放大，设备卡按运行状态点亮顶部状态线 ---- */
+.monitor-value { font-size: 24px; letter-spacing: -.01em; }
+.monitor-bar { height: 8px; background: var(--tint-strong); }
+.monitor-bar-cpu { background: var(--grad-primary); box-shadow: 0 0 10px color-mix(in srgb, var(--primary) 45%, transparent); }
+.monitor-bar-ram {
+    background: linear-gradient(90deg, var(--success), var(--primary));
+    box-shadow: 0 0 10px color-mix(in srgb, var(--success) 35%, transparent);
+}
+.device-card { position: relative; }
+.device-card::before {
+    content: "";
+    position: absolute;
+    left: 18px;
+    right: 18px;
+    top: -1px;
+    height: 2px;
+    border-radius: 0 0 4px 4px;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity .3s;
+}
+.device-card:has(.led.on)::before {
+    opacity: 1;
+    background: linear-gradient(90deg, transparent, var(--success), transparent);
+    box-shadow: 0 0 14px var(--success);
+}
+.device-card:has(.led.error)::before {
+    opacity: 1;
+    background: linear-gradient(90deg, transparent, var(--danger), transparent);
+    box-shadow: 0 0 14px var(--danger);
+}
+
+/* ---- 空态：图标放进品牌色圆形底座 + 外圈光晕，提示文字更清晰 ---- */
+.empty { font-size: 14px; gap: 12px; }
+.empty svg {
+    width: 68px;
+    height: 68px;
+    padding: 18px;
+    border-radius: 50%;
+    opacity: 1;
+    color: var(--primary);
+    background: var(--primary-soft);
+    box-shadow: 0 0 0 8px color-mix(in srgb, var(--primary) 6%, transparent);
+}
+
+/* ---- 登录页：氛围光斑（::before/::after 的 inset:-20%）超出视口会让整页出现滚动条，用 clip 只裁装饰层、不影响内容滚动 ---- */
+.login-page { overflow: clip; }
+
+/* ---- 登录页：主按钮使用实心渐变（全站唯一的实心主按钮，突出唯一的主操作） ---- */
+.login-form .btn-primary {
+    background: var(--grad-primary);
+    border-color: transparent;
+    color: #04121F;
+    font-weight: 600;
+    box-shadow: 0 8px 22px -10px color-mix(in srgb, var(--primary) 80%, transparent);
+}
+.login-form .btn-primary:hover {
+    background: var(--grad-primary);
+    filter: brightness(1.08);
+}
+:root[data-theme="light"] .login-form .btn-primary { color: #FFFFFF; }
+
+/* ---- 滚动条：圆角 thumb 内缩，hover 提亮 ---- */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    background-clip: padding-box;
+    border-radius: 8px;
+}
+
+/* ---- 动效：设备卡依次入场、弹窗/提示用弹性曲线（仅 transform / opacity；backwards 填充，播完不残留 transform） ---- */
+@keyframes card-pop { from { opacity: 0; transform: translateY(14px) scale(.985); } }
+.device-wall > .device-card { animation: card-pop .5s var(--ease) backwards; }
+.device-wall > .device-card:nth-child(2) { animation-delay: .05s; }
+.device-wall > .device-card:nth-child(3) { animation-delay: .10s; }
+.device-wall > .device-card:nth-child(4) { animation-delay: .15s; }
+.device-wall > .device-card:nth-child(5) { animation-delay: .20s; }
+.device-wall > .device-card:nth-child(6) { animation-delay: .25s; }
+.device-wall > .device-card:nth-child(n+7) { animation-delay: .30s; }
+@keyframes modal-in {
+    from { opacity: 0; transform: translateY(16px) scale(.965); }
+    to { opacity: 1; transform: none; }
+}
+.modal { animation-duration: .32s; animation-timing-function: var(--ease-spring); }
+@keyframes toast-in { from { opacity: 0; transform: translateY(-14px) scale(.96); } }
+@media (prefers-reduced-motion: reduce) {
+    .device-wall > .device-card, .modal, .toast { animation: none !important; }
+    .app-nav .nav-item svg { transition: none; }
+}
+
+/* ---- 表格横向适配：min-width 由 app.js 按 colgroup 列宽之和写入；窄窗口时数据区横向滚动、表头同步（见 app.js「表格自适应」） ---- */
+.snet-table-wrap { overflow-x: auto; }
+/* 表头右侧预留宽度必须等于数据区竖向滚动条宽度（上方已把滚动条加宽到 10px），否则表头与数据列会错位 2px */
+.snet-table-head { padding-right: 10px; }

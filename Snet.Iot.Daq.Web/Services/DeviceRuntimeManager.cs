@@ -36,6 +36,8 @@ public class DeviceRuntimeManager : IAsyncDisposable
         _appState = appState;
         // 感知更新：插件/地址/项目修改后立即同步设备快照（SN、层级、地址集）
         appState.EntityChanged += OnEntityChanged;
+        // OPC UA 服务端启停后立即让正在采集的设备注入/重新注入（数据不变的设备不会再产生数据批次）
+        appState.ServerStateChanged += OnServerStateChanged;
     }
 
     /// <summary>获取当前设备运行时的线程安全快照视图。</summary>
@@ -170,6 +172,12 @@ public class DeviceRuntimeManager : IAsyncDisposable
     /// <summary>响应全局配置变化；使用可退订的命名回调，避免管理器释放后重新创建设备。</summary>
     private void OnEntityChanged() => SyncFromProjects(_appState);
 
+    /// <summary>服务端状态变化：触发所有设备检查 OPC UA 注入（后台执行，不阻塞状态通知）。</summary>
+    private void OnServerStateChanged()
+    {
+        foreach (var runtime in _runtimes.Values) runtime.TriggerUaForwarding();
+    }
+
     /// <summary>进入不可恢复的释放状态，退订配置事件；重复调用等待同一清理任务。</summary>
     public ValueTask DisposeAsync()
     {
@@ -177,6 +185,7 @@ public class DeviceRuntimeManager : IAsyncDisposable
         {
             _disposed = true;
             _appState.EntityChanged -= OnEntityChanged;
+            _appState.ServerStateChanged -= OnServerStateChanged;
             return new ValueTask(_disposeTask ??= DisposeCoreAsync(_pendingSync));
         }
     }

@@ -454,6 +454,14 @@ namespace Snet.Iot.Daq.Core.handler
         }
 
         /// <summary>
+        /// 取得设备当前已打开的 IDaq 对象（不创建、不连接）；尚未打开时返回 null。<br/>
+        /// 供 OPC UA 服务端注入使用：服务端与采集共用同一个对象，不再额外建立连接。
+        /// </summary>
+        /// <param name="guid">设备唯一标识符</param>
+        /// <returns>设备当前的 IDaq 对象；设备重启后会是新的对象</returns>
+        public IDaq? GetOpenedDaq(string guid) => icoDaq.TryGetValue(guid, out IDaq? daq) ? daq : null;
+
+        /// <summary>
         /// 获取指定设备的连接状态
         /// </summary>
         /// <param name="guid">设备唯一标识符</param>
