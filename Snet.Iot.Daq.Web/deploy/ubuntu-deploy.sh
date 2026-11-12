@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # ============================================================
 # Snet.Iot.Daq.Web Ubuntu 裸机部署脚本（无 Docker）
-# 功能：安装 .NET 10 运行时 → 发布 → 数据目录 → systemd 服务
+# 功能：安装 .NET 11 运行时 → 发布 → 数据目录 → systemd 服务
 # 用法：sudo bash ubuntu-deploy.sh [--port 5051] [--data /var/lib/snet-daq-web]
 # 支持 x86_64 / arm64（树莓派、飞腾等 ARM 服务器）
 # ============================================================
@@ -26,18 +26,22 @@ if [[ $EUID -ne 0 ]]; then
     exit 1
 fi
 
-echo "==> 1/5 检测并安装 .NET 10 运行时"
+echo "==> 1/5 检测并安装 .NET 11 运行时"
 if ! command -v dotnet >/dev/null 2>&1; then
     . /etc/os-release
     if [[ "$ID" != "ubuntu" ]]; then
-        echo "仅支持 Ubuntu（检测到 $ID，请手动安装 .NET 10 后重试）"
+        echo "仅支持 Ubuntu（检测到 $ID，请手动安装 .NET 11 后重试）"
         exit 1
     fi
     # 微软 apt 源
     wget https://packages.microsoft.com/config/ubuntu/"${VERSION_ID}"/packages-microsoft-prod.deb -O /tmp/packages-microsoft-prod.deb
     dpkg -i /tmp/packages-microsoft-prod.deb
     apt-get update -y
-    apt-get install -y aspnetcore-runtime-10.0
+    apt-get install -y aspnetcore-runtime-11.0 || {
+        echo "当前软件源没有 aspnetcore-runtime-11.0，请改用 Docker 部署（见 README.DEPLOY.md），"
+        echo "或参照 https://learn.microsoft.com/dotnet/core/install/linux-ubuntu 手动安装 .NET 11 后重试"
+        exit 1
+    }
 fi
 DOTNET_VERSION="$(dotnet --version)"
 echo "    dotnet: $DOTNET_VERSION"

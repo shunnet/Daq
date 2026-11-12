@@ -155,8 +155,8 @@ sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh --port 8080 --data /srv/snet-
 | 组件 | 要求 |
 |------|------|
 | 🖥️ **操作系统** | Windows 10 / 11 (x64) |
-| 🔧 **.NET 运行时** | .NET 10.0 Desktop Runtime |
-| 🛠️ **开发工具** | Visual Studio 2022+（编译需要） |
+| 🔧 **.NET 运行时** | .NET 11.0 Desktop Runtime |
+| 🛠️ **开发工具** | Visual Studio 2026+（编译需要） |
 | 💾 **磁盘空间** | ≥ 200 MB |
 
 ### 📥 1️⃣ 克隆仓库
@@ -168,7 +168,7 @@ cd Daq
 
 ### 🔨 2️⃣ 编译项目
 
-使用 **Visual Studio 2022** 或更高版本打开 `Snet.Iot.Daq.sln`，选择 Debug 或 Release 构建。
+使用 **Visual Studio 2026** 或更高版本打开 `Snet.Iot.Daq.sln`，选择 Debug 或 Release 构建。
 
 ### ▶️ 3️⃣ 运行程序
 

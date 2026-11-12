@@ -6,7 +6,7 @@
 #   （基础镜像 mcr.microsoft.com/dotnet/* 官方支持多架构，一条命令同时产出 amd64/arm64 镜像）
 
 # ---- 构建阶段 ----
-FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
+FROM mcr.microsoft.com/dotnet/sdk:11.0 AS build
 WORKDIR /src
 
 # 先 COPY 两个 csproj 单独还原，利用 Docker 层缓存（依赖不变则还原层不重建）
@@ -19,7 +19,7 @@ COPY Snet.Iot.Daq.Web/ Snet.Iot.Daq.Web/
 RUN dotnet publish Snet.Iot.Daq.Web/Snet.Iot.Daq.Web.csproj -c Release -o /app/publish --no-restore
 
 # ---- 运行阶段 ----
-FROM mcr.microsoft.com/dotnet/aspnet:10.0
+FROM mcr.microsoft.com/dotnet/aspnet:11.0
 WORKDIR /app
 
 COPY --from=build /app/publish .

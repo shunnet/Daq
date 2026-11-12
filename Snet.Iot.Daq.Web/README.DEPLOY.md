@@ -42,7 +42,7 @@ sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh
 sudo bash Snet.Iot.Daq.Web/deploy/ubuntu-deploy.sh --port 8080 --data /srv/snet-daq
 ```
 
-脚本自动：安装 .NET 10 运行时 → Release 发布 → 创建数据目录（www-data 属主）→ 注册并启动 systemd 服务。
+脚本自动：安装 .NET 11 运行时 → Release 发布 → 创建数据目录（www-data 属主）→ 注册并启动 systemd 服务。
 
 ```bash
 journalctl -u snet-daq-web -f   # 查看日志

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/.NET-10.0-blue?logo=dotnet"/>
+  <img src="https://img.shields.io/badge/.NET-11.0-blue?logo=dotnet"/>
   <img src="https://img.shields.io/badge/platform-Windows-success?logo=windows"/>
   <img src="https://img.shields.io/badge/Web-Linux%20x64%20%2F%20ARM64-blue?logo=linux"/>
   <img src="https://img.shields.io/badge/license-MIT-green"/>
@@ -155,8 +155,8 @@ Pushing a `v*` tag automatically produces **linux-x64 / linux-arm64 / win-x64** 
 | Component | Requirement |
 |------|------|
 | 🖥️ **OS** | Windows 10 / 11 (x64) |
-| 🔧 **.NET Runtime** | .NET 10.0 Desktop Runtime |
-| 🛠️ **Build Tools** | Visual Studio 2022+ (to compile) |
+| 🔧 **.NET Runtime** | .NET 11.0 Desktop Runtime |
+| 🛠️ **Build Tools** | Visual Studio 2026+ (to compile) |
 | 💾 **Disk Space** | ≥ 200 MB |
 
 ### 📥 1️⃣ Clone
@@ -168,7 +168,7 @@ cd Daq
 
 ### 🔨 2️⃣ Build
 
-Open `Snet.Iot.Daq.sln` with **Visual Studio 2022** or later, then build Debug or Release.
+Open `Snet.Iot.Daq.sln` with **Visual Studio 2026** or later, then build Debug or Release.
 
 > ⚠️ OPC UA forwarding depends on a new Snet.Opc that is not yet on NuGet; see the dependency note in "OPC UA Forwarding" above for how to build.
 
