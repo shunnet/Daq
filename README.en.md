@@ -126,7 +126,7 @@ The desktop and web editions share `Snet.Iot.Daq.Core.handler.UaForwarding`. Onc
 The **Blazor Server Web edition**, sharing all business capabilities of `Snet.Iot.Daq.Core` with the desktop edition — just open it in a browser, no client installation required.
 
 - **Platforms**: Windows / Linux x64 / Linux ARM64 (Raspberry Pi, Phytium, Kunpeng, etc.)
-- **UI**: deep-space blue (dark) / misty blue (light) themes with a cyan-to-indigo brand gradient, consistent status colors, depth and motion, Chinese / English switching, responsive layout for phones and tablets
+- **UI**: Obsidian & Gold (dark: obsidian base with champagne gold) / Ivory & Bronze (light) themes matching the Snet brand colors, consistent status colors, depth and motion, Chinese / English switching, responsive layout for phones and tablets
 - **Feature parity**: plugin hot-plug & hot update, OPC UA server, MQTT broker, WebAPI, auto batching, device soft start
 - **Multi-user & security**: two-tier roles — Administrator / Regular User (read-only), failed-login lockout, operation log audit
 - **Differences**: no ScottPlot charts, system tray or GPU monitoring (desktop-only features)

@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/.NET-10.0-blue?logo=dotnet"/>
+  <img src="https://img.shields.io/badge/.NET-11.0-blue?logo=dotnet"/>
   <img src="https://img.shields.io/badge/platform-Windows-success?logo=windows"/>
   <img src="https://img.shields.io/badge/Web-Linux%20x64%20%2F%20ARM64-blue?logo=linux"/>
   <img src="https://img.shields.io/badge/license-MIT-green"/>
@@ -126,7 +126,7 @@
 **Blazor Server Web 版**，与桌面版共用 `Snet.Iot.Daq.Core` 全部业务能力，浏览器访问即可使用，无需安装客户端。
 
 - **平台支持**：Windows / Linux x64 / Linux ARM64（树莓派、飞腾、鲲鹏等）
-- **界面**：深空蓝（暗）/ 晨雾蓝（亮）双主题，青蓝→靛紫品牌渐变，状态色、层次与动效统一，中英文切换，手机 / 平板自适应布局
+- **界面**：黑金（暗，曜石底 + 香槟金）/ 象牙青铜（亮）双主题，与 Snet 品牌色一致，状态色、层次与动效统一，中英文切换，手机 / 平板自适应布局
 - **功能对齐**：插件热插拔与热更新、OPC UA 服务端、MQTT Broker、WebAPI、自动组包、设备软启动
 - **多用户与安全**：管理员 / 普通用户两级权限（普通用户只读），登录失败锁定，操作日志审计
 - **差异项**：无桌面版专属的 ScottPlot 图表、系统托盘与 GPU 监控
